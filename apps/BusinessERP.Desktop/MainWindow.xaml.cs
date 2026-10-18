@@ -285,6 +285,45 @@ public partial class MainWindow : Window
         }
     }
 
+    private async void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (Keyboard.Modifiers != ModifierKeys.Control)
+            return;
+
+        switch (e.Key)
+        {
+            case Key.F:
+                e.Handled = true;
+                GeneralSearchBox.Focus();
+                GeneralSearchBox.SelectAll();
+                break;
+            case Key.N:
+                e.Handled = true;
+                await NavigateToKeyAsync("Sales");
+                SalesWorkspacePanel.BeginNewDraft();
+                RibbonStatusText.Text = SalesWorkspacePanel.WorkspaceStatusMessage;
+                break;
+            case Key.R:
+                e.Handled = true;
+                await RibbonRefreshAsync();
+                break;
+            case Key.S when SalesWorkspacePanel.Visibility == Visibility.Visible && _erpApiClient is not null:
+                e.Handled = true;
+                await SalesWorkspacePanel.SaveCurrentDraftAsync();
+                RibbonStatusText.Text = SalesWorkspacePanel.WorkspaceStatusMessage;
+                break;
+        }
+    }
+
+    private async Task RibbonRefreshAsync()
+    {
+        if (SalesWorkspacePanel.Visibility == Visibility.Visible && _erpApiClient is not null)
+            await SalesWorkspacePanel.RefreshAsync();
+        await CheckApiHealthAsync();
+        if (SalesWorkspacePanel.Visibility == Visibility.Visible && _erpApiClient is not null)
+            RibbonStatusText.Text = "اكتمل التحديث · بيانات مساحة المبيعات أُعيد تحميلها من API";
+    }
+
     private void ToggleRibbon_Click(object sender, RoutedEventArgs e)
     {
         _ribbonExpanded = !_ribbonExpanded;
@@ -311,14 +350,8 @@ public partial class MainWindow : Window
         RibbonStatusText.Text = SalesWorkspacePanel.WorkspaceStatusMessage;
     }
 
-    private async void RibbonRefresh_Click(object sender, RoutedEventArgs e)
-    {
-        if (SalesWorkspacePanel.Visibility == Visibility.Visible && _erpApiClient is not null)
-            await SalesWorkspacePanel.RefreshAsync();
-        await CheckApiHealthAsync();
-        if (SalesWorkspacePanel.Visibility == Visibility.Visible && _erpApiClient is not null)
-            RibbonStatusText.Text = "اكتمل التحديث · بيانات مساحة المبيعات أُعيد تحميلها من API";
-    }
+    private async void RibbonRefresh_Click(object sender, RoutedEventArgs e) =>
+        await RibbonRefreshAsync();
 
     private async void RibbonSave_Click(object sender, RoutedEventArgs e)
     {
