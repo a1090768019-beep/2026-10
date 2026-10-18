@@ -16,6 +16,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BusinessERP.Desktop", "apps
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BusinessERP.Infrastructure.Tests", "tests\BusinessERP.Infrastructure.Tests\BusinessERP.Infrastructure.Tests.csproj", "{88CBF2E8-6428-4B6C-A9D9-1BAE9B40BB07}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BusinessERP.Api.Tests", "tests\BusinessERP.Api.Tests\BusinessERP.Api.Tests.csproj", "{88CBF2E8-6428-4B6C-A9D9-1BAE9B40BB08}"
+EndProject
 Global
     GlobalSection(SolutionConfigurationPlatforms) = preSolution
         Debug|Any CPU = Debug|Any CPU
@@ -50,5 +52,9 @@ Global
         {88CBF2E8-6428-4B6C-A9D9-1BAE9B40BB07}.Debug|Any CPU.Build.0 = Debug|Any CPU
         {88CBF2E8-6428-4B6C-A9D9-1BAE9B40BB07}.Release|Any CPU.ActiveCfg = Release|Any CPU
         {88CBF2E8-6428-4B6C-A9D9-1BAE9B40BB07}.Release|Any CPU.Build.0 = Release|Any CPU
+        {88CBF2E8-6428-4B6C-A9D9-1BAE9B40BB08}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+        {88CBF2E8-6428-4B6C-A9D9-1BAE9B40BB08}.Debug|Any CPU.Build.0 = Debug|Any CPU
+        {88CBF2E8-6428-4B6C-A9D9-1BAE9B40BB08}.Release|Any CPU.ActiveCfg = Release|Any CPU
+        {88CBF2E8-6428-4B6C-A9D9-1BAE9B40BB08}.Release|Any CPU.Build.0 = Release|Any CPU
     EndGlobalSection
 EndGlobal
