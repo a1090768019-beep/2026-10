@@ -204,7 +204,8 @@ public sealed class AccountingApiIntegrationTests
                         quantity = 1m,
                         unitPrice = 100m,
                         discountAmount = 10m,
-                        treatment = "StandardRated"
+                        treatment = "StandardRated",
+                        treatmentReason = (string?)null
                     },
                     new
                     {
