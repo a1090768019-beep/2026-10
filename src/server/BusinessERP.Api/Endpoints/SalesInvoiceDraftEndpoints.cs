@@ -175,17 +175,17 @@ public static class SalesInvoiceDraftEndpoints
             if (exists != 0)
                 return Results.Conflict(new { error = "sales_invoice_number_conflict", message = "رقم المسودة مستخدم بالفعل في هذه الشركة." });
 
-            var draftId = await db.Database.SqlQuery<Guid>($"""
+            var draftId = Guid.NewGuid();
+            await db.Database.ExecuteSqlInterpolatedAsync($"""
                 INSERT INTO sales_invoice_drafts
-                    (tenant_id, company_id, customer_id, invoice_number, issue_date, due_date,
+                    (id, tenant_id, company_id, customer_id, invoice_number, issue_date, due_date,
                      currency_code, customer_name_snapshot, customer_tax_number_snapshot,
                      subtotal_amount, notes, status, created_by)
                 VALUES
-                    ({tenant.TenantId}, {companyId}, {customer.Id}, {invoiceNumber}, {request.IssueDate},
+                    ({draftId}, {tenant.TenantId}, {companyId}, {customer.Id}, {invoiceNumber}, {request.IssueDate},
                      {request.DueDate}, {company.BaseCurrency.Trim().ToUpperInvariant()},
                      {customer.Name}, {customer.TaxNumber}, {subtotal}, {notes}, 'DRAFT', {tenant.UserId})
-                RETURNING id AS "Value"
-                """).SingleAsync(token);
+                """, token);
 
             for (var index = 0; index < lines.Count; index++)
             {

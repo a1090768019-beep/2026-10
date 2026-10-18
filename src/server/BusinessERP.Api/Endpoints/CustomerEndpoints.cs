@@ -104,13 +104,13 @@ public static class CustomerEndpoints
             if (existing != 0)
                 return Results.Conflict(new { error = "customer_code_conflict" });
 
-            var id = await db.Database.SqlQuery<Guid>($"""
+            var id = Guid.NewGuid();
+            await db.Database.ExecuteSqlInterpolatedAsync($"""
                 INSERT INTO customers
-                    (tenant_id, company_id, customer_code, name, email, phone, tax_number)
+                    (id, tenant_id, company_id, customer_code, name, email, phone, tax_number)
                 VALUES
-                    ({tenant.TenantId}, {companyId}, {code}, {name}, {email}, {phone}, {taxNumber})
-                RETURNING id AS "Value"
-                """).SingleAsync(token);
+                    ({id}, {tenant.TenantId}, {companyId}, {code}, {name}, {email}, {phone}, {taxNumber})
+                """, token);
 
             var created = await db.Database.SqlQuery<CustomerListItem>($"""
                 SELECT id AS "Id",
