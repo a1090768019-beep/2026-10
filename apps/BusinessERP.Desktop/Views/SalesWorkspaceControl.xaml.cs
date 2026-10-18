@@ -33,16 +33,16 @@ public partial class SalesWorkspaceControl : UserControl
 
     public async Task SaveCurrentDraftAsync()
     {
-        await SaveCurrentDraftAsync();
+        InvoiceLinesGrid.CommitEdit(DataGridEditingUnit.Cell, true);
+        InvoiceLinesGrid.CommitEdit(DataGridEditingUnit.Row, true);
+        await _viewModel.CreateInvoiceDraftAsync();
     }
 
     public Task PostSelectedDraftToLedgerAsync() => _viewModel.PostSelectedDraftToLedgerAsync();
 
     private async void CreateInvoiceDraftButton_Click(object sender, RoutedEventArgs e)
     {
-        InvoiceLinesGrid.CommitEdit(DataGridEditingUnit.Cell, true);
-        InvoiceLinesGrid.CommitEdit(DataGridEditingUnit.Row, true);
-        await _viewModel.CreateInvoiceDraftAsync();
+        await SaveCurrentDraftAsync();
     }
 
     private async void CalculateVatPreviewButton_Click(object sender, RoutedEventArgs e)
