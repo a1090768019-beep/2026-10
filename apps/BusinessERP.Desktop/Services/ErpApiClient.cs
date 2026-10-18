@@ -171,7 +171,7 @@ public sealed record SalesVatPreviewLineApiRequest(
 public sealed record SalesVatPreviewApiResult(
     Guid CompanyId, string CurrencyCode, string DocumentStatus, string Message,
     decimal GrossAmount, decimal DiscountAmount, decimal NetAmount, decimal VatAmount, decimal TotalAmount,
-    IReadOnlyList<SalesVatPreviewLineApiResult> Lines);
+    IReadOnlyList<SalesVatPreviewApiLineResult> Lines);
 public sealed record SalesVatPreviewApiLineResult(
     int LineNumber, string Description, string Treatment, decimal GrossAmount, decimal DiscountAmount,
     decimal NetAmount, decimal VatRatePercent, decimal VatAmount, decimal TotalAmount, string? TreatmentReason);
