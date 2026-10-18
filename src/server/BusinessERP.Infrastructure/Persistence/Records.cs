@@ -29,6 +29,32 @@ public sealed class TenantMembershipRecord
 }
 
 
+public sealed class SubscriptionPlanRecord
+{
+    public Guid Id { get; set; }
+    public string Code { get; set; } = "";
+    public string Name { get; set; } = "";
+    public string BillingInterval { get; set; } = "MONTHLY";
+    public decimal Price { get; set; }
+    public string Currency { get; set; } = "SAR";
+    public string LimitsJson { get; set; } = "{}";
+    public bool IsActive { get; set; } = true;
+    public DateTime CreatedAt { get; set; }
+}
+
+public sealed class TenantSubscriptionRecord
+{
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public Guid SubscriptionPlanId { get; set; }
+    public string Status { get; set; } = "TRIALING";
+    public DateTime StartsAt { get; set; }
+    public DateTime? EndsAt { get; set; }
+    public string? ExternalCustomerId { get; set; }
+    public string? ExternalSubscriptionId { get; set; }
+    public DateTime CreatedAt { get; set; }
+}
+
 public sealed class AccountTemplateRecord
 {
     public Guid Id { get; set; }
