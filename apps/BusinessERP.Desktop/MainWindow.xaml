@@ -8,6 +8,7 @@
         Background="{StaticResource PageBrush}"
         FontFamily="Segoe UI"
         FlowDirection="LeftToRight"
+        PreviewKeyDown="MainWindow_PreviewKeyDown"
         Loaded="MainWindow_Loaded"
         Closed="MainWindow_Closed">
     <Grid>
