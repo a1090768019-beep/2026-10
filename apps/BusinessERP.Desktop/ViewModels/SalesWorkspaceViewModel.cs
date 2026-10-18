@@ -4,6 +4,7 @@ using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
+using System.Windows.Data;
 using BusinessERP.Desktop.Services;
 
 namespace BusinessERP.Desktop.ViewModels;
@@ -19,6 +20,7 @@ public sealed class SalesWorkspaceViewModel : INotifyPropertyChanged
     private ApiAccount? _selectedRevenueAccount;
     private ApiAccount? _selectedOutputVatAccount;
     private string _journalEntryNumber = "";
+    private string _tableSearchTerm = "";
     private InvoiceLineInput? _selectedInvoiceLine;
     private string _statusMessage = "سجّل الدخول ثم فعّل المستأجر للوصول إلى بيانات المبيعات.";
     private bool _statusIsError;
@@ -36,6 +38,8 @@ public sealed class SalesWorkspaceViewModel : INotifyPropertyChanged
     public ObservableCollection<ApiAccount> RevenueAccounts { get; } = [];
     public ObservableCollection<ApiAccount> OutputVatAccounts { get; } = [];
     public ObservableCollection<InvoiceLineInput> InvoiceLines { get; } = [];
+    public ICollectionView CustomersView { get; }
+    public ICollectionView DraftsView { get; }
 
     public IReadOnlyList<SalesVatTreatmentOption> VatTreatmentOptions { get; } =
     [
@@ -197,6 +201,10 @@ public sealed class SalesWorkspaceViewModel : INotifyPropertyChanged
 
     public SalesWorkspaceViewModel()
     {
+        CustomersView = CollectionViewSource.GetDefaultView(Customers);
+        CustomersView.Filter = FilterCustomer;
+        DraftsView = CollectionViewSource.GetDefaultView(Drafts);
+        DraftsView.Filter = FilterDraft;
         RefreshCommand = new AsyncRelayCommand(RefreshAsync, () => _apiClient is not null && !IsBusy);
         CreateCompanyCommand = new AsyncRelayCommand(CreateCompanyAsync, () => _apiClient is not null && !IsBusy);
         CreateCustomerCommand = new AsyncRelayCommand(CreateCustomerAsync, () => _apiClient is not null && SelectedCompany is not null && !IsBusy);
@@ -223,6 +231,9 @@ public sealed class SalesWorkspaceViewModel : INotifyPropertyChanged
             Companies.Clear();
             Customers.Clear();
             Drafts.Clear();
+            _tableSearchTerm = "";
+            CustomersView.Refresh();
+            DraftsView.Refresh();
             Accounts.Clear();
             FiscalPeriods.Clear();
             ReceivableAccounts.Clear();
@@ -254,6 +265,10 @@ public sealed class SalesWorkspaceViewModel : INotifyPropertyChanged
             StatusIsError = true;
             return false;
         }
+
+        _tableSearchTerm = term;
+        CustomersView.Refresh();
+        DraftsView.Refresh();
 
         var matchingCompanies = Companies.Where(x =>
             Contains(x.Name, term) || Contains(x.BaseCurrency, term) || Contains(x.TaxNumber, term)).ToList();
@@ -311,6 +326,23 @@ public sealed class SalesWorkspaceViewModel : INotifyPropertyChanged
         StatusIsError = false;
     }
 
+    private bool FilterCustomer(object item)
+    {
+        if (_tableSearchTerm.Length == 0) return true;
+        return item is ApiCustomer customer &&
+               (Contains(customer.Code, _tableSearchTerm) || Contains(customer.Name, _tableSearchTerm) ||
+                Contains(customer.Email, _tableSearchTerm) || Contains(customer.Phone, _tableSearchTerm) ||
+                Contains(customer.TaxNumber, _tableSearchTerm));
+    }
+
+    private bool FilterDraft(object item)
+    {
+        if (_tableSearchTerm.Length == 0) return true;
+        return item is SalesInvoiceDraftListItem draft &&
+               (Contains(draft.InvoiceNumber, _tableSearchTerm) || Contains(draft.CustomerName, _tableSearchTerm) ||
+                Contains(draft.Status, _tableSearchTerm) || Contains(draft.TaxCalculationStatus, _tableSearchTerm));
+    }
+
     private static bool Contains(string? source, string term) =>
         !string.IsNullOrEmpty(source) && source.Contains(term, StringComparison.OrdinalIgnoreCase);
 
@@ -349,6 +381,9 @@ public sealed class SalesWorkspaceViewModel : INotifyPropertyChanged
             {
                 Customers.Clear();
                 Drafts.Clear();
+                _tableSearchTerm = "";
+                CustomersView.Refresh();
+                DraftsView.Refresh();
                 Accounts.Clear();
                 FiscalPeriods.Clear();
                 ReceivableAccounts.Clear();
