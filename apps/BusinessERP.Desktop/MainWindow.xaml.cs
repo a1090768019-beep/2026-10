@@ -189,6 +189,7 @@ public partial class MainWindow : Window
             _erpApiClient = candidateClient;
             await SalesWorkspacePanel.SetApiClientAsync(candidateClient);
             AuthStatusText.Text = $"تم تفعيل المستأجر · {tenantId.ToString("D")[..8]}";
+            UpdateRibbonContext();
             RibbonStatusText.Text = $"API متصل · المستأجر {tenantId.ToString("D")[..8]}";
         }
         catch (ErpApiException ex)
@@ -220,6 +221,7 @@ public partial class MainWindow : Window
         await SalesWorkspacePanel.SetApiClientAsync(null);
         _authenticatedHttpClient?.Dispose();
         _authenticatedHttpClient = null;
+        UpdateRibbonContext();
         TenantIdTextBox.IsEnabled = false;
         ApplyTenantButton.IsEnabled = false;
         LogoutButton.Visibility = Visibility.Collapsed;
@@ -306,7 +308,7 @@ public partial class MainWindow : Window
     {
         await NavigateToKeyAsync("Sales");
         SalesWorkspacePanel.BeginNewDraft();
-        RibbonStatusText.Text = "تم تجهيز نموذج مسودة مبيعات جديدة؛ لم يُحفظ المستند بعد.";
+        RibbonStatusText.Text = SalesWorkspacePanel.WorkspaceStatusMessage;
     }
 
     private async void RibbonRefresh_Click(object sender, RoutedEventArgs e)
@@ -316,6 +318,28 @@ public partial class MainWindow : Window
         await CheckApiHealthAsync();
         if (SalesWorkspacePanel.Visibility == Visibility.Visible && _erpApiClient is not null)
             RibbonStatusText.Text = "اكتمل التحديث · بيانات مساحة المبيعات أُعيد تحميلها من API";
+    }
+
+    private async void RibbonSave_Click(object sender, RoutedEventArgs e)
+    {
+        if (_erpApiClient is null || SalesWorkspacePanel.Visibility != Visibility.Visible)
+        {
+            RibbonStatusText.Text = "افتح مساحة المبيعات وفعّل المستأجر قبل حفظ مسودة.";
+            return;
+        }
+        await SalesWorkspacePanel.SaveCurrentDraftAsync();
+        RibbonStatusText.Text = SalesWorkspacePanel.WorkspaceStatusMessage;
+    }
+
+    private async void RibbonPostSalesDraft_Click(object sender, RoutedEventArgs e)
+    {
+        if (_erpApiClient is null || SalesWorkspacePanel.Visibility != Visibility.Visible)
+        {
+            RibbonStatusText.Text = "افتح مساحة المبيعات وفعّل المستأجر قبل الترحيل.";
+            return;
+        }
+        await SalesWorkspacePanel.PostSelectedDraftToLedgerAsync();
+        RibbonStatusText.Text = SalesWorkspacePanel.WorkspaceStatusMessage;
     }
 
     private async void GeneralSearch_Click(object sender, RoutedEventArgs e) =>
@@ -353,6 +377,13 @@ public partial class MainWindow : Window
         await NavigateToKeyAsync(key);
     }
 
+    private void UpdateRibbonContext()
+    {
+        var salesIsActive = _erpApiClient is not null && SalesWorkspacePanel.Visibility == Visibility.Visible;
+        RibbonSaveButton.IsEnabled = salesIsActive;
+        RibbonPostButton.IsEnabled = salesIsActive;
+    }
+
     private async Task NavigateToKeyAsync(string key)
     {
         if (string.Equals(key, "Overview", StringComparison.OrdinalIgnoreCase))
@@ -361,6 +392,7 @@ public partial class MainWindow : Window
             DashboardPanel.Visibility = Visibility.Visible;
             ModulePlaceholderPanel.Visibility = Visibility.Collapsed;
             SalesWorkspacePanel.Visibility = Visibility.Collapsed;
+            UpdateRibbonContext();
             return;
         }
 
@@ -377,6 +409,7 @@ public partial class MainWindow : Window
                 await SalesWorkspacePanel.SetApiClientAsync(null);
             else
                 await SalesWorkspacePanel.RefreshAsync();
+            UpdateRibbonContext();
             return;
         }
 
@@ -387,5 +420,6 @@ public partial class MainWindow : Window
         ModuleStatusText.Text = $"الحالة الحالية: {module.Status}. لم تُفعّل عمليات الحفظ أو الترحيل من هذه الشاشة.";
         DashboardPanel.Visibility = Visibility.Collapsed;
         ModulePlaceholderPanel.Visibility = Visibility.Visible;
+        UpdateRibbonContext();
     }
 }
