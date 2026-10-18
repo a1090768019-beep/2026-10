@@ -126,7 +126,7 @@
                     <StackPanel>
                         <TextBlock Text="مسودة بيع داخلية" FontSize="17" FontWeight="Bold" Foreground="#19243A" />
                         <TextBlock Text="رقم المسودة" Foreground="#69758D" FontSize="12" />
-                        <TextBox Text="{Binding InvoiceNumber, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBox x:Name="InvoiceNumberTextBox" Text="{Binding InvoiceNumber, UpdateSourceTrigger=PropertyChanged}" />
                         <TextBlock Text="العميل" Foreground="#69758D" FontSize="12" />
                         <ComboBox ItemsSource="{Binding Customers}" SelectedItem="{Binding SelectedCustomer, Mode=TwoWay}" DisplayMemberPath="Name" />
                         <Grid>
