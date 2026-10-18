@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Input;
 using BusinessERP.Desktop.Models;
 using BusinessERP.Desktop.Services;
 
@@ -22,6 +23,7 @@ public partial class MainWindow : Window
             ["CashBank"] = new("CashBank", "الصناديق والبنوك", "سندات القبض والصرف والتحويلات والتسويات البنكية.", "CB", "لاحقًا"),
             ["Tax"] = new("Tax", "الضرائب والفوترة", "إعدادات ضريبة القيمة المضافة والفوترة الإلكترونية والتكامل مع فاتورة.", "TX", "يتطلب تحققًا رسميًا"),
             ["Settings"] = new("Settings", "الإعدادات والصلاحيات", "إعدادات الشركة والمستخدمين والأدوار والفروع وسياسات الوصول.", "CFG", "لم تُربط بعد"),
+            ["Reports"] = new("Reports", "التقارير المالية", "تقارير الأستاذ العام وميزان المراجعة وقائمة الدخل والميزانية من الحركات المرحلة.", "RPT", "واجهات API موجودة؛ شاشة التقارير قيد الربط"),
         };
 
     private readonly string _apiBaseUrl;
@@ -29,6 +31,8 @@ public partial class MainWindow : Window
     private readonly OidcAuthenticationService _oidcAuthenticationService;
     private HttpClient? _authenticatedHttpClient;
     private ErpApiClient? _erpApiClient;
+    private bool _ribbonExpanded = true;
+    private bool _navigationExpanded = true;
 
     public MainWindow()
     {
@@ -136,6 +140,7 @@ public partial class MainWindow : Window
                               result.User.FindFirst("preferred_username")?.Value ??
                               result.User.FindFirst("sub")?.Value ?? "مستخدم";
             AuthStatusText.Text = $"تم الدخول: {displayName}";
+            RibbonStatusText.Text = "تم تسجيل الدخول · بانتظار تفعيل عضوية المستأجر";
 
             if (Guid.TryParse(TenantIdTextBox.Text.Trim(), out var tenantId) && tenantId != Guid.Empty)
                 await ActivateTenantAsync(tenantId, showErrors: false);
@@ -184,12 +189,14 @@ public partial class MainWindow : Window
             _erpApiClient = candidateClient;
             await SalesWorkspacePanel.SetApiClientAsync(candidateClient);
             AuthStatusText.Text = $"تم تفعيل المستأجر · {tenantId.ToString("D")[..8]}";
+            RibbonStatusText.Text = $"API متصل · المستأجر {tenantId.ToString("D")[..8]}";
         }
         catch (ErpApiException ex)
         {
             _erpApiClient = null;
             await SalesWorkspacePanel.SetApiClientAsync(null);
             AuthStatusText.Text = "تم رفض المستأجر أو صلاحيات المستخدم";
+            RibbonStatusText.Text = "تم رفض عضوية المستأجر أو صلاحيات المستخدم";
             if (showErrors)
                 MessageBox.Show(ex.Message, "تفعيل المستأجر", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
@@ -198,6 +205,7 @@ public partial class MainWindow : Window
             _erpApiClient = null;
             await SalesWorkspacePanel.SetApiClientAsync(null);
             AuthStatusText.Text = "تعذر الاتصال بـ API";
+            RibbonStatusText.Text = "تعذر الاتصال بـ API";
             if (showErrors)
                 MessageBox.Show("تعذر الاتصال بالخادم. تحقق من اتصال الشبكة وعنوان API.", "تفعيل المستأجر",
                     MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -217,6 +225,7 @@ public partial class MainWindow : Window
         LogoutButton.Visibility = Visibility.Collapsed;
         LoginButton.Visibility = Visibility.Visible;
         AuthStatusText.Text = _oidcAuthenticationService.IsConfigured ? "تم إنهاء الجلسة المحلية" : "إعداد OIDC مطلوب";
+        RibbonStatusText.Text = "غير متصل · تم إنهاء الجلسة المحلية";
     }
 
     private sealed class StaticAccessTokenHandler(string accessToken) : DelegatingHandler(new HttpClientHandler())
@@ -261,6 +270,10 @@ public partial class MainWindow : Window
             ApiStatusDot.Background = result.IsOnline
                 ? new SolidColorBrush(Color.FromRgb(32, 160, 104))
                 : new SolidColorBrush(Color.FromRgb(208, 74, 74));
+            if (_erpApiClient is null)
+                RibbonStatusText.Text = result.IsOnline ? "API متصل · سجّل الدخول لتفعيل المستأجر" : "API غير متصل";
+            else if (!result.IsOnline)
+                RibbonStatusText.Text = "API غير متصل · قد لا تتوفر عمليات الحفظ";
             ApiLastChecked.Text = $"آخر فحص: {DateTimeOffset.Now.ToString("HH:mm:ss", System.Globalization.CultureInfo.GetCultureInfo("ar-SA"))}";
         }
         finally
@@ -270,11 +283,78 @@ public partial class MainWindow : Window
         }
     }
 
+    private void ToggleRibbon_Click(object sender, RoutedEventArgs e)
+    {
+        _ribbonExpanded = !_ribbonExpanded;
+        RibbonActionsPanel.Visibility = _ribbonExpanded ? Visibility.Visible : Visibility.Collapsed;
+        RibbonToggleButton.Content = _ribbonExpanded ? "تصغير الشريط ▴" : "توسيع الشريط ▾";
+    }
+
+    private void ToggleNavigation_Click(object sender, RoutedEventArgs e)
+    {
+        _navigationExpanded = !_navigationExpanded;
+        NavigationColumn.Width = _navigationExpanded ? new GridLength(264) : new GridLength(0);
+    }
+
+    private async void RibbonNavigate_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { Tag: string key })
+            await NavigateToKeyAsync(key);
+    }
+
+    private async void RibbonNew_Click(object sender, RoutedEventArgs e)
+    {
+        await NavigateToKeyAsync("Sales");
+        SalesWorkspacePanel.BeginNewDraft();
+        RibbonStatusText.Text = "تم تجهيز نموذج مسودة مبيعات جديدة؛ لم يُحفظ المستند بعد.";
+    }
+
+    private async void RibbonRefresh_Click(object sender, RoutedEventArgs e)
+    {
+        if (SalesWorkspacePanel.Visibility == Visibility.Visible && _erpApiClient is not null)
+            await SalesWorkspacePanel.RefreshAsync();
+        await CheckApiHealthAsync();
+        if (SalesWorkspacePanel.Visibility == Visibility.Visible && _erpApiClient is not null)
+            RibbonStatusText.Text = "اكتمل التحديث · بيانات مساحة المبيعات أُعيد تحميلها من API";
+    }
+
+    private async void GeneralSearch_Click(object sender, RoutedEventArgs e) =>
+        await RunGeneralSearchAsync();
+
+    private async void GeneralSearchBox_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter) return;
+        e.Handled = true;
+        await RunGeneralSearchAsync();
+    }
+
+    private async Task RunGeneralSearchAsync()
+    {
+        if (_erpApiClient is null)
+        {
+            RibbonStatusText.Text = "سجّل الدخول وفعّل المستأجر قبل البحث في البيانات.";
+            return;
+        }
+
+        var search = GeneralSearchBox.Text?.Trim() ?? "";
+        var salesMatch = SalesWorkspacePanel.SearchLoadedData(search);
+        if (salesMatch)
+        {
+            await NavigateToKeyAsync("Sales");
+            SalesWorkspacePanel.SearchLoadedData(search);
+        }
+        RibbonStatusText.Text = SalesWorkspacePanel.WorkspaceStatusMessage;
+    }
+
     private async void Navigate_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not Button { Tag: string key })
             return;
+        await NavigateToKeyAsync(key);
+    }
 
+    private async Task NavigateToKeyAsync(string key)
+    {
         if (string.Equals(key, "Overview", StringComparison.OrdinalIgnoreCase))
         {
             PageTitle.Text = "نظرة عامة";
