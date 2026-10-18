@@ -85,6 +85,24 @@ public sealed class AccountingApiIntegrationTests
         });
         Assert.Equal(HttpStatusCode.Conflict, duplicateCustomer.StatusCode);
 
+        // Two simultaneous creates using the same normalized customer code must serialize.
+        var racingCustomerCode = "RACE-" + Guid.NewGuid().ToString("N")[..12].ToUpperInvariant();
+        var racingCustomerTaskA = client.PostAsJsonAsync($"/api/v1/companies/{CompanyA}/customers", new
+        {
+            code = racingCustomerCode,
+            name = "Concurrent customer A"
+        });
+        var racingCustomerTaskB = client.PostAsJsonAsync($"/api/v1/companies/{CompanyA}/customers", new
+        {
+            code = racingCustomerCode,
+            name = "Concurrent customer B"
+        });
+        using var racingCustomerA = await racingCustomerTaskA;
+        using var racingCustomerB = await racingCustomerTaskB;
+        var racingCustomerStatuses = new[] { racingCustomerA.StatusCode, racingCustomerB.StatusCode };
+        Assert.Contains(HttpStatusCode.Created, racingCustomerStatuses);
+        Assert.Contains(HttpStatusCode.Conflict, racingCustomerStatuses);
+
         // Persisted sales invoice draft lines must equal their header subtotal exactly.
         var invoiceNumber = "DRAFT-" + Guid.NewGuid().ToString("N")[..12].ToUpperInvariant();
         using var draftResponse = await client.PostAsJsonAsync(
@@ -111,6 +129,27 @@ public sealed class AccountingApiIntegrationTests
         Assert.Equal("عميل اختبار API", draftJson.RootElement.GetProperty("customerName").GetString());
         Assert.Equal(2, draftJson.RootElement.GetProperty("lines").GetArrayLength());
         Assert.False(draftJson.RootElement.TryGetProperty("vatAmount", out _));
+
+        // Competing requests for the same invoice number: at most one draft may commit.
+        var racingInvoiceNumber = "DRAFT-RACE-" + Guid.NewGuid().ToString("N")[..10].ToUpperInvariant();
+        object RacingDraftPayload() => new
+        {
+            customerId,
+            invoiceNumber = racingInvoiceNumber,
+            issueDate = new DateOnly(2026, 2, 16),
+            dueDate = (DateOnly?)null,
+            notes = "race test",
+            lines = new[] { new { description = "Race line", quantity = 1m, unitPrice = 25m } }
+        };
+        var racingDraftTaskA = client.PostAsJsonAsync(
+            $"/api/v1/companies/{CompanyA}/sales-invoice-drafts", RacingDraftPayload());
+        var racingDraftTaskB = client.PostAsJsonAsync(
+            $"/api/v1/companies/{CompanyA}/sales-invoice-drafts", RacingDraftPayload());
+        using var racingDraftA = await racingDraftTaskA;
+        using var racingDraftB = await racingDraftTaskB;
+        var racingDraftStatuses = new[] { racingDraftA.StatusCode, racingDraftB.StatusCode };
+        Assert.Contains(HttpStatusCode.Created, racingDraftStatuses);
+        Assert.Contains(HttpStatusCode.Conflict, racingDraftStatuses);
 
         using (var duplicateDraft = await client.PostAsJsonAsync(
             $"/api/v1/companies/{CompanyA}/sales-invoice-drafts",
