@@ -9,6 +9,11 @@ on:
 permissions:
   contents: read
 
+# Do not waste runner time validating stale commits after a newer main commit exists.
+concurrency:
+  group: business-erp-ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   domain-and-api:
     runs-on: ubuntu-latest
