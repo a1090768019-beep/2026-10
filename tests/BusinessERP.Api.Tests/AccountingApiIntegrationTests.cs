@@ -1,7 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Security.Claims;
-using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using BusinessERP.Api;
@@ -32,7 +31,7 @@ public sealed class AccountingApiIntegrationTests
         var connectionString = Environment.GetEnvironmentVariable("BUSINESS_ERP_TEST_CONNECTION");
         Assert.False(string.IsNullOrWhiteSpace(connectionString));
 
-        await using var factory = new ApiTestFactory(connectionString!);
+        using var factory = new ApiTestFactory(connectionString!);
         using var client = factory.CreateClient();
         SetTenant(client, TenantA);
 
@@ -62,7 +61,6 @@ public sealed class AccountingApiIntegrationTests
         var idempotencyKey = "api-test-" + Guid.NewGuid().ToString("N");
         var idempotentNumber = "IT-IDEM-" + Guid.NewGuid().ToString("N");
         var idempotentPayload = NewJournalPayload(idempotentNumber, "Idempotency retry", 20m);
-        using var keyContent = JsonContent.Create(idempotentPayload);
         client.DefaultRequestHeaders.Remove("Idempotency-Key");
         client.DefaultRequestHeaders.Add("Idempotency-Key", idempotencyKey);
         using var firstCreate = await client.PostAsJsonAsync($"/api/v1/companies/{CompanyA}/journal-entries", idempotentPayload);
