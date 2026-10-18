@@ -4,7 +4,8 @@
 Modular Monolith من WPF desktop وASP.NET Core REST API وPostgreSQL. هيكل الحل لا يثبت جاهزية SaaS إنتاجية.
 
 - Desktop: WPF/XAML على net10.0-windows؛ يتصل بالخادم ولا يتصل مباشرة بقاعدة البيانات.
-- API: endpoints للمحاسبة، دليل الحسابات، قراءة الاشتراك، العملاء ومسودات المبيعات.
+- API: endpoints للمحاسبة والتقارير الأولية، دليل الحسابات، قراءة الاشتراك، العملاء ومسودات المبيعات.
+- WPF: شاشة مبيعات RTL متصلة بالـ API وتدفق OIDC بمتصفح النظام/callback loopback؛ مزود الهوية الحي وخروج الموفر ليسا مكتملين.
 - Domain/Application: قواعد القيود وعقود سياق المستأجر.
 - Infrastructure: EF Core/Npgsql، التحقق من العضوية، TenantTransactionRunner، سجل التدقيق.
 - Database: 0001_initial.sql bootstrap و0002_sales_invoice_drafts.sql ترحيل تزايدي للعملاء والمسودات.
