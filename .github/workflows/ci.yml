@@ -66,6 +66,10 @@ jobs:
         env:
           BUSINESS_ERP_TEST_CONNECTION: Host=localhost;Port=5432;Database=business_erp;Username=erp_ci_runtime;Password=ci-only-password
         run: dotnet test tests/BusinessERP.Infrastructure.Tests/BusinessERP.Infrastructure.Tests.csproj --configuration Release
+      - name: Verify API tenant authorization and accounting workflow
+        env:
+          BUSINESS_ERP_TEST_CONNECTION: Host=localhost;Port=5432;Database=business_erp;Username=erp_ci_runtime;Password=ci-only-password
+        run: dotnet test tests/BusinessERP.Api.Tests/BusinessERP.Api.Tests.csproj --configuration Release
       - name: Test accounting domain
         run: dotnet test tests/BusinessERP.Domain.Tests/BusinessERP.Domain.Tests.csproj --configuration Release --no-restore
       - name: Build API
