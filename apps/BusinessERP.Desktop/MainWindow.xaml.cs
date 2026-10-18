@@ -377,6 +377,26 @@ public partial class MainWindow : Window
         await NavigateToKeyAsync(key);
     }
 
+    private void UpdateWorkspaceTabs(string key)
+    {
+        SetWorkspaceTabStyle(OverviewWorkspaceTab, string.Equals(key, "Overview", StringComparison.OrdinalIgnoreCase));
+        SetWorkspaceTabStyle(SalesWorkspaceTab, string.Equals(key, "Sales", StringComparison.OrdinalIgnoreCase));
+        SetWorkspaceTabStyle(ReportsWorkspaceTab, string.Equals(key, "Reports", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static void SetWorkspaceTabStyle(Button tab, bool selected)
+    {
+        tab.Background = selected
+            ? new SolidColorBrush(Color.FromRgb(220, 231, 255))
+            : Brushes.Transparent;
+        tab.BorderBrush = selected
+            ? new SolidColorBrush(Color.FromRgb(53, 106, 230))
+            : Brushes.Transparent;
+        tab.Foreground = selected
+            ? new SolidColorBrush(Color.FromRgb(35, 75, 164))
+            : new SolidColorBrush(Color.FromRgb(52, 64, 84));
+    }
+
     private void UpdateRibbonContext()
     {
         var salesIsActive = _erpApiClient is not null && SalesWorkspacePanel.Visibility == Visibility.Visible;
@@ -386,6 +406,7 @@ public partial class MainWindow : Window
 
     private async Task NavigateToKeyAsync(string key)
     {
+        UpdateWorkspaceTabs(key);
         if (string.Equals(key, "Overview", StringComparison.OrdinalIgnoreCase))
         {
             PageTitle.Text = "نظرة عامة";
