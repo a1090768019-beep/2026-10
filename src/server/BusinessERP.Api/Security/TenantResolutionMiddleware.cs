@@ -13,7 +13,6 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next, ILogger<Ten
     public async Task InvokeAsync(
         HttpContext http,
         IConfiguration configuration,
-        IServiceProvider services,
         CancellationToken cancellationToken)
     {
         if (!http.Request.Path.StartsWithSegments("/api"))
@@ -52,6 +51,9 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next, ILogger<Ten
             return;
         }
 
+        // Always resolve scoped services from the active request scope. This keeps the
+        // TenantContext instance populated here identical to the one injected into API endpoints.
+        var services = http.RequestServices;
         var db = services.GetRequiredService<ErpDbContext>();
         var user = await db.Users.AsNoTracking()
             .SingleOrDefaultAsync(x => x.OidcSubject == subject && x.DisabledAt == null, cancellationToken);
