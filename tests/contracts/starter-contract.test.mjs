@@ -242,3 +242,36 @@ test('sales draft GL posting is tenant-bound, balanced, immutable after post and
   assert.match(endpoint, /sales_draft_vat_not_calculated/);
   assert.match(program, /MapSalesDraftLedgerPostingEndpoints/);
 });
+
+
+test('WPF Ribbon commands are wired to real sales/search/navigation workflows', async () => {
+  const app = await read('apps/BusinessERP.Desktop/App.xaml');
+  const shell = await read('apps/BusinessERP.Desktop/MainWindow.xaml');
+  const code = await read('apps/BusinessERP.Desktop/MainWindow.xaml.cs');
+  const salesView = await read('apps/BusinessERP.Desktop/Views/SalesWorkspaceControl.xaml');
+  const salesCode = await read('apps/BusinessERP.Desktop/Views/SalesWorkspaceControl.xaml.cs');
+  const viewModel = await read('apps/BusinessERP.Desktop/ViewModels/SalesWorkspaceViewModel.cs');
+  const apiClient = await read('apps/BusinessERP.Desktop/Services/ErpApiClient.cs');
+
+  assert.match(app, /RibbonTabButtonStyle/);
+  assert.match(shell, /x:Name="RibbonActionsPanel"/);
+  assert.match(shell, /Click="RibbonNew_Click"/);
+  assert.match(shell, /Click="RibbonRefresh_Click"/);
+  assert.match(shell, /Click="RibbonSave_Click"/);
+  assert.match(shell, /Click="RibbonPostSalesDraft_Click"/);
+  assert.match(shell, /Click="ToggleRibbon_Click"/);
+  assert.match(shell, /Click="ToggleNavigation_Click"/);
+  assert.match(shell, /KeyDown="GeneralSearchBox_KeyDown"/);
+  assert.match(shell, /IsEnabled="False" ToolTip="تصدير Excel غير منفذ/);
+  assert.match(code, /private async Task RunGeneralSearchAsync/);
+  assert.match(code, /private void UpdateRibbonContext/);
+  assert.match(salesView, /SelectedItem="{Binding SelectedDraft, Mode=TwoWay}"/);
+  assert.match(salesView, /PostSelectedDraftToLedgerCommand/);
+  assert.match(salesCode, /SaveCurrentDraftAsync/);
+  assert.match(salesCode, /PostSelectedDraftToLedgerAsync/);
+  assert.match(viewModel, /SearchLoadedData/);
+  assert.match(viewModel, /PrepareNewDraft/);
+  assert.match(viewModel, /CanPostSelectedDraft/);
+  assert.match(apiClient, /GetFiscalPeriodsAsync/);
+  assert.match(apiClient, /PostSalesDraftToLedgerAsync/);
+});
