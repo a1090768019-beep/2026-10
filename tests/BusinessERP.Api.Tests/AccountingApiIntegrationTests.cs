@@ -192,6 +192,59 @@ public sealed class AccountingApiIntegrationTests
             }))
             Assert.Equal(HttpStatusCode.BadRequest, invalidDraft.StatusCode);
 
+        // Tax validation must fail before any VAT values are written.
+        using (var invalidPersistedTax = await client.PostAsJsonAsync(
+            $"/api/v1/companies/{CompanyA}/sales-invoice-drafts/{draftId}/calculate-vat",
+            new
+            {
+                lines = new[]
+                {
+                    new { lineNumber = 1, discountAmount = 999m, treatment = "StandardRated", treatmentReason = (string?)null },
+                    new { lineNumber = 2, discountAmount = 0m, treatment = "Exempt", treatmentReason = "Integration test classification" }
+                }
+            }))
+            Assert.Equal(HttpStatusCode.BadRequest, invalidPersistedTax.StatusCode);
+
+        // A user in tenant A cannot apply tax to tenant B's real saved invoice.
+        var companyB = Guid.Parse("22222222-2222-4222-8222-222222222201");
+        var tenantBInvoice = Guid.Parse("22222222-2222-4222-8222-222222222203");
+        using (var crossTenantTax = await client.PostAsJsonAsync(
+            $"/api/v1/companies/{companyB}/sales-invoice-drafts/{tenantBInvoice}/calculate-vat",
+            new
+            {
+                lines = new[]
+                {
+                    new { lineNumber = 1, discountAmount = 0m, treatment = "StandardRated", treatmentReason = (string?)null }
+                }
+            }))
+            Assert.Equal(HttpStatusCode.NotFound, crossTenantTax.StatusCode);
+
+        using (var persistedTaxResponse = await client.PostAsJsonAsync(
+            $"/api/v1/companies/{CompanyA}/sales-invoice-drafts/{draftId}/calculate-vat",
+            new
+            {
+                lines = new[]
+                {
+                    new { lineNumber = 1, discountAmount = 10m, treatment = "StandardRated", treatmentReason = (string?)null },
+                    new { lineNumber = 2, discountAmount = 0m, treatment = "Exempt", treatmentReason = "Integration test classification" }
+                }
+            }))
+        {
+            Assert.True(persistedTaxResponse.StatusCode == HttpStatusCode.OK,
+                $"Persist draft VAT returned {(int)persistedTaxResponse.StatusCode}: {await persistedTaxResponse.Content.ReadAsStringAsync()}{Environment.NewLine}{TestExceptionHandler.LastException}");
+            using var persistedTax = await ParseJsonAsync(persistedTaxResponse);
+            Assert.Equal("CALCULATED", persistedTax.RootElement.GetProperty("taxCalculationStatus").GetString());
+            Assert.Equal(31.86m, persistedTax.RootElement.GetProperty("grossAmount").GetDecimal());
+            Assert.Equal(10m, persistedTax.RootElement.GetProperty("discountAmount").GetDecimal());
+            Assert.Equal(21.86m, persistedTax.RootElement.GetProperty("netAmount").GetDecimal());
+            Assert.Equal(3.13m, persistedTax.RootElement.GetProperty("vatAmount").GetDecimal());
+            Assert.Equal(24.99m, persistedTax.RootElement.GetProperty("totalAmount").GetDecimal());
+            Assert.Equal("StandardRated", persistedTax.RootElement.GetProperty("lines")[0].GetProperty("treatment").GetString());
+            Assert.Equal(3.13m, persistedTax.RootElement.GetProperty("lines")[0].GetProperty("vatAmount").GetDecimal());
+            Assert.Equal("Exempt", persistedTax.RootElement.GetProperty("lines")[1].GetProperty("treatment").GetString());
+            Assert.Equal(0m, persistedTax.RootElement.GetProperty("lines")[1].GetProperty("vatAmount").GetDecimal());
+        }
+
         // VAT preview uses explicit treatment, decimal amounts and the authenticated tenant/company.
         using (var vatPreviewResponse = await client.PostAsJsonAsync(
             $"/api/v1/companies/{CompanyA}/sales-vat-preview",

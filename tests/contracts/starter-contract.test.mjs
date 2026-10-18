@@ -202,3 +202,19 @@ test('WPF sales workspace sends VAT preview to the API and labels it as non-pers
   assert.match(view, /DisplayMemberPath="Label"/);
   assert.match(codeBehind, /await _viewModel\.CalculateVatPreviewAsync\(\)/);
 });
+
+
+test('persisted VAT endpoint calculates from stored invoice lines and updates header plus lines atomically', async () => {
+  const endpoint = await read('src/server/BusinessERP.Api/Endpoints/SalesDraftVatEndpoints.cs');
+  const migration = await read('database/migrations/0003_sales_invoice_draft_vat.sql');
+  const program = await read('src/server/BusinessERP.Api/Program.cs');
+  assert.match(endpoint, /sales-invoice-drafts\/{invoiceId:guid}\/calculate-vat/);
+  assert.match(endpoint, /SaudiVatCalculator\.Calculate/);
+  assert.match(endpoint, /SELECT id AS "Id"[\s\S]*FROM sales_invoice_draft_lines/);
+  assert.match(endpoint, /UPDATE sales_invoice_drafts[\s\S]*tax_calculation_status = 'CALCULATED'/);
+  assert.match(endpoint, /SALES_DRAFT_VAT_CALCULATED/);
+  assert.match(endpoint, /TenantTransactionRunner/);
+  assert.match(migration, /ck_sales_invoice_draft_tax_totals/);
+  assert.match(migration, /actual_vat <> expected_vat/);
+  assert.match(program, /MapSalesDraftVatEndpoints/);
+});
