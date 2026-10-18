@@ -173,8 +173,25 @@ public sealed class AccountingApiIntegrationTests
     }
 }
 
-public sealed class ApiTestFactory(string connectionString) : WebApplicationFactory<Program>
+public sealed class ApiTestFactory : WebApplicationFactory<Program>
 {
+    private const string Authority = "https://oidc.example.invalid/";
+    private const string Audience = "business-erp-api";
+    private readonly string _connectionString;
+    private readonly string? _previousConnectionString = Environment.GetEnvironmentVariable("ConnectionStrings__Postgres");
+    private readonly string? _previousAuthority = Environment.GetEnvironmentVariable("Authentication__Authority");
+    private readonly string? _previousAudience = Environment.GetEnvironmentVariable("Authentication__Audience");
+
+    public ApiTestFactory(string connectionString)
+    {
+        _connectionString = connectionString;
+        // WebApplication.CreateBuilder reads process environment during Program startup. Set these
+        // before CreateClient starts the host so the real DI registrations are exercised.
+        Environment.SetEnvironmentVariable("ConnectionStrings__Postgres", connectionString);
+        Environment.SetEnvironmentVariable("Authentication__Authority", Authority);
+        Environment.SetEnvironmentVariable("Authentication__Audience", Audience);
+    }
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Development");
@@ -182,9 +199,9 @@ public sealed class ApiTestFactory(string connectionString) : WebApplicationFact
         {
             configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["ConnectionStrings:Postgres"] = connectionString,
-                ["Authentication:Authority"] = "https://oidc.example.invalid/",
-                ["Authentication:Audience"] = "business-erp-api"
+                ["ConnectionStrings:Postgres"] = _connectionString,
+                ["Authentication:Authority"] = Authority,
+                ["Authentication:Audience"] = Audience
             });
         });
 
@@ -199,6 +216,17 @@ public sealed class ApiTestFactory(string connectionString) : WebApplicationFact
             }).AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(
                 TestAuthHandler.SchemeName, _ => { });
         });
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+        if (!disposing)
+            return;
+
+        Environment.SetEnvironmentVariable("ConnectionStrings__Postgres", _previousConnectionString);
+        Environment.SetEnvironmentVariable("Authentication__Authority", _previousAuthority);
+        Environment.SetEnvironmentVariable("Authentication__Audience", _previousAudience);
     }
 }
 
