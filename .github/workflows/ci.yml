@@ -12,13 +12,51 @@ permissions:
 jobs:
   domain-and-api:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: business_erp
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d business_erp"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
       - name: Restore
         run: dotnet restore BusinessERP.sln
+      - name: Run source contract tests
+        run: node --test tests/contracts/*.test.mjs
+      - name: Apply PostgreSQL bootstrap schema
+        env:
+          POSTGRES_ADMIN_URL: postgresql://postgres:postgres@localhost:5432/business_erp
+        run: psql "$POSTGRES_ADMIN_URL" -v ON_ERROR_STOP=1 -f database/migrations/0001_initial.sql
+      - name: Create least-privilege runtime role
+        env:
+          POSTGRES_ADMIN_URL: postgresql://postgres:postgres@localhost:5432/business_erp
+          RUNTIME_PASSWORD: ci-only-password
+        run: psql "$POSTGRES_ADMIN_URL" -v ON_ERROR_STOP=1 -v runtime_password="$RUNTIME_PASSWORD" -f database/tests/prepare-runtime-role.sql
+      - name: Seed two-tenant database fixtures
+        env:
+          POSTGRES_ADMIN_URL: postgresql://postgres:postgres@localhost:5432/business_erp
+        run: psql "$POSTGRES_ADMIN_URL" -v ON_ERROR_STOP=1 -f database/tests/postgres-fixture.sql
+      - name: Verify RLS and accounting database constraints as runtime role
+        env:
+          POSTGRES_RUNTIME_URL: postgresql://erp_ci_runtime:ci-only-password@localhost:5432/business_erp
+        run: psql "$POSTGRES_RUNTIME_URL" -v ON_ERROR_STOP=1 -f database/tests/postgres-smoke.sql
       - name: Test accounting domain
         run: dotnet test tests/BusinessERP.Domain.Tests/BusinessERP.Domain.Tests.csproj --configuration Release --no-restore
       - name: Build API
