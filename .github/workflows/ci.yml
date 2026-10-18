@@ -1,0 +1,35 @@
+name: Business ERP CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  domain-and-api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Restore
+        run: dotnet restore BusinessERP.sln
+      - name: Test accounting domain
+        run: dotnet test tests/BusinessERP.Domain.Tests/BusinessERP.Domain.Tests.csproj --configuration Release --no-restore
+      - name: Build API
+        run: dotnet build src/server/BusinessERP.Api/BusinessERP.Api.csproj --configuration Release --no-restore
+
+  desktop:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Build WPF desktop
+        run: dotnet build apps/BusinessERP.Desktop/BusinessERP.Desktop.csproj --configuration Release
