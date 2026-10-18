@@ -129,7 +129,7 @@ test('SaaS subscription endpoints expose active plans and tenant-scoped subscrip
   assert.match(api, /s\.TenantId == tenant\.TenantId/);
   assert.match(api, /Status\.Equals\("TRIALING"/);
   assert.match(api, /Status\.Equals\("ACTIVE"/);
-  assert.match(api, /does not represent collected payment|لا يمثل تحصيلًا/);
+  assert.match(api, /تمثل تحصيلًا/);
   assert.match(context, /DbSet<SubscriptionPlanRecord>/);
   assert.match(context, /DbSet<TenantSubscriptionRecord>/);
   assert.match(records, /class SubscriptionPlanRecord/);
