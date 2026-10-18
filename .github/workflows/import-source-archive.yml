@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'transfer/business-erp-csharp-commercial-core.zip.b64'
+      - 'transfer/IMPORT.trigger'
 
 permissions:
   contents: write
@@ -22,7 +22,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          base64 --decode transfer/business-erp-csharp-commercial-core.zip.b64 > "$RUNNER_TEMP/business-erp.zip"
+          cat transfer/chunk-*.b64 > "$RUNNER_TEMP/business-erp.zip.b64"
+          base64 --decode "$RUNNER_TEMP/business-erp.zip.b64" > "$RUNNER_TEMP/business-erp.zip"
           mkdir -p "$RUNNER_TEMP/archive"
           unzip -q "$RUNNER_TEMP/business-erp.zip" -d "$RUNNER_TEMP/archive"
           test -d "$RUNNER_TEMP/archive/business-erp"
