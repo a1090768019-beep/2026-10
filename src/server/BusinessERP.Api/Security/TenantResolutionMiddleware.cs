@@ -12,9 +12,9 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next, ILogger<Ten
 {
     public async Task InvokeAsync(
         HttpContext http,
-        IConfiguration configuration,
-        CancellationToken cancellationToken)
+        IConfiguration configuration)
     {
+        var cancellationToken = http.RequestAborted;
         if (!http.Request.Path.StartsWithSegments("/api"))
         {
             await next(http);
