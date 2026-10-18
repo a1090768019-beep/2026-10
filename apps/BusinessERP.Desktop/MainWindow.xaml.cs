@@ -1,7 +1,7 @@
 using System.IO;
 using System.Net.Http;
 using System.Net.Http.Headers;
-using IdentityModel.OidcClient;
+using Duende.IdentityModel.OidcClient;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
