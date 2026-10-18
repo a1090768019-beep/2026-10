@@ -29,7 +29,7 @@ public sealed class JournalEntryValidatorTests
     [Fact]
     public void One_line_entry_is_rejected()
     {
-        var errors = JournalEntryValidator.Validate(Draft(new(Guid.NewGuid(), 10m, 0m)));
+        var errors = JournalEntryValidator.Validate(Draft(new JournalEntryLineDraft(Guid.NewGuid(), 10m, 0m)));
         Assert.Contains(errors, error => error.Contains("at least two", StringComparison.OrdinalIgnoreCase));
     }
 
