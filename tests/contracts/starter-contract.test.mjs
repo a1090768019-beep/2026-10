@@ -160,3 +160,13 @@ test('sales invoice drafts are tenant-scoped, exact-decimal internal documents a
   assert.match(api, /MidpointRounding\.AwayFromZero/);
   assert.match(program, /MapSalesInvoiceDraftEndpoints/);
 });
+
+test('income statement and balance sheet reports derive only from posted ledger entries', async () => {
+  const api = await read('src/server/BusinessERP.Api/Endpoints/AccountingEndpoints.cs');
+  assert.match(api, /reports\/income-statement/);
+  assert.match(api, /reports\/balance-sheet/);
+  assert.match(api, /entry\.Status == "POSTED"/);
+  assert.match(api, /LoadPostedAccountMovementsAsync/);
+  assert.match(api, /TotalAssets, totalLiabilities, totalEquity/);
+  assert.match(api, /totalAssets - totalLiabilities - totalEquity/);
+});
