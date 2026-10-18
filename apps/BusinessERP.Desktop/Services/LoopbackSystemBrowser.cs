@@ -75,10 +75,15 @@ public sealed class LoopbackSystemBrowser(Uri callbackUri) : IBrowser
                     };
                 }
 
+                var providerError = context.Request.QueryString["error"];
+                var callbackMessage = string.IsNullOrWhiteSpace(providerError)
+                    ? "تم استلام استجابة موفر الهوية. يمكنك العودة إلى التطبيق."
+                    : "لم يكتمل تسجيل الدخول. عد إلى التطبيق لعرض رسالة الخطأ.";
+
                 context.Response.StatusCode = (int)HttpStatusCode.OK;
                 await WriteResponseAsync(
                     context.Response,
-                    "تم تسجيل الدخول أو معالجة استجابة الهوية. يمكنك العودة إلى Business ERP.",
+                    callbackMessage,
                     cancellationToken);
 
                 // OidcClient expects the query string, including OAuth error responses, and then

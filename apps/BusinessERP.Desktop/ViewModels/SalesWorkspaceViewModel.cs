@@ -1,4 +1,3 @@
-using System.Net;
 using System.Net.Http;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -172,9 +171,12 @@ public sealed class SalesWorkspaceViewModel : INotifyPropertyChanged
             }
             else
             {
-                await LoadCompanyDataAsync();
-                StatusMessage = $"تم تحميل {Companies.Count} شركة وبيانات الشركة المحددة.";
-                StatusIsError = false;
+                var companyDataLoaded = await LoadCompanyDataAsync();
+                if (companyDataLoaded)
+                {
+                    StatusMessage = $"تم تحميل {Companies.Count} شركة وبيانات الشركة المحددة.";
+                    StatusIsError = false;
+                }
             }
         }
         catch (ErpApiException ex)
@@ -194,10 +196,10 @@ public sealed class SalesWorkspaceViewModel : INotifyPropertyChanged
         }
     }
 
-    private async Task LoadCompanyDataAsync()
+    private async Task<bool> LoadCompanyDataAsync()
     {
         if (_apiClient is null || SelectedCompany is null || _loadingCompanies)
-            return;
+            return false;
 
         try
         {
@@ -205,13 +207,14 @@ public sealed class SalesWorkspaceViewModel : INotifyPropertyChanged
             var customerTask = _apiClient.GetCustomersAsync(companyId);
             var draftTask = _apiClient.GetSalesInvoiceDraftsAsync(companyId);
             await Task.WhenAll(customerTask, draftTask);
+            var customers = await customerTask;
+            var drafts = await draftTask;
 
             Customers.Clear();
-            foreach (var customer in await customerTask)
+            foreach (var customer in customers)
                 Customers.Add(customer);
-
             Drafts.Clear();
-            foreach (var draft in await draftTask)
+            foreach (var draft in drafts)
                 Drafts.Add(draft);
 
             if (SelectedCustomer is null || !Customers.Any(x => x.Id == SelectedCustomer.Id))
@@ -219,16 +222,19 @@ public sealed class SalesWorkspaceViewModel : INotifyPropertyChanged
 
             StatusMessage = $"الشركة: {SelectedCompany.Name} · العملاء {Customers.Count} · مسودات البيع {Drafts.Count}.";
             StatusIsError = false;
+            return true;
         }
         catch (ErpApiException ex)
         {
             StatusMessage = ex.Message;
             StatusIsError = true;
+            return false;
         }
         catch (HttpRequestException)
         {
             StatusMessage = "تعذر تحميل بيانات الشركة من الخادم.";
             StatusIsError = true;
+            return false;
         }
         finally
         {
@@ -301,10 +307,13 @@ public sealed class SalesWorkspaceViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(CustomerEmail));
             OnPropertyChanged(nameof(CustomerPhone));
             OnPropertyChanged(nameof(CustomerTaxNumber));
-            await LoadCompanyDataAsync();
+            var refreshed = await LoadCompanyDataAsync();
             SelectedCustomer = Customers.FirstOrDefault(x => x.Id == created.Id);
-            StatusMessage = $"تم حفظ العميل {created.Code} في قاعدة البيانات.";
-            StatusIsError = false;
+            if (refreshed)
+            {
+                StatusMessage = $"تم حفظ العميل {created.Code} في قاعدة البيانات.";
+                StatusIsError = false;
+            }
         }
         catch (ErpApiException ex)
         {
@@ -377,9 +386,17 @@ public sealed class SalesWorkspaceViewModel : INotifyPropertyChanged
             InvoiceLines.Add(new InvoiceLineInput());
             OnPropertyChanged(nameof(InvoiceLines));
 
-            await LoadCompanyDataAsync();
-            StatusMessage = $"تم حفظ المسودة {created.InvoiceNumber} بإجمالي فرعي {created.SubtotalAmount:N4} {created.CurrencyCode}. هذه مسودة داخلية غير ضريبية.";
-            StatusIsError = false;
+            var refreshed = await LoadCompanyDataAsync();
+            if (refreshed)
+            {
+                StatusMessage = $"تم حفظ المسودة {created.InvoiceNumber} بإجمالي فرعي {created.SubtotalAmount:N4} {created.CurrencyCode}. هذه مسودة داخلية غير ضريبية.";
+                StatusIsError = false;
+            }
+            else
+            {
+                StatusMessage = $"تم حفظ المسودة {created.InvoiceNumber}، لكن تعذر تحديث القائمة. اضغط «تحديث البيانات» لإعادة التحميل.";
+                StatusIsError = true;
+            }
         }
         catch (ErpApiException ex)
         {

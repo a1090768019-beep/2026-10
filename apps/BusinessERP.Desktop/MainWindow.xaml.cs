@@ -1,7 +1,6 @@
 using System.IO;
 using System.Net.Http;
 using System.Net.Http.Headers;
-using Duende.IdentityModel.OidcClient;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
@@ -28,7 +27,6 @@ public partial class MainWindow : Window
     private readonly string _apiBaseUrl;
     private readonly ApiHealthService _apiHealthService;
     private readonly OidcAuthenticationService _oidcAuthenticationService;
-    private LoginResult? _loginResult;
     private HttpClient? _authenticatedHttpClient;
     private ErpApiClient? _erpApiClient;
 
@@ -120,7 +118,6 @@ public partial class MainWindow : Window
             }
 
             _authenticatedHttpClient?.Dispose();
-            _loginResult = result;
             HttpMessageHandler handler = result.RefreshTokenHandler ??
                 new StaticAccessTokenHandler(result.AccessToken);
             _authenticatedHttpClient = new HttpClient(handler)
@@ -215,7 +212,6 @@ public partial class MainWindow : Window
         await SalesWorkspacePanel.SetApiClientAsync(null);
         _authenticatedHttpClient?.Dispose();
         _authenticatedHttpClient = null;
-        _loginResult = null;
         TenantIdTextBox.IsEnabled = false;
         ApplyTenantButton.IsEnabled = false;
         LogoutButton.Visibility = Visibility.Collapsed;
