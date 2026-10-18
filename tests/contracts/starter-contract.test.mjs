@@ -275,3 +275,23 @@ test('WPF Ribbon commands are wired to real sales/search/navigation workflows', 
   assert.match(apiClient, /GetFiscalPeriodsAsync/);
   assert.match(apiClient, /PostSalesDraftToLedgerAsync/);
 });
+
+test('WPF workspace tables support filtering, sorting, virtualization and keyboard shortcuts', async () => {
+  const shell = await read('apps/BusinessERP.Desktop/MainWindow.xaml');
+  const code = await read('apps/BusinessERP.Desktop/MainWindow.xaml.cs');
+  const view = await read('apps/BusinessERP.Desktop/Views/SalesWorkspaceControl.xaml');
+  const vm = await read('apps/BusinessERP.Desktop/ViewModels/SalesWorkspaceViewModel.cs');
+  assert.match(shell, /x:Name="OverviewWorkspaceTab"/);
+  assert.match(shell, /x:Name="SalesWorkspaceTab"/);
+  assert.match(shell, /x:Name="ReportsWorkspaceTab"/);
+  assert.match(shell, /PreviewKeyDown="MainWindow_PreviewKeyDown"/);
+  assert.match(code, /case Key\.F:/);
+  assert.match(code, /case Key\.N:/);
+  assert.match(code, /case Key\.R:/);
+  assert.match(view, /ItemsSource="{Binding CustomersView}"/);
+  assert.match(view, /ItemsSource="{Binding DraftsView}"/);
+  assert.match(view, /CanUserSortColumns/);
+  assert.match(view, /VirtualizationMode" Value="Recycling"/);
+  assert.match(vm, /CustomersView\.Filter = FilterCustomer/);
+  assert.match(vm, /DraftsView\.Filter = FilterDraft/);
+});
