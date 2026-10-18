@@ -119,7 +119,7 @@ END $$;
 
 -- Switching the tenant context inside the same transaction must also isolate tenant B.
 SELECT set_config('app.tenant_id', '22222222-2222-4222-8222-222222222222', true);
-DO $
+DO $$
 BEGIN
     IF (SELECT count(*) FROM companies) <> 1
        OR NOT EXISTS (SELECT 1 FROM companies WHERE id = '22222222-2222-4222-8222-222222222201')
@@ -132,6 +132,6 @@ BEGIN
        OR NOT EXISTS (SELECT 1 FROM sales_invoice_draft_lines WHERE id = '22222222-2222-4222-8222-222222222204') THEN
         RAISE EXCEPTION 'Sales RLS smoke failed: tenant B saw cross-tenant customer or company data';
     END IF;
-END $;
+END $$;
 
 COMMIT;
