@@ -62,6 +62,37 @@ public sealed class AccountingApiIntegrationTests
             Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
 
         SetTenant(client, TenantA);
+
+        // Two overlapping fiscal-year requests for the same new company must not both commit.
+        using var newCompanyResponse = await client.PostAsJsonAsync("/api/v1/companies", new
+        {
+            name = "CI Concurrency Company " + Guid.NewGuid().ToString("N"),
+            baseCurrency = "SAR"
+        });
+        Assert.Equal(HttpStatusCode.Created, newCompanyResponse.StatusCode);
+        using var newCompanyJson = await ParseJsonAsync(newCompanyResponse);
+        var concurrencyCompanyId = newCompanyJson.RootElement.GetProperty("id").GetGuid();
+        var fiscalYearUrl = $"/api/v1/companies/{concurrencyCompanyId}/fiscal-years";
+        var fiscalYearPayloadA = new
+        {
+            name = "Concurrent Year A",
+            startDate = new DateOnly(2027, 1, 1),
+            endDate = new DateOnly(2027, 12, 31)
+        };
+        var fiscalYearPayloadB = new
+        {
+            name = "Concurrent Year B",
+            startDate = new DateOnly(2027, 1, 1),
+            endDate = new DateOnly(2027, 12, 31)
+        };
+        var fiscalYearTaskA = client.PostAsJsonAsync(fiscalYearUrl, fiscalYearPayloadA);
+        var fiscalYearTaskB = client.PostAsJsonAsync(fiscalYearUrl, fiscalYearPayloadB);
+        using var fiscalYearResponseA = await fiscalYearTaskA;
+        using var fiscalYearResponseB = await fiscalYearTaskB;
+        var fiscalYearStatuses = new[] { fiscalYearResponseA.StatusCode, fiscalYearResponseB.StatusCode };
+        Assert.Contains(HttpStatusCode.Created, fiscalYearStatuses);
+        Assert.Contains(HttpStatusCode.Conflict, fiscalYearStatuses);
+
         var idempotencyKey = "api-test-" + Guid.NewGuid().ToString("N");
         var idempotentNumber = "IT-IDEM-" + Guid.NewGuid().ToString("N");
         var idempotentPayload = NewJournalPayload(idempotentNumber, "Idempotency retry", 20m);
@@ -83,6 +114,30 @@ public sealed class AccountingApiIntegrationTests
         Assert.Equal(firstEntryId, secondEntryId);
 
         client.DefaultRequestHeaders.Remove("Idempotency-Key");
+
+        // A duplicate entry number with different idempotency keys must produce one creation and one conflict.
+        var competingEntryNumber = "IT-RACE-" + Guid.NewGuid().ToString("N");
+        var competingPayload = NewJournalPayload(competingEntryNumber, "Competing entry-number requests", 12m);
+        using var competingRequestA = new HttpRequestMessage(
+            HttpMethod.Post, $"/api/v1/companies/{CompanyA}/journal-entries")
+        {
+            Content = JsonContent.Create(competingPayload)
+        };
+        using var competingRequestB = new HttpRequestMessage(
+            HttpMethod.Post, $"/api/v1/companies/{CompanyA}/journal-entries")
+        {
+            Content = JsonContent.Create(competingPayload)
+        };
+        competingRequestA.Headers.Add("Idempotency-Key", "race-a-" + Guid.NewGuid().ToString("N"));
+        competingRequestB.Headers.Add("Idempotency-Key", "race-b-" + Guid.NewGuid().ToString("N"));
+        var competingTaskA = client.SendAsync(competingRequestA);
+        var competingTaskB = client.SendAsync(competingRequestB);
+        using var competingResponseA = await competingTaskA;
+        using var competingResponseB = await competingTaskB;
+        var competingStatuses = new[] { competingResponseA.StatusCode, competingResponseB.StatusCode };
+        Assert.Contains(HttpStatusCode.Created, competingStatuses);
+        Assert.Contains(HttpStatusCode.Conflict, competingStatuses);
+
         using (var entriesResponse = await client.GetAsync($"/api/v1/companies/{CompanyA}/journal-entries?limit=200"))
         {
             Assert.Equal(HttpStatusCode.OK, entriesResponse.StatusCode);
