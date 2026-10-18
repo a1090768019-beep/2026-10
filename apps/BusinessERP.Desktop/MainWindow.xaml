@@ -99,7 +99,7 @@
                             <TextBox x:Name="GeneralSearchBox" Grid.Column="3" MinWidth="130" MaxWidth="280"
                                      Height="34" VerticalContentAlignment="Center" Padding="10,5"
                                      ToolTip="بحث في الشركات والعملاء والحسابات والمسودات المحمّلة للمستأجر الحالي"
-                                     TextChanged="GeneralSearchBox_TextChanged" KeyDown="GeneralSearchBox_KeyDown"
+                                     KeyDown="GeneralSearchBox_KeyDown"
                                      Margin="0,0,6,0" />
                             <Button Grid.Column="4" Content="بحث ⌕" Click="GeneralSearch_Click" Padding="12,8"
                                     Background="#FFFFFF" Foreground="#315CC4" BorderBrush="#D5DFF1" />
