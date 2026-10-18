@@ -39,6 +39,8 @@ public static class AccountingEndpoints
         api.MapPost("/journal-entries/{entryId:guid}/cancel", CancelJournalEntry).WithName("CancelJournalEntry");
         api.MapPost("/journal-entries/{entryId:guid}/reverse", ReverseJournalEntry).WithName("ReverseJournalEntry");
         api.MapGet("/companies/{companyId:guid}/reports/trial-balance", GetTrialBalance).WithName("GetTrialBalance");
+        api.MapGet("/companies/{companyId:guid}/reports/income-statement", GetIncomeStatement).WithName("GetIncomeStatement");
+        api.MapGet("/companies/{companyId:guid}/reports/balance-sheet", GetBalanceSheet).WithName("GetBalanceSheet");
 
         return endpoints;
     }
@@ -603,6 +605,114 @@ public static class AccountingEndpoints
                 rows.Sum(x => x.DebitBalance), rows.Sum(x => x.CreditBalance)));
         }, ct);
 
+    private static async Task<IResult> GetIncomeStatement(
+        Guid companyId, DateOnly fromDate, DateOnly toDate, TenantTransactionRunner runner, CancellationToken ct) =>
+        await runner.ExecuteAsync<IResult>(async (db, token) =>
+        {
+            if (fromDate > toDate)
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["dateRange"] = ["تاريخ البداية يجب ألا يتجاوز تاريخ النهاية."]
+                });
+            if (!await db.Companies.AnyAsync(x => x.Id == companyId, token))
+                return Results.NotFound();
+
+            var totals = await LoadPostedAccountMovementsAsync(db, companyId, fromDate, toDate, token);
+            var accounts = await db.Accounts.AsNoTracking()
+                .Where(x => x.CompanyId == companyId &&
+                            (x.AccountType == "REVENUE" || x.AccountType == "EXPENSE"))
+                .OrderBy(x => x.AccountType).ThenBy(x => x.Code).ToListAsync(token);
+            var revenue = new List<FinancialStatementAccountDto>();
+            var expenses = new List<FinancialStatementAccountDto>();
+
+            foreach (var account in accounts)
+            {
+                totals.TryGetValue(account.Id, out var movement);
+                var debit = movement?.Debit ?? 0m;
+                var credit = movement?.Credit ?? 0m;
+                var amount = account.AccountType == "REVENUE" ? credit - debit : debit - credit;
+                if (amount == 0m) continue;
+                var row = new FinancialStatementAccountDto(account.Id, account.Code, account.NameAr, account.NameEn, amount);
+                if (account.AccountType == "REVENUE") revenue.Add(row);
+                else expenses.Add(row);
+            }
+
+            var totalRevenue = revenue.Sum(x => x.Amount);
+            var totalExpenses = expenses.Sum(x => x.Amount);
+            return Results.Ok(new IncomeStatementDto(companyId, fromDate, toDate, revenue, expenses,
+                totalRevenue, totalExpenses, totalRevenue - totalExpenses));
+        }, ct);
+
+    private static async Task<IResult> GetBalanceSheet(
+        Guid companyId, DateOnly asOfDate, TenantTransactionRunner runner, CancellationToken ct) =>
+        await runner.ExecuteAsync<IResult>(async (db, token) =>
+        {
+            if (!await db.Companies.AnyAsync(x => x.Id == companyId, token))
+                return Results.NotFound();
+
+            var totals = await LoadPostedAccountMovementsAsync(db, companyId, null, asOfDate, token);
+            var accounts = await db.Accounts.AsNoTracking().Where(x => x.CompanyId == companyId)
+                .OrderBy(x => x.AccountType).ThenBy(x => x.Code).ToListAsync(token);
+
+            var assets = new List<FinancialStatementAccountDto>();
+            var liabilities = new List<FinancialStatementAccountDto>();
+            var equity = new List<FinancialStatementAccountDto>();
+            decimal unclosedEarnings = 0m;
+
+            foreach (var account in accounts)
+            {
+                totals.TryGetValue(account.Id, out var movement);
+                var debit = movement?.Debit ?? 0m;
+                var credit = movement?.Credit ?? 0m;
+                if (account.AccountType == "ASSET")
+                {
+                    var amount = debit - credit;
+                    if (amount != 0m) assets.Add(new FinancialStatementAccountDto(account.Id, account.Code, account.NameAr, account.NameEn, amount));
+                }
+                else if (account.AccountType == "LIABILITY")
+                {
+                    var amount = credit - debit;
+                    if (amount != 0m) liabilities.Add(new FinancialStatementAccountDto(account.Id, account.Code, account.NameAr, account.NameEn, amount));
+                }
+                else if (account.AccountType == "EQUITY")
+                {
+                    var amount = credit - debit;
+                    if (amount != 0m) equity.Add(new FinancialStatementAccountDto(account.Id, account.Code, account.NameAr, account.NameEn, amount));
+                }
+                else if (account.AccountType == "REVENUE") unclosedEarnings += credit - debit;
+                else if (account.AccountType == "EXPENSE") unclosedEarnings -= debit - credit;
+            }
+
+            if (unclosedEarnings != 0m)
+                equity.Add(new FinancialStatementAccountDto(null, "UNCLOSED-EARNINGS", "صافي الأرباح غير المقفلة", "Unclosed earnings", unclosedEarnings));
+
+            var totalAssets = assets.Sum(x => x.Amount);
+            var totalLiabilities = liabilities.Sum(x => x.Amount);
+            var totalEquity = equity.Sum(x => x.Amount);
+            return Results.Ok(new BalanceSheetDto(companyId, asOfDate, assets, liabilities, equity,
+                unclosedEarnings, totalAssets, totalLiabilities, totalEquity,
+                totalAssets - totalLiabilities - totalEquity));
+        }, ct);
+
+    private static async Task<Dictionary<Guid, AccountMovement>> LoadPostedAccountMovementsAsync(
+        ErpDbContext db, Guid companyId, DateOnly? fromDate, DateOnly toDate, CancellationToken token)
+    {
+        var query =
+            from line in db.JournalEntryLines.AsNoTracking()
+            join entry in db.JournalEntries.AsNoTracking()
+                on new { line.TenantId, line.CompanyId, Id = line.JournalEntryId }
+                equals new { entry.TenantId, entry.CompanyId, Id = entry.Id }
+            where line.CompanyId == companyId && entry.Status == "POSTED" && entry.EntryDate <= toDate
+            select new { line.AccountId, line.Debit, line.Credit, entry.EntryDate };
+        if (fromDate.HasValue)
+            query = query.Where(x => x.EntryDate >= fromDate.Value);
+
+        var rows = await query.GroupBy(x => x.AccountId)
+            .Select(g => new AccountMovement(g.Key, g.Sum(x => x.Debit), g.Sum(x => x.Credit)))
+            .ToListAsync(token);
+        return rows.ToDictionary(x => x.AccountId);
+    }
+
     private static async Task<JournalEntryDto> LoadJournalEntryDtoAsync(ErpDbContext db, JournalEntryRecord entry, CancellationToken ct)
     {
         var lines = await db.JournalEntryLines.AsNoTracking().Where(x => x.JournalEntryId == entry.Id).OrderBy(x => x.LineNumber)
@@ -650,6 +760,10 @@ public static class AccountingEndpoints
     public sealed record ReverseJournalEntryRequest(Guid FiscalPeriodId, string EntryNumber, DateOnly EntryDate, string Description);
     public sealed record TrialBalanceRowDto(Guid AccountId, string AccountCode, string AccountNameAr, string AccountNameEn, string AccountType, decimal DebitMovement, decimal CreditMovement, decimal DebitBalance, decimal CreditBalance);
     public sealed record TrialBalanceDto(Guid CompanyId, DateOnly FromDate, DateOnly ToDate, IReadOnlyList<TrialBalanceRowDto> Rows, decimal TotalDebitMovement, decimal TotalCreditMovement, decimal TotalDebitBalance, decimal TotalCreditBalance);
+    public sealed record FinancialStatementAccountDto(Guid? AccountId, string AccountCode, string AccountNameAr, string AccountNameEn, decimal Amount);
+    public sealed record IncomeStatementDto(Guid CompanyId, DateOnly FromDate, DateOnly ToDate, IReadOnlyList<FinancialStatementAccountDto> Revenue, IReadOnlyList<FinancialStatementAccountDto> Expenses, decimal TotalRevenue, decimal TotalExpenses, decimal NetIncome);
+    public sealed record BalanceSheetDto(Guid CompanyId, DateOnly AsOfDate, IReadOnlyList<FinancialStatementAccountDto> Assets, IReadOnlyList<FinancialStatementAccountDto> Liabilities, IReadOnlyList<FinancialStatementAccountDto> Equity, decimal UnclosedEarnings, decimal TotalAssets, decimal TotalLiabilities, decimal TotalEquity, decimal Difference);
+    private sealed record AccountMovement(Guid AccountId, decimal Debit, decimal Credit);
     public sealed record GeneralLedgerLineDto(Guid JournalEntryId, string EntryNumber, DateOnly EntryDate, string EntryDescription, string CurrencyCode, int LineNumber, string LineDescription, decimal Debit, decimal Credit, decimal RunningBalance);
     public sealed record GeneralLedgerDto(Guid CompanyId, Guid AccountId, string AccountCode, string AccountNameAr, DateOnly FromDate, DateOnly ToDate, decimal OpeningBalance, IReadOnlyList<GeneralLedgerLineDto> Lines, decimal ClosingBalance, decimal TotalDebit, decimal TotalCredit);
 }
