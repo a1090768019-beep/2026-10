@@ -204,7 +204,7 @@
                                         </Grid>
                                     </Border>
                                 </UniformGrid>
-                                <TextBlock Text="تم ربط مسودة المبيعات والعملاء بالـ API؛ بقية الوحدات والشاشات ما زالت قيد التنفيذ." Foreground="#8A6A20" FontSize="12" Margin="4,14,0,0" TextWrapping="Wrap" />
+                                <TextBlock Text="تم ربط العملاء ومسودات المبيعات وحساب VAT الداخلي وترحيل القيد المتوازن. بقية الوحدات وقوائم التقارير وتجربة التوزيع ما زالت قيد التنفيذ." Foreground="#8A6A20" FontSize="12" Margin="4,14,0,0" TextWrapping="Wrap" />
                             </StackPanel>
                         </Border>
 
@@ -232,7 +232,7 @@
                                 <StackPanel>
                                     <Grid Margin="0,0,0,15"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><Border Width="42" Height="42" Background="#E8F8F1" CornerRadius="12" HorizontalAlignment="Right"><TextBlock Text="AR" Foreground="#19865C" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" /></Border><TextBlock Grid.Column="1" Text="↗" FontSize="20" Foreground="#A7B1C4" VerticalAlignment="Center" /></Grid>
                                     <TextBlock Text="المبيعات والعملاء" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}" />
-                                    <TextBlock Text="العملاء ومسودات البيع المحفوظة؛ لا تتضمن هذه النسخة VAT أو ترحيلًا محاسبيًا." Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" Margin="0,7,0,15" />
+                                    <TextBlock Text="العملاء ومسودات البيع وتصنيف VAT الداخلي وترحيل الأثر المحاسبي إلى الأستاذ؛ لا يوجد إصدار قانوني أو تكامل ZATCA." Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" Margin="0,7,0,15" />
                                     <TextBlock Text="مسودات أولية متصلة بالخادم" Foreground="#19865C" FontSize="12" FontWeight="SemiBold" />
                                 </StackPanel>
                             </Button>
