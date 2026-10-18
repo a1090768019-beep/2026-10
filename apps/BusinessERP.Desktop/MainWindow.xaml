@@ -13,14 +13,16 @@
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="264" />
+            <ColumnDefinition x:Name="NavigationColumn" Width="264" />
         </Grid.ColumnDefinitions>
 
         <!-- Main workspace. The desktop client communicates with the API only. -->
         <Grid Grid.Column="0" FlowDirection="RightToLeft">
             <Grid.RowDefinitions>
                 <RowDefinition Height="76" />
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
+                <RowDefinition Height="30" />
             </Grid.RowDefinitions>
 
             <Border Grid.Row="0" Background="White" BorderBrush="#E6EAF2" BorderThickness="0,0,0,1" Padding="28,0">
@@ -47,7 +49,67 @@
                 </Grid>
             </Border>
 
-            <Grid Grid.Row="1">
+<Border Grid.Row="1" Background="#F9FBFE" BorderBrush="#DDE5F0" BorderThickness="0,0,0,1" Padding="14,7">
+                <StackPanel>
+                    <Grid Margin="0,0,0,6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Content="☰ القائمة" Click="ToggleNavigation_Click"
+                                Padding="9,5" Margin="0,0,8,0" Background="#EEF2F8" Foreground="#344054" BorderThickness="0" />
+                        <ScrollViewer Grid.Column="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                            <StackPanel Orientation="Horizontal" FlowDirection="RightToLeft">
+                                <Button Content="الرئيسية" Tag="Overview" Click="RibbonNavigate_Click" Style="{StaticResource RibbonTabButtonStyle}" />
+                                <Button Content="المالية" Tag="Accounting" Click="RibbonNavigate_Click" Style="{StaticResource RibbonTabButtonStyle}" />
+                                <Button Content="المبيعات" Tag="Sales" Click="RibbonNavigate_Click" Style="{StaticResource RibbonTabButtonStyle}" />
+                                <Button Content="المشتريات" Tag="Purchases" Click="RibbonNavigate_Click" Style="{StaticResource RibbonTabButtonStyle}" />
+                                <Button Content="المخزون" Tag="Inventory" Click="RibbonNavigate_Click" Style="{StaticResource RibbonTabButtonStyle}" />
+                                <Button Content="التقارير" Tag="Reports" Click="RibbonNavigate_Click" Style="{StaticResource RibbonTabButtonStyle}" />
+                                <Button Content="إدارة النظام" Tag="Settings" Click="RibbonNavigate_Click" Style="{StaticResource RibbonTabButtonStyle}" />
+                            </StackPanel>
+                        </ScrollViewer>
+                        <Button Grid.Column="2" x:Name="RibbonToggleButton" Content="تصغير الشريط ▴" Click="ToggleRibbon_Click"
+                                Padding="9,5" Margin="8,0,0,0" Background="Transparent" Foreground="#52627C" BorderBrush="#DDE5F0" />
+                    </Grid>
+                    <StackPanel x:Name="RibbonActionsPanel">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="0,0,10,0">
+                                <Button Content="＋ جديد" Click="RibbonNew_Click" Padding="10,8" Margin="0,0,4,0" Background="#315CC4" Foreground="White" BorderThickness="0" />
+                                <Button Content="↻ تحديث" Click="RibbonRefresh_Click" Padding="10,8" Margin="0,0,4,0" Background="#EAF0FF" Foreground="#315CC4" BorderThickness="0" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="0,0,10,0">
+                                <Button Content="حفظ" IsEnabled="False" ToolTip="اختر نموذجًا يدعم الحفظ من مساحة العمل." Padding="10,8" Margin="0,0,4,0" />
+                                <Button Content="تعديل" IsEnabled="False" ToolTip="التعديل متاح فقط عندما تدعمه حالة المستند وصلاحياتك." Padding="10,8" Margin="0,0,4,0" />
+                                <Button Content="حذف" IsEnabled="False" ToolTip="الحذف غير مفعّل للمستندات المحاسبية؛ استخدم مسار تصحيح معتمد." Padding="10,8" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="0,0,10,0">
+                                <Button Content="طباعة" IsEnabled="False" ToolTip="الطباعة والمعاينة النهائية لم تُربطا بعد." Padding="10,8" Margin="0,0,4,0" />
+                                <Button Content="Excel" IsEnabled="False" ToolTip="تصدير Excel غير منفذ لهذه الشاشة." Padding="10,8" Margin="0,0,4,0" />
+                                <Button Content="PDF" IsEnabled="False" ToolTip="تصدير PDF غير منفذ لهذه الشاشة." Padding="10,8" />
+                            </StackPanel>
+                            <TextBox x:Name="GeneralSearchBox" Grid.Column="3" MinWidth="130" MaxWidth="280"
+                                     Height="34" VerticalContentAlignment="Center" Padding="10,5"
+                                     ToolTip="بحث في الشركات والعملاء والحسابات والمسودات المحمّلة للمستأجر الحالي"
+                                     TextChanged="GeneralSearchBox_TextChanged" KeyDown="GeneralSearchBox_KeyDown"
+                                     Margin="0,0,6,0" />
+                            <Button Grid.Column="4" Content="بحث ⌕" Click="GeneralSearch_Click" Padding="12,8"
+                                    Background="#FFFFFF" Foreground="#315CC4" BorderBrush="#D5DFF1" />
+                        </Grid>
+                        <TextBlock Text="أوامر المستند والسجلات المتاحة بحسب المرحلة الحالية؛ الأوامر غير المنفذة معطّلة عمدًا." Foreground="#8490A4" FontSize="10" Margin="4,4,0,0" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <Grid Grid.Row="2">
                 <ScrollViewer x:Name="DashboardPanel" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <StackPanel Margin="28,24,28,26" FlowDirection="RightToLeft">
                         <Border Background="#EAF0FF" CornerRadius="18" Padding="28" Margin="0,0,0,20">
@@ -248,6 +310,15 @@
                 </ScrollViewer>
                 <views:SalesWorkspaceControl x:Name="SalesWorkspacePanel" Visibility="Collapsed" />
             </Grid>
+
+            <Border Grid.Row="3" Background="#F1F4F9" BorderBrush="#DDE5F0" BorderThickness="0,1,0,0" Padding="12,0">
+                <DockPanel LastChildFill="True">
+                    <TextBlock DockPanel.Dock="Right" Text="Business ERP" Foreground="#52627C" FontSize="10" VerticalAlignment="Center" />
+                    <TextBlock x:Name="RibbonStatusText" Text="غير متصل · سجّل الدخول لتفعيل بيانات المستأجر" Foreground="#69758D"
+                               FontSize="10" VerticalAlignment="Center" Margin="16,0,0,0" />
+                    <TextBlock DockPanel.Dock="Left" Text="RTL · SAR" Foreground="#8490A4" FontSize="10" VerticalAlignment="Center" />
+                </DockPanel>
+            </Border>
         </Grid>
 
         <!-- RTL navigation rail on the right side of the window. -->
