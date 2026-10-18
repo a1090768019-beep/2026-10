@@ -26,6 +26,15 @@ BEGIN
         RAISE EXCEPTION 'RLS smoke failed: tenant A can see tenant B company';
     END IF;
 
+    IF (SELECT count(*) FROM tenant_subscriptions) <> 1 OR NOT EXISTS (
+        SELECT 1 FROM tenant_subscriptions s
+        JOIN subscription_plans p ON p.id = s.subscription_plan_id
+        WHERE s.tenant_id = '11111111-1111-4111-8111-111111111111'
+          AND p.code = 'CI-STARTER' AND s.status = 'ACTIVE'
+    ) THEN
+        RAISE EXCEPTION 'Subscription smoke failed: active tenant subscription could not be read through RLS';
+    END IF;
+
     UPDATE journal_entries SET status = 'APPROVED'
      WHERE id = '11111111-1111-4111-8111-111111111106';
     GET DIAGNOSTICS posted_rows = ROW_COUNT;
