@@ -67,15 +67,20 @@ public sealed class AccountingApiIntegrationTests
         var idempotentPayload = NewJournalPayload(idempotentNumber, "Idempotency retry", 20m);
         client.DefaultRequestHeaders.Remove("Idempotency-Key");
         client.DefaultRequestHeaders.Add("Idempotency-Key", idempotencyKey);
-        using var firstCreate = await client.PostAsJsonAsync($"/api/v1/companies/{CompanyA}/journal-entries", idempotentPayload);
-        Assert.Equal(HttpStatusCode.Created, firstCreate.StatusCode);
-        using var firstJson = await ParseJsonAsync(firstCreate);
-        var idempotentEntryId = firstJson.RootElement.GetProperty("id").GetGuid();
+        // Start both requests before awaiting either response to exercise the transaction lock under contention.
+        var firstCreateTask = client.PostAsJsonAsync($"/api/v1/companies/{CompanyA}/journal-entries", idempotentPayload);
+        var secondCreateTask = client.PostAsJsonAsync($"/api/v1/companies/{CompanyA}/journal-entries", idempotentPayload);
+        using var firstCreate = await firstCreateTask;
+        using var secondCreate = await secondCreateTask;
+        var statuses = new[] { firstCreate.StatusCode, secondCreate.StatusCode };
+        Assert.Contains(HttpStatusCode.Created, statuses);
+        Assert.Contains(HttpStatusCode.OK, statuses);
 
-        using var retryCreate = await client.PostAsJsonAsync($"/api/v1/companies/{CompanyA}/journal-entries", idempotentPayload);
-        Assert.Equal(HttpStatusCode.OK, retryCreate.StatusCode);
-        using var retryJson = await ParseJsonAsync(retryCreate);
-        Assert.Equal(idempotentEntryId, retryJson.RootElement.GetProperty("id").GetGuid());
+        using var firstJson = await ParseJsonAsync(firstCreate);
+        using var secondJson = await ParseJsonAsync(secondCreate);
+        var firstEntryId = firstJson.RootElement.GetProperty("id").GetGuid();
+        var secondEntryId = secondJson.RootElement.GetProperty("id").GetGuid();
+        Assert.Equal(firstEntryId, secondEntryId);
 
         client.DefaultRequestHeaders.Remove("Idempotency-Key");
         using (var entriesResponse = await client.GetAsync($"/api/v1/companies/{CompanyA}/journal-entries?limit=200"))
