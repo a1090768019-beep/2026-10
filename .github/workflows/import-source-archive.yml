@@ -22,7 +22,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cat transfer/chunk-*.b64 > "$RUNNER_TEMP/business-erp.zip.b64"
+          cat transfer/part-*.b64 > "$RUNNER_TEMP/business-erp.zip.b64"
           base64 --decode "$RUNNER_TEMP/business-erp.zip.b64" > "$RUNNER_TEMP/business-erp.zip"
           mkdir -p "$RUNNER_TEMP/archive"
           unzip -q "$RUNNER_TEMP/business-erp.zip" -d "$RUNNER_TEMP/archive"
