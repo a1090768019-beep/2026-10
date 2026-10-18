@@ -13,6 +13,12 @@ public sealed class SalesWorkspaceViewModel : INotifyPropertyChanged
     private ErpApiClient? _apiClient;
     private ApiCompany? _selectedCompany;
     private ApiCustomer? _selectedCustomer;
+    private SalesInvoiceDraftListItem? _selectedDraft;
+    private ApiFiscalPeriod? _selectedFiscalPeriod;
+    private ApiAccount? _selectedReceivableAccount;
+    private ApiAccount? _selectedRevenueAccount;
+    private ApiAccount? _selectedOutputVatAccount;
+    private string _journalEntryNumber = "";
     private InvoiceLineInput? _selectedInvoiceLine;
     private string _statusMessage = "سجّل الدخول ثم فعّل المستأجر للوصول إلى بيانات المبيعات.";
     private bool _statusIsError;
@@ -24,6 +30,11 @@ public sealed class SalesWorkspaceViewModel : INotifyPropertyChanged
     public ObservableCollection<ApiCompany> Companies { get; } = [];
     public ObservableCollection<ApiCustomer> Customers { get; } = [];
     public ObservableCollection<SalesInvoiceDraftListItem> Drafts { get; } = [];
+    public ObservableCollection<ApiAccount> Accounts { get; } = [];
+    public ObservableCollection<ApiFiscalPeriod> FiscalPeriods { get; } = [];
+    public ObservableCollection<ApiAccount> ReceivableAccounts { get; } = [];
+    public ObservableCollection<ApiAccount> RevenueAccounts { get; } = [];
+    public ObservableCollection<ApiAccount> OutputVatAccounts { get; } = [];
     public ObservableCollection<InvoiceLineInput> InvoiceLines { get; } = [];
 
     public IReadOnlyList<SalesVatTreatmentOption> VatTreatmentOptions { get; } =
@@ -81,6 +92,76 @@ public sealed class SalesWorkspaceViewModel : INotifyPropertyChanged
         set { if (ReferenceEquals(_selectedCustomer, value)) return; _selectedCustomer = value; OnPropertyChanged(); }
     }
 
+    public SalesInvoiceDraftListItem? SelectedDraft
+    {
+        get => _selectedDraft;
+        set
+        {
+            if (ReferenceEquals(_selectedDraft, value)) return;
+            _selectedDraft = value;
+            OnPropertyChanged();
+            if (value is not null)
+            {
+                JournalEntryNumber = ("SI-" + value.InvoiceNumber)[..Math.Min(80, ("SI-" + value.InvoiceNumber).Length)];
+                SelectedFiscalPeriod = FiscalPeriods.FirstOrDefault(x =>
+                    x.Status == "OPEN" && x.StartDate <= value.IssueDate && x.EndDate >= value.IssueDate);
+            }
+            OnPropertyChanged(nameof(SelectedDraftPostingSummary));
+            NotifyCommands();
+        }
+    }
+
+    public ApiFiscalPeriod? SelectedFiscalPeriod
+    {
+        get => _selectedFiscalPeriod;
+        set { if (ReferenceEquals(_selectedFiscalPeriod, value)) return; _selectedFiscalPeriod = value; OnPropertyChanged(); NotifyCommands(); }
+    }
+
+    public ApiAccount? SelectedReceivableAccount
+    {
+        get => _selectedReceivableAccount;
+        set { if (ReferenceEquals(_selectedReceivableAccount, value)) return; _selectedReceivableAccount = value; OnPropertyChanged(); NotifyCommands(); }
+    }
+
+    public ApiAccount? SelectedRevenueAccount
+    {
+        get => _selectedRevenueAccount;
+        set { if (ReferenceEquals(_selectedRevenueAccount, value)) return; _selectedRevenueAccount = value; OnPropertyChanged(); NotifyCommands(); }
+    }
+
+    public ApiAccount? SelectedOutputVatAccount
+    {
+        get => _selectedOutputVatAccount;
+        set { if (ReferenceEquals(_selectedOutputVatAccount, value)) return; _selectedOutputVatAccount = value; OnPropertyChanged(); NotifyCommands(); }
+    }
+
+    public string JournalEntryNumber
+    {
+        get => _journalEntryNumber;
+        set { if (_journalEntryNumber == value) return; _journalEntryNumber = value; OnPropertyChanged(); NotifyCommands(); }
+    }
+
+    public string SelectedDraftPostingSummary => SelectedDraft is null
+        ? "حدد مسودة محفوظة لعرض إجمالياتها وإعداد الترحيل."
+        : $"المسودة: {SelectedDraft.InvoiceNumber} · الحالة: {SelectedDraft.Status} · VAT: {SelectedDraft.VatAmount:N2} · الإجمالي: {SelectedDraft.TotalAmount:N2} {SelectedDraft.CurrencyCode}";
+
+    private bool CanPostSelectedDraft =>
+        _apiClient is not null && SelectedCompany is not null && SelectedDraft is not null &&
+        SelectedDraft.Status == "DRAFT" && SelectedDraft.TaxCalculationStatus == "CALCULATED" &&
+        SelectedDraft.TotalAmount.HasValue && SelectedDraft.TotalAmount.Value > 0m &&
+        SelectedFiscalPeriod is { Status: "OPEN" } period &&
+        period.StartDate <= SelectedDraft.IssueDate && period.EndDate >= SelectedDraft.IssueDate &&
+        SelectedReceivableAccount is not null && SelectedReceivableAccount.AccountType == "ASSET" &&
+        SelectedReceivableAccount.NormalBalance == "DEBIT" && SelectedReceivableAccount.IsActive &&
+        SelectedReceivableAccount.AllowPosting &&
+        SelectedRevenueAccount is not null && SelectedRevenueAccount.AccountType == "REVENUE" &&
+        SelectedRevenueAccount.NormalBalance == "CREDIT" && SelectedRevenueAccount.IsActive &&
+        SelectedRevenueAccount.AllowPosting &&
+        (SelectedDraft.VatAmount is null or <= 0m ||
+         (SelectedOutputVatAccount is not null && SelectedOutputVatAccount.AccountType == "LIABILITY" &&
+          SelectedOutputVatAccount.NormalBalance == "CREDIT" && SelectedOutputVatAccount.IsActive &&
+          SelectedOutputVatAccount.AllowPosting));
+
     public InvoiceLineInput? SelectedInvoiceLine
     {
         get => _selectedInvoiceLine;
@@ -110,6 +191,7 @@ public sealed class SalesWorkspaceViewModel : INotifyPropertyChanged
     public ICommand CreateCustomerCommand { get; }
     public ICommand AddInvoiceLineCommand { get; }
     public ICommand RemoveInvoiceLineCommand { get; }
+    public ICommand PostSelectedDraftToLedgerCommand { get; }
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -128,6 +210,7 @@ public sealed class SalesWorkspaceViewModel : INotifyPropertyChanged
                 SelectedInvoiceLine = null;
             }
         }, () => SelectedInvoiceLine is not null && !IsBusy);
+        PostSelectedDraftToLedgerCommand = new AsyncRelayCommand(PostSelectedDraftToLedgerAsync, () => CanPostSelectedDraft && !IsBusy);
 
         AddInvoiceLine();
     }
@@ -140,8 +223,18 @@ public sealed class SalesWorkspaceViewModel : INotifyPropertyChanged
             Companies.Clear();
             Customers.Clear();
             Drafts.Clear();
+            Accounts.Clear();
+            FiscalPeriods.Clear();
+            ReceivableAccounts.Clear();
+            RevenueAccounts.Clear();
+            OutputVatAccounts.Clear();
             SelectedCompany = null;
             SelectedCustomer = null;
+            SelectedDraft = null;
+            SelectedFiscalPeriod = null;
+            SelectedReceivableAccount = null;
+            SelectedRevenueAccount = null;
+            SelectedOutputVatAccount = null;
             ClearVatPreview("سجّل الدخول وفعّل المستأجر قبل حساب معاينة VAT.");
             StatusMessage = "سجّل الدخول ثم فعّل معرّف المستأجر للوصول إلى البيانات المحفوظة.";
             StatusIsError = false;
@@ -187,6 +280,12 @@ public sealed class SalesWorkspaceViewModel : INotifyPropertyChanged
             {
                 Customers.Clear();
                 Drafts.Clear();
+                Accounts.Clear();
+                FiscalPeriods.Clear();
+                ReceivableAccounts.Clear();
+                RevenueAccounts.Clear();
+                OutputVatAccounts.Clear();
+                SelectedDraft = null;
                 StatusMessage = "لا توجد شركات لهذا المستأجر. استخدم نموذج إنشاء الشركة إذا كانت صلاحيتك OWNER أو ADMIN.";
                 StatusIsError = false;
             }
@@ -227,9 +326,13 @@ public sealed class SalesWorkspaceViewModel : INotifyPropertyChanged
             var companyId = SelectedCompany.Id;
             var customerTask = _apiClient.GetCustomersAsync(companyId);
             var draftTask = _apiClient.GetSalesInvoiceDraftsAsync(companyId);
-            await Task.WhenAll(customerTask, draftTask);
+            var accountTask = _apiClient.GetAccountsAsync(companyId);
+            var periodTask = _apiClient.GetFiscalPeriodsAsync(companyId);
+            await Task.WhenAll(customerTask, draftTask, accountTask, periodTask);
             var customers = await customerTask;
             var drafts = await draftTask;
+            var accounts = await accountTask;
+            var periods = await periodTask;
 
             Customers.Clear();
             foreach (var customer in customers)
@@ -237,11 +340,30 @@ public sealed class SalesWorkspaceViewModel : INotifyPropertyChanged
             Drafts.Clear();
             foreach (var draft in drafts)
                 Drafts.Add(draft);
+            Accounts.Clear();
+            foreach (var account in accounts)
+                Accounts.Add(account);
+            FiscalPeriods.Clear();
+            foreach (var period in periods)
+                FiscalPeriods.Add(period);
+            RebuildPostingAccountChoices();
 
             if (SelectedCustomer is null || !Customers.Any(x => x.Id == SelectedCustomer.Id))
                 SelectedCustomer = Customers.FirstOrDefault();
+            if (SelectedDraft is not null)
+                SelectedDraft = Drafts.FirstOrDefault(x => x.Id == SelectedDraft.Id);
+            else
+                SelectedDraft = Drafts.FirstOrDefault();
+            if (SelectedFiscalPeriod is null || !FiscalPeriods.Any(x => x.Id == SelectedFiscalPeriod.Id))
+                SelectedFiscalPeriod = FiscalPeriods.FirstOrDefault(x => x.Status == "OPEN");
+            if (SelectedReceivableAccount is null || !ReceivableAccounts.Any(x => x.Id == SelectedReceivableAccount.Id))
+                SelectedReceivableAccount = ReceivableAccounts.FirstOrDefault();
+            if (SelectedRevenueAccount is null || !RevenueAccounts.Any(x => x.Id == SelectedRevenueAccount.Id))
+                SelectedRevenueAccount = RevenueAccounts.FirstOrDefault();
+            if (SelectedOutputVatAccount is null || !OutputVatAccounts.Any(x => x.Id == SelectedOutputVatAccount.Id))
+                SelectedOutputVatAccount = OutputVatAccounts.FirstOrDefault();
 
-            StatusMessage = $"الشركة: {SelectedCompany.Name} · العملاء {Customers.Count} · مسودات البيع {Drafts.Count}.";
+            StatusMessage = $"الشركة: {SelectedCompany.Name} · العملاء {Customers.Count} · مسودات البيع {Drafts.Count} · الحسابات {Accounts.Count} · الفترات {FiscalPeriods.Count}.";
             StatusIsError = false;
             return true;
         }
@@ -462,6 +584,79 @@ public sealed class SalesWorkspaceViewModel : INotifyPropertyChanged
         }
     }
 
+    private async Task PostSelectedDraftToLedgerAsync()
+    {
+        if (_apiClient is null || SelectedCompany is null || SelectedDraft is null)
+            return;
+        if (!CanPostSelectedDraft)
+        {
+            StatusMessage = "تحقق من اختيار مسودة محسوبة VAT، وفترة مفتوحة تشمل تاريخها، وحسابات ذمم/إيراد/ضريبة صالحة.";
+            StatusIsError = true;
+            return;
+        }
+        var draft = SelectedDraft;
+        var companyId = SelectedCompany.Id;
+        var entryNumber = JournalEntryNumber.Trim().ToUpperInvariant();
+        if (entryNumber.Length is < 1 or > 80)
+        {
+            StatusMessage = "رقم القيد مطلوب ولا يتجاوز 80 حرفًا.";
+            StatusIsError = true;
+            return;
+        }
+
+        IsBusy = true;
+        try
+        {
+            var result = await _apiClient.PostSalesDraftToLedgerAsync(companyId, draft.Id,
+                new PostSalesDraftToLedgerApiRequest(
+                    SelectedFiscalPeriod!.Id,
+                    entryNumber,
+                    SelectedReceivableAccount!.Id,
+                    SelectedRevenueAccount!.Id,
+                    draft.VatAmount.GetValueOrDefault() > 0m ? SelectedOutputVatAccount!.Id : null));
+            await LoadCompanyDataAsync();
+            SelectedDraft = Drafts.FirstOrDefault(x => x.Id == draft.Id);
+            StatusMessage = result.AlreadyPosted
+                ? $"المسودة مرتبطة مسبقًا بالقيد {result.EntryNumber}؛ لم يُنشأ قيد مكرر."
+                : $"تم ترحيل الأثر المحاسبي للمسودة {draft.InvoiceNumber} إلى القيد {result.EntryNumber}. الإجمالي {result.TotalAmount:N2} {draft.CurrencyCode}. لم يصدر مستند ضريبي ولم يُرسل إلى ZATCA.";
+            StatusIsError = false;
+        }
+        catch (ErpApiException ex)
+        {
+            StatusMessage = ex.Message;
+            StatusIsError = true;
+        }
+        catch (HttpRequestException)
+        {
+            StatusMessage = "تعذر الاتصال بالخادم أثناء ترحيل المسودة إلى دفتر الأستاذ.";
+            StatusIsError = true;
+        }
+        finally
+        {
+            IsBusy = false;
+            NotifyCommands();
+        }
+    }
+
+    private void RebuildPostingAccountChoices()
+    {
+        ReceivableAccounts.Clear();
+        RevenueAccounts.Clear();
+        OutputVatAccounts.Clear();
+        foreach (var account in Accounts.Where(x => x.IsActive && x.AllowPosting))
+        {
+            if (account.AccountType == "ASSET" && account.NormalBalance == "DEBIT")
+                ReceivableAccounts.Add(account);
+            else if (account.AccountType == "REVENUE" && account.NormalBalance == "CREDIT")
+                RevenueAccounts.Add(account);
+            else if (account.AccountType == "LIABILITY" && account.NormalBalance == "CREDIT")
+                OutputVatAccounts.Add(account);
+        }
+        OnPropertyChanged(nameof(Accounts));
+        OnPropertyChanged(nameof(FiscalPeriods));
+        NotifyCommands();
+    }
+
     public async Task CalculateVatPreviewAsync()
     {
         if (_apiClient is null || SelectedCompany is null)
@@ -552,6 +747,7 @@ public sealed class SalesWorkspaceViewModel : INotifyPropertyChanged
         (CreateCustomerCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
         (AddInvoiceLineCommand as RelayCommand)?.RaiseCanExecuteChanged();
         (RemoveInvoiceLineCommand as RelayCommand)?.RaiseCanExecuteChanged();
+        (PostSelectedDraftToLedgerCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
     }
 
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null) =>
