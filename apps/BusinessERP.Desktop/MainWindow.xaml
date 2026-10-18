@@ -84,6 +84,10 @@
                             </Grid.ColumnDefinitions>
                             <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="0,0,10,0">
                                 <Button Content="＋ جديد" Click="RibbonNew_Click" Padding="10,8" Margin="0,0,4,0" Background="#315CC4" Foreground="White" BorderThickness="0" />
+                                <Button Content="حفظ المسودة" x:Name="RibbonSaveButton" Click="RibbonSave_Click" IsEnabled="False"
+                                        ToolTip="يحفظ مسودة جديدة من نموذج المبيعات المفتوح حاليًا." Padding="10,8" Margin="0,0,4,0" />
+                                <Button Content="ترحيل GL" x:Name="RibbonPostButton" Click="RibbonPostSalesDraft_Click" IsEnabled="False"
+                                        ToolTip="يرحّل المسودة المحددة إذا تم حساب VAT واختيار فترة وحسابات صحيحة." Padding="10,8" Margin="0,0,4,0" Background="#E7F5EE" Foreground="#146C4A" />
                                 <Button Content="↻ تحديث" Click="RibbonRefresh_Click" Padding="10,8" Margin="0,0,4,0" Background="#EAF0FF" Foreground="#315CC4" BorderThickness="0" />
                             </StackPanel>
                             <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="0,0,10,0">
