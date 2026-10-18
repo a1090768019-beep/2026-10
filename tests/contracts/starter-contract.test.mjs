@@ -107,3 +107,13 @@ test('industry chart templates are seeded as database reference data and applied
   assert.match(endpoints, /ParentCode/);
   assert.match(program, /MapChartOfAccountsTemplateEndpoints/);
 });
+
+test('concurrent accounting uniqueness checks are serialized inside the transaction', async () => {
+  const api = await read('src/server/BusinessERP.Api/Endpoints/AccountingEndpoints.cs');
+  assert.match(api, /pg_advisory_xact_lock\(hashtextextended/);
+  assert.match(api, /journal-entry-number:/);
+  assert.match(api, /journal-entry-idempotency:/);
+  assert.match(api, /journal-reversal:/);
+  assert.match(api, /fiscal-year-overlap:/);
+  assert.match(api, /Keep lock ordering stable/);
+});
