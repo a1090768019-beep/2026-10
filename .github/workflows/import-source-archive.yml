@@ -22,7 +22,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cat transfer/part-00.b64 transfer/part-01.b64 transfer/part-02.b64 transfer/part-03.b64 transfer/part-04.b64 transfer/part-05.b64 transfer/part-06.b64 transfer/part-07.b64 transfer/part-08.b64 transfer/part-09.b64 transfer/part-10.b64 transfer/part-11.b64 transfer/part-12.b64 transfer/part-13.b64 transfer/part-14a.b64 transfer/part-14b.b64 transfer/part-15a.b64 transfer/part-15b.b64 > "$RUNNER_TEMP/business-erp.zip.b64"
+          cat transfer/part-00.b64 transfer/part-01.b64 transfer/part-02.b64 transfer/part-03.b64 transfer/part-04.b64 transfer/part-05.b64 transfer/part-06.b64 transfer/part-07.b64 transfer/part-08.b64 transfer/part-09.b64 transfer/part-10.b64 transfer/part-11.b64 transfer/part-12.b64 transfer/part-13.b64 transfer/part-14a.b64 transfer/part-14b.b64 transfer/part-15a.b64 transfer/part-15b1.b64 transfer/part-15b2.b64 > "$RUNNER_TEMP/business-erp.zip.b64"
           base64 --decode "$RUNNER_TEMP/business-erp.zip.b64" > "$RUNNER_TEMP/business-erp.zip"
           mkdir -p "$RUNNER_TEMP/archive"
           unzip -q "$RUNNER_TEMP/business-erp.zip" -d "$RUNNER_TEMP/archive"
