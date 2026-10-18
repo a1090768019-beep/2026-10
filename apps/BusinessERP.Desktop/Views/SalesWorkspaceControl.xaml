@@ -1,0 +1,176 @@
+<UserControl x:Class="BusinessERP.Desktop.Views.SalesWorkspaceControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             FlowDirection="RightToLeft"
+             Background="#F6F8FC">
+    <UserControl.Resources>
+        <Style TargetType="TextBox">
+            <Setter Property="Margin" Value="0,4,0,8" />
+            <Setter Property="Padding" Value="9,7" />
+            <Setter Property="BorderBrush" Value="#D8DFEA" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style TargetType="ComboBox">
+            <Setter Property="Margin" Value="0,4,0,8" />
+            <Setter Property="Padding" Value="8,6" />
+            <Setter Property="BorderBrush" Value="#D8DFEA" />
+        </Style>
+        <Style TargetType="Button">
+            <Setter Property="Padding" Value="13,8" />
+            <Setter Property="Margin" Value="0,4,0,8" />
+            <Setter Property="Background" Value="#315CC4" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+        </Style>
+        <Style TargetType="DataGrid">
+            <Setter Property="Margin" Value="0,8,0,0" />
+            <Setter Property="AutoGenerateColumns" Value="False" />
+            <Setter Property="CanUserAddRows" Value="False" />
+            <Setter Property="HeadersVisibility" Value="Column" />
+            <Setter Property="GridLinesVisibility" Value="Horizontal" />
+            <Setter Property="BorderBrush" Value="#E0E6F0" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="AlternationCount" Value="2" />
+            <Setter Property="IsReadOnly" Value="True" />
+        </Style>
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="22,18,22,28">
+            <Border Background="White" BorderBrush="#E3E9F2" BorderThickness="1" CornerRadius="14" Padding="16" Margin="0,0,0,14">
+                <StackPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="العملاء ومسودات المبيعات" FontSize="20" FontWeight="Bold" Foreground="#19243A" />
+                            <TextBlock Text="تُحفظ البيانات في API وقاعدة PostgreSQL. هذه مستندات داخلية غير ضريبية." FontSize="12" Foreground="#69758D" Margin="0,5,0,0" />
+                        </StackPanel>
+                        <Button Grid.Column="1" Content="تحديث البيانات" Command="{Binding RefreshCommand}" VerticalAlignment="Center" />
+                    </Grid>
+                    <TextBlock Text="{Binding StatusMessage}" Margin="0,10,0,0" TextWrapping="Wrap" FontSize="12">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Foreground" Value="#69758D" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding StatusIsError}" Value="True">
+                                        <Setter Property="Foreground" Value="#B42318" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </StackPanel>
+            </Border>
+
+            <Border Background="White" BorderBrush="#E3E9F2" BorderThickness="1" CornerRadius="14" Padding="16" Margin="0,0,0,14">
+                <StackPanel>
+                    <TextBlock Text="الشركة الحالية" FontSize="15" FontWeight="SemiBold" Foreground="#19243A" />
+                    <Grid Margin="0,6,0,0">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="2*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                        <ComboBox x:Name="CompanyComboBox" Grid.Column="0" ItemsSource="{Binding Companies}"
+                                  SelectedItem="{Binding SelectedCompany, Mode=TwoWay}" DisplayMemberPath="Name"
+                                  ToolTip="اختر شركة محفوظة لهذا المستأجر" />
+                        <TextBlock Grid.Column="1" Text="{Binding SelectedCompanyCurrency, StringFormat=العملة الأساسية: {0}}"
+                                   VerticalAlignment="Center" Foreground="#69758D" Margin="12,0" />
+                        <Button Grid.Column="2" Content="إنشاء شركة" Command="{Binding CreateCompanyCommand}" VerticalAlignment="Center" />
+                    </Grid>
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="2*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                        <TextBox Grid.Column="0" Text="{Binding CompanyName, UpdateSourceTrigger=PropertyChanged}" ToolTip="اسم الشركة الجديدة" />
+                        <TextBlock Grid.Column="1" Text="العملة" VerticalAlignment="Center" Margin="8,0" Foreground="#69758D" />
+                        <TextBox Grid.Column="2" Text="{Binding BaseCurrency, UpdateSourceTrigger=PropertyChanged}" MaxLength="3" />
+                        <TextBox Grid.Column="3" Text="{Binding CompanyTaxNumber, UpdateSourceTrigger=PropertyChanged}" Width="180" ToolTip="الرقم الضريبي (اختياري)" />
+                    </Grid>
+                    <TextBlock Text="إنشاء الشركة متاح للأدوار المصرح بها من الخادم فقط." FontSize="11" Foreground="#8A6A20" />
+                </StackPanel>
+            </Border>
+
+            <Grid>
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0" Background="White" BorderBrush="#E3E9F2" BorderThickness="1" CornerRadius="14" Padding="16" Margin="0,0,8,0">
+                    <StackPanel>
+                        <TextBlock Text="بيانات العميل" FontSize="17" FontWeight="Bold" Foreground="#19243A" />
+                        <TextBlock Text="الرمز" Foreground="#69758D" FontSize="12" />
+                        <TextBox Text="{Binding CustomerCode, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Text="اسم العميل" Foreground="#69758D" FontSize="12" />
+                        <TextBox Text="{Binding CustomerName, UpdateSourceTrigger=PropertyChanged}" />
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Margin="0,0,5,0">
+                                <TextBlock Text="البريد" Foreground="#69758D" FontSize="12" />
+                                <TextBox Text="{Binding CustomerEmail, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Margin="5,0,0,0">
+                                <TextBlock Text="الهاتف" Foreground="#69758D" FontSize="12" />
+                                <TextBox Text="{Binding CustomerPhone, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+                        </Grid>
+                        <TextBlock Text="الرقم الضريبي" Foreground="#69758D" FontSize="12" />
+                        <TextBox Text="{Binding CustomerTaxNumber, UpdateSourceTrigger=PropertyChanged}" />
+                        <Button Content="حفظ العميل" Command="{Binding CreateCustomerCommand}" HorizontalAlignment="Right" />
+                        <TextBlock Text="العملاء المحفوظون" FontSize="14" FontWeight="SemiBold" Foreground="#19243A" Margin="0,12,0,0" />
+                        <DataGrid ItemsSource="{Binding Customers}" Height="290">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="الرمز" Binding="{Binding Code}" Width="90" />
+                                <DataGridTextColumn Header="الاسم" Binding="{Binding Name}" Width="*" />
+                                <DataGridTextColumn Header="الرقم الضريبي" Binding="{Binding TaxNumber}" Width="125" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Column="1" Background="White" BorderBrush="#E3E9F2" BorderThickness="1" CornerRadius="14" Padding="16" Margin="8,0,0,0">
+                    <StackPanel>
+                        <TextBlock Text="مسودة بيع داخلية" FontSize="17" FontWeight="Bold" Foreground="#19243A" />
+                        <TextBlock Text="رقم المسودة" Foreground="#69758D" FontSize="12" />
+                        <TextBox Text="{Binding InvoiceNumber, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Text="العميل" Foreground="#69758D" FontSize="12" />
+                        <ComboBox ItemsSource="{Binding Customers}" SelectedItem="{Binding SelectedCustomer, Mode=TwoWay}" DisplayMemberPath="Name" />
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Margin="0,0,5,0">
+                                <TextBlock Text="تاريخ الإصدار" Foreground="#69758D" FontSize="12" />
+                                <DatePicker SelectedDate="{Binding DraftIssueDate, Mode=TwoWay}" Margin="0,4,0,8" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Margin="5,0,0,0">
+                                <TextBlock Text="تاريخ الاستحقاق" Foreground="#69758D" FontSize="12" />
+                                <DatePicker SelectedDate="{Binding DraftDueDate, Mode=TwoWay}" Margin="0,4,0,8" />
+                            </StackPanel>
+                        </Grid>
+                        <TextBlock Text="البنود (الكمية وسعر الوحدة حتى 4 منازل عشرية)" Foreground="#69758D" FontSize="12" />
+                        <DataGrid x:Name="InvoiceLinesGrid" ItemsSource="{Binding InvoiceLines}" SelectedItem="{Binding SelectedInvoiceLine, Mode=TwoWay}" Height="175" IsReadOnly="False">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="الوصف" Binding="{Binding Description, UpdateSourceTrigger=PropertyChanged}" Width="*" />
+                                <DataGridTextColumn Header="الكمية" Binding="{Binding Quantity, UpdateSourceTrigger=PropertyChanged}" Width="90" />
+                                <DataGridTextColumn Header="السعر" Binding="{Binding UnitPrice, UpdateSourceTrigger=PropertyChanged}" Width="95" />
+                                <DataGridTextColumn Header="القيمة" Binding="{Binding LineAmount, StringFormat=N4}" IsReadOnly="True" Width="95" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+                        <Grid>
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <Button Grid.Column="0" Content="إضافة بند" Command="{Binding AddInvoiceLineCommand}" Margin="0,4,4,8" />
+                            <Button Grid.Column="1" Content="حذف البند المحدد" Command="{Binding RemoveInvoiceLineCommand}" Background="#EEF2F8" Foreground="#344054" Margin="4,4,0,8" />
+                        </Grid>
+                        <TextBlock Text="ملاحظات" Foreground="#69758D" FontSize="12" />
+                        <TextBox Text="{Binding InvoiceNotes, UpdateSourceTrigger=PropertyChanged}" />
+                        <Button Content="حفظ المسودة في قاعدة البيانات" Click="CreateInvoiceDraftButton_Click" HorizontalAlignment="Stretch" FontWeight="SemiBold" Padding="12,11" />
+                        <TextBlock Text="المسودة لا تحتوي VAT، ولا تعتبر فاتورة ضريبية، ولا تنشئ قيدًا محاسبيًا نهائيًا." FontSize="11" Foreground="#8A6A20" TextWrapping="Wrap" />
+                        <TextBlock Text="مسودات البيع المحفوظة" FontSize="14" FontWeight="SemiBold" Foreground="#19243A" Margin="0,10,0,0" />
+                        <DataGrid ItemsSource="{Binding Drafts}" Height="200">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="رقم" Binding="{Binding InvoiceNumber}" Width="*" />
+                                <DataGridTextColumn Header="التاريخ" Binding="{Binding IssueDate}" Width="105" />
+                                <DataGridTextColumn Header="الإجمالي" Binding="{Binding SubtotalAmount, StringFormat=N4}" Width="110" />
+                                <DataGridTextColumn Header="البنود" Binding="{Binding LineCount}" Width="60" />
+                                <DataGridTextColumn Header="الحالة" Binding="{Binding Status}" Width="75" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
