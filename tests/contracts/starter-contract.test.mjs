@@ -170,3 +170,19 @@ test('income statement and balance sheet reports derive only from posted ledger 
   assert.match(api, /totalAssets, totalLiabilities, totalEquity/);
   assert.match(api, /totalAssets - totalLiabilities - totalEquity/);
 });
+
+
+test('Saudi VAT preview requires explicit treatment, decimal rounding and tenant company validation', async () => {
+  const calculator = await read('src/server/BusinessERP.Domain/Tax/SaudiVatCalculator.cs');
+  const endpoint = await read('src/server/BusinessERP.Api/Endpoints/SalesVatPreviewEndpoints.cs');
+  const program = await read('src/server/BusinessERP.Api/Program.cs');
+  assert.match(calculator, /StandardRatePercent = 15m/);
+  assert.match(calculator, /MidpointRounding\.AwayFromZero/);
+  assert.match(calculator, /SalesVatTreatment\.ZeroRated/);
+  assert.match(calculator, /TreatmentReason/);
+  assert.match(endpoint, /sales-vat-preview/);
+  assert.match(endpoint, /PREVIEW_ONLY/);
+  assert.match(endpoint, /db\.Companies\.AsNoTracking\(\)/);
+  assert.match(endpoint, /SaudiVatCalculator\.Calculate/);
+  assert.match(program, /MapSalesVatPreviewEndpoints/);
+});
