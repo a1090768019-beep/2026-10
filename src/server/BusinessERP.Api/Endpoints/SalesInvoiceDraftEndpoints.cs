@@ -43,6 +43,9 @@ public static class SalesInvoiceDraftEndpoints
                        invoice.customer_id AS "CustomerId",
                        invoice.customer_name_snapshot AS "CustomerName",
                        invoice.subtotal_amount AS "SubtotalAmount",
+                       invoice.tax_calculation_status AS "TaxCalculationStatus",
+                       invoice.vat_amount AS "VatAmount",
+                       invoice.total_amount AS "TotalAmount",
                        invoice.status AS "Status",
                        invoice.created_at AS "CreatedAt",
                        (SELECT count(*)::integer
@@ -269,7 +272,8 @@ public static class SalesInvoiceDraftEndpoints
 
     private static DraftListDto ToListDto(DraftListRow row) => new(
         row.Id, row.InvoiceNumber, row.IssueDate, row.DueDate, row.CurrencyCode.Trim(),
-        row.CustomerId, row.CustomerName, row.SubtotalAmount, row.Status, row.CreatedAt, row.LineCount);
+        row.CustomerId, row.CustomerName, row.SubtotalAmount, row.TaxCalculationStatus,
+        row.VatAmount, row.TotalAmount, row.Status, row.CreatedAt, row.LineCount);
 
     private static bool HasSupportedPrecision(decimal value) =>
         value >= 0m && value <= MaxAmount && decimal.Round(value, 4, MidpointRounding.ToEven) == value;
@@ -282,7 +286,8 @@ public static class SalesInvoiceDraftEndpoints
     public sealed record CreateDraftLineRequest(string? Description, decimal Quantity, decimal UnitPrice);
     public sealed record DraftListDto(
         Guid Id, string InvoiceNumber, DateOnly IssueDate, DateOnly? DueDate, string CurrencyCode,
-        Guid CustomerId, string CustomerName, decimal SubtotalAmount, string Status, DateTime CreatedAt, int LineCount);
+        Guid CustomerId, string CustomerName, decimal SubtotalAmount, string TaxCalculationStatus,
+        decimal? VatAmount, decimal? TotalAmount, string Status, DateTime CreatedAt, int LineCount);
     public sealed record SalesInvoiceDraftDto(
         Guid Id, Guid CompanyId, Guid CustomerId, string InvoiceNumber, DateOnly IssueDate,
         DateOnly? DueDate, string CurrencyCode, string CustomerName, string? CustomerTaxNumber,
@@ -306,6 +311,9 @@ public static class SalesInvoiceDraftEndpoints
         public Guid CustomerId { get; init; }
         public string CustomerName { get; init; } = "";
         public decimal SubtotalAmount { get; init; }
+        public string TaxCalculationStatus { get; init; } = "NOT_CALCULATED";
+        public decimal? VatAmount { get; init; }
+        public decimal? TotalAmount { get; init; }
         public string Status { get; init; } = "DRAFT";
         public DateTime CreatedAt { get; init; }
         public int LineCount { get; init; }

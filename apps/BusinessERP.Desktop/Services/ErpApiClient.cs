@@ -159,7 +159,8 @@ public sealed record ApiCustomer(Guid Id, string Code, string Name, string? Emai
 public sealed record CreateCustomerApiRequest(string Code, string Name, string? Email = null, string? Phone = null, string? TaxNumber = null);
 public sealed record SalesInvoiceDraftListItem(
     Guid Id, string InvoiceNumber, DateOnly IssueDate, DateOnly? DueDate, string CurrencyCode,
-    Guid CustomerId, string CustomerName, decimal SubtotalAmount, string Status, DateTime CreatedAt, int LineCount);
+    Guid CustomerId, string CustomerName, decimal SubtotalAmount, string TaxCalculationStatus,
+    decimal? VatAmount, decimal? TotalAmount, string Status, DateTime CreatedAt, int LineCount);
 public sealed record CreateSalesInvoiceDraftApiRequest(
     Guid CustomerId, string InvoiceNumber, DateOnly IssueDate, DateOnly? DueDate,
     string? Notes, IReadOnlyList<CreateSalesInvoiceDraftLineApiRequest> Lines);

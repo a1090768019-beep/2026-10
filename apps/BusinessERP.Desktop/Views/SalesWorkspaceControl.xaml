@@ -184,7 +184,10 @@
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="رقم" Binding="{Binding InvoiceNumber}" Width="*" />
                                 <DataGridTextColumn Header="التاريخ" Binding="{Binding IssueDate}" Width="105" />
-                                <DataGridTextColumn Header="الإجمالي" Binding="{Binding SubtotalAmount, StringFormat=N4}" Width="110" />
+                                <DataGridTextColumn Header="المجموع الخام" Binding="{Binding SubtotalAmount, StringFormat=N4}" Width="105" />
+                                <DataGridTextColumn Header="VAT" Binding="{Binding VatAmount, StringFormat=N2}" Width="65" />
+                                <DataGridTextColumn Header="الإجمالي الضريبي" Binding="{Binding TotalAmount, StringFormat=N2}" Width="100" />
+                                <DataGridTextColumn Header="حالة الضريبة" Binding="{Binding TaxCalculationStatus}" Width="120" />
                                 <DataGridTextColumn Header="البنود" Binding="{Binding LineCount}" Width="60" />
                                 <DataGridTextColumn Header="الحالة" Binding="{Binding Status}" Width="75" />
                             </DataGrid.Columns>
