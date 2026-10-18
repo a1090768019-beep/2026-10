@@ -53,6 +53,10 @@ jobs:
         env:
           POSTGRES_ADMIN_URL: postgresql://postgres:postgres@localhost:5432/business_erp
         run: psql "$POSTGRES_ADMIN_URL" -v ON_ERROR_STOP=1 -f database/migrations/0002_sales_invoice_drafts.sql
+      - name: Apply sales invoice draft VAT migration
+        env:
+          POSTGRES_ADMIN_URL: postgresql://postgres:postgres@localhost:5432/business_erp
+        run: psql "$POSTGRES_ADMIN_URL" -v ON_ERROR_STOP=1 -f database/migrations/0003_sales_invoice_draft_vat.sql
       - name: Create least-privilege runtime role
         env:
           POSTGRES_ADMIN_URL: postgresql://postgres:postgres@localhost:5432/business_erp
