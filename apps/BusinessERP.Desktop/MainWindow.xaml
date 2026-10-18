@@ -32,9 +32,17 @@
                         <TextBlock x:Name="PageTitle" Text="نظرة عامة" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}" />
                         <TextBlock Text="مساحة العمل  /  إدارة الأعمال" FontSize="12" Foreground="{StaticResource MutedBrush}" Margin="0,3,0,0" />
                     </StackPanel>
-                    <Border Grid.Column="1" CornerRadius="18" Background="#EEF3FF" Padding="14,8" VerticalAlignment="Center">
-                        <TextBlock Text="●  الواجهة العربية" Foreground="#315CC4" FontSize="12" FontWeight="SemiBold" />
-                    </Border>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" FlowDirection="RightToLeft" VerticalAlignment="Center">
+                        <TextBlock x:Name="AuthStatusText" Text="إعداد الهوية مطلوب" Foreground="#69758D" FontSize="11" VerticalAlignment="Center" Margin="0,0,8,0" MaxWidth="150" TextWrapping="Wrap" />
+                        <TextBox x:Name="TenantIdTextBox" Width="210" Height="34" Padding="8,5" IsEnabled="False"
+                                 ToolTip="أدخل معرّف المستأجر الذي خصصه لك مشغّل المنصة" Margin="0,0,6,0" />
+                        <Button x:Name="ApplyTenantButton" Content="تفعيل المستأجر" Click="ApplyTenantButton_Click"
+                                IsEnabled="False" Padding="10,7" Margin="0,0,6,0" Background="#EEF3FF" Foreground="#315CC4" BorderThickness="0" Cursor="Hand" />
+                        <Button x:Name="LoginButton" Content="تسجيل الدخول" Click="LoginButton_Click"
+                                Padding="11,7" Margin="0,0,6,0" Background="#315CC4" Foreground="White" BorderThickness="0" Cursor="Hand" />
+                        <Button x:Name="LogoutButton" Content="إنهاء الجلسة" Click="LogoutButton_Click" Visibility="Collapsed"
+                                Padding="11,7" Margin="0,0,0,0" Background="#FBEAEA" Foreground="#9D3030" BorderThickness="0" Cursor="Hand" />
+                    </StackPanel>
                 </Grid>
             </Border>
 
@@ -133,7 +141,7 @@
                                         </Grid>
                                     </Border>
                                 </UniformGrid>
-                                <TextBlock Text="تنبيه: شاشات إنشاء الشركة وحفظ البيانات لم تُربط بعد بالخادم." Foreground="#8A6A20" FontSize="12" Margin="4,14,0,0" TextWrapping="Wrap" />
+                                <TextBlock Text="تم ربط مسودة المبيعات والعملاء بالـ API؛ بقية الوحدات والشاشات ما زالت قيد التنفيذ." Foreground="#8A6A20" FontSize="12" Margin="4,14,0,0" TextWrapping="Wrap" />
                             </StackPanel>
                         </Border>
 
@@ -161,8 +169,8 @@
                                 <StackPanel>
                                     <Grid Margin="0,0,0,15"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><Border Width="42" Height="42" Background="#E8F8F1" CornerRadius="12" HorizontalAlignment="Right"><TextBlock Text="AR" Foreground="#19865C" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" /></Border><TextBlock Grid.Column="1" Text="↗" FontSize="20" Foreground="#A7B1C4" VerticalAlignment="Center" /></Grid>
                                     <TextBlock Text="المبيعات والعملاء" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}" />
-                                    <TextBlock Text="الفواتير والتحصيل وأعمار الديون." Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" Margin="0,7,0,15" />
-                                    <TextBlock Text="لاحقًا" Foreground="#78839A" FontSize="12" FontWeight="SemiBold" />
+                                    <TextBlock Text="العملاء ومسودات البيع المحفوظة؛ لا تتضمن هذه النسخة VAT أو ترحيلًا محاسبيًا." Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" Margin="0,7,0,15" />
+                                    <TextBlock Text="مسودات أولية متصلة بالخادم" Foreground="#19865C" FontSize="12" FontWeight="SemiBold" />
                                 </StackPanel>
                             </Button>
                             <Button Style="{StaticResource ModuleCardStyle}" Tag="Purchases" Click="Navigate_Click">
@@ -237,6 +245,7 @@
                         </Border>
                     </StackPanel>
                 </ScrollViewer>
+                <views:SalesWorkspaceControl x:Name="SalesWorkspacePanel" Visibility="Collapsed" />
             </Grid>
         </Grid>
 

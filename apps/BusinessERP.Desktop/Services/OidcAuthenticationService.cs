@@ -39,7 +39,7 @@ public sealed class OidcAuthenticationService
             callback.Scheme != Uri.UriSchemeHttp ||
             !IPAddress.TryParse(callback.Host, out var callbackAddress) ||
             !IPAddress.IsLoopback(callbackAddress) ||
-            !callback.AbsolutePath.EndsWith('/', StringComparison.Ordinal) ||
+            !callback.AbsolutePath.EndsWith("/", StringComparison.Ordinal) ||
             !string.IsNullOrEmpty(callback.Query) ||
             !string.IsNullOrEmpty(callback.Fragment))
         {
