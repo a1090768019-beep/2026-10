@@ -300,6 +300,7 @@ public partial class MainWindow : Window
             case Key.N:
                 e.Handled = true;
                 await NavigateToKeyAsync("Sales");
+                GeneralSearchBox.Clear();
                 SalesWorkspacePanel.BeginNewDraft();
                 RibbonStatusText.Text = SalesWorkspacePanel.WorkspaceStatusMessage;
                 break;
@@ -346,6 +347,7 @@ public partial class MainWindow : Window
     private async void RibbonNew_Click(object sender, RoutedEventArgs e)
     {
         await NavigateToKeyAsync("Sales");
+        GeneralSearchBox.Clear();
         SalesWorkspacePanel.BeginNewDraft();
         RibbonStatusText.Text = SalesWorkspacePanel.WorkspaceStatusMessage;
     }
