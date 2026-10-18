@@ -1,4 +1,4 @@
-using IdentityModel.OidcClient;
+using Duende.IdentityModel.OidcClient;
 using System.Net;
 
 namespace BusinessERP.Desktop.Services;
