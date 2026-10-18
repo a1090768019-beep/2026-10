@@ -91,6 +91,7 @@ app.MapSubscriptionEndpoints();
 app.MapCustomerEndpoints();
 app.MapSalesInvoiceDraftEndpoints();
 app.MapSalesVatPreviewEndpoints();
+app.MapSalesDraftVatEndpoints();
 app.Run();
 
 public partial class Program { }
