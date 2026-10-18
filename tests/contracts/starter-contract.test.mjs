@@ -167,6 +167,6 @@ test('income statement and balance sheet reports derive only from posted ledger 
   assert.match(api, /reports\/balance-sheet/);
   assert.match(api, /entry\.Status == "POSTED"/);
   assert.match(api, /LoadPostedAccountMovementsAsync/);
-  assert.match(api, /TotalAssets, totalLiabilities, totalEquity/);
+  assert.match(api, /totalAssets, totalLiabilities, totalEquity/);
   assert.match(api, /totalAssets - totalLiabilities - totalEquity/);
 });
