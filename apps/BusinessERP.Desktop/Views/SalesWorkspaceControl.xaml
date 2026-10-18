@@ -178,9 +178,9 @@
                         <TextBlock Text="ملاحظات" Foreground="#69758D" FontSize="12" />
                         <TextBox Text="{Binding InvoiceNotes, UpdateSourceTrigger=PropertyChanged}" />
                         <Button Content="حفظ المسودة في قاعدة البيانات" Click="CreateInvoiceDraftButton_Click" HorizontalAlignment="Stretch" FontWeight="SemiBold" Padding="12,11" />
-                        <TextBlock Text="يحفظ النظام تصنيف VAT وحسابها داخل المسودة. المستند ليس فاتورة ضريبية نهائية ولا يُرسل إلى ZATCA ولا ينشئ قيدًا محاسبيًا." FontSize="11" Foreground="#8A6A20" TextWrapping="Wrap" />
+                        <TextBlock Text="يحفظ النظام التصنيف والإجماليات الضريبية داخليًا. المستند ليس فاتورة ضريبية صادرة ولا يُرسل إلى ZATCA؛ يمكن ترحيل أثره المحاسبي إلى الأستاذ عند تحقق الشروط." FontSize="11" Foreground="#8A6A20" TextWrapping="Wrap" />
                         <TextBlock Text="مسودات البيع المحفوظة" FontSize="14" FontWeight="SemiBold" Foreground="#19243A" Margin="0,10,0,0" />
-                        <DataGrid ItemsSource="{Binding Drafts}" Height="200">
+                        <DataGrid ItemsSource="{Binding Drafts}" SelectedItem="{Binding SelectedDraft, Mode=TwoWay}" Height="200">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="رقم" Binding="{Binding InvoiceNumber}" Width="*" />
                                 <DataGridTextColumn Header="التاريخ" Binding="{Binding IssueDate}" Width="105" />
@@ -192,6 +192,48 @@
                                 <DataGridTextColumn Header="الحالة" Binding="{Binding Status}" Width="75" />
                             </DataGrid.Columns>
                         </DataGrid>
+
+                        <Border Background="#F8FAFD" BorderBrush="#DDE5F0" BorderThickness="1" CornerRadius="10" Padding="14" Margin="0,12,0,0">
+                            <StackPanel>
+                                <TextBlock Text="ترحيل الأثر المحاسبي إلى دفتر الأستاذ" FontSize="15" FontWeight="Bold" Foreground="#19243A" />
+                                <TextBlock Text="{Binding SelectedDraftPostingSummary}" Foreground="#69758D" TextWrapping="Wrap" Margin="0,5,0,10" />
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Margin="0,0,5,0">
+                                        <TextBlock Text="الفترة المالية المفتوحة" Foreground="#69758D" FontSize="12" />
+                                        <ComboBox ItemsSource="{Binding FiscalPeriods}" SelectedItem="{Binding SelectedFiscalPeriod, Mode=TwoWay}" DisplayMemberPath="DisplayName" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Margin="5,0,0,0">
+                                        <TextBlock Text="رقم القيد" Foreground="#69758D" FontSize="12" />
+                                        <TextBox Text="{Binding JournalEntryNumber, UpdateSourceTrigger=PropertyChanged}" />
+                                    </StackPanel>
+                                </Grid>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Margin="0,0,5,0">
+                                        <TextBlock Text="حساب الذمم المدينة (أصل مدين)" Foreground="#69758D" FontSize="12" />
+                                        <ComboBox ItemsSource="{Binding ReceivableAccounts}" SelectedItem="{Binding SelectedReceivableAccount, Mode=TwoWay}" DisplayMemberPath="DisplayName" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Margin="5,0,0,0">
+                                        <TextBlock Text="حساب الإيرادات (إيراد دائن)" Foreground="#69758D" FontSize="12" />
+                                        <ComboBox ItemsSource="{Binding RevenueAccounts}" SelectedItem="{Binding SelectedRevenueAccount, Mode=TwoWay}" DisplayMemberPath="DisplayName" />
+                                    </StackPanel>
+                                </Grid>
+                                <TextBlock Text="حساب ضريبة المخرجات (التزام دائن)" Foreground="#69758D" FontSize="12" />
+                                <ComboBox ItemsSource="{Binding OutputVatAccounts}" SelectedItem="{Binding SelectedOutputVatAccount, Mode=TwoWay}" DisplayMemberPath="DisplayName" />
+                                <Button Content="ترحيل المسودة المختارة إلى الأستاذ العام"
+                                        Command="{Binding PostSelectedDraftToLedgerCommand}"
+                                        HorizontalAlignment="Stretch" FontWeight="SemiBold" Padding="12,11"
+                                        Background="#167A55" Margin="0,5,0,2" />
+                                <TextBlock Text="ينشئ الخادم قيدًا متوازنًا ذريًا ومربوطًا بالمصدر، ويمنع التكرار والتعديل بعد الترحيل. هذا ليس إصدار فاتورة ضريبية ولا إرسالًا إلى ZATCA." FontSize="11" Foreground="#8A6A20" TextWrapping="Wrap" Margin="0,6,0,0" />
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
                 </Border>
             </Grid>
