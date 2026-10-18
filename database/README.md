@@ -23,3 +23,9 @@
 ## Migration validation
 
 The initial schema is still a bootstrap script, not a complete versioned EF Core migration chain. Apply it only to a new, disposable PostgreSQL database until a tested forward-upgrade path is supplied. The SQL and RLS policies have not been executed against PostgreSQL in this environment. Before production, run clean-install, rerun/upgrade, rollback or restore, two-tenant isolation, concurrent idempotency, journal immutability, and runtime-role permission tests against real PostgreSQL.
+
+## Automated PostgreSQL smoke tests
+
+The GitHub Actions workflow starts a disposable PostgreSQL 17 service, applies the bootstrap schema, creates a non-owner/non-superuser runtime role, and seeds two isolated tenants. It then runs `database/tests/postgres-smoke.sql` as that restricted role to verify that missing tenant context returns no tenant-owned rows, tenant A cannot read tenant B's company, a balanced journal can be approved and posted, an unbalanced journal cannot be approved, debit and credit cannot both be positive on one line, and a posted journal cannot be edited.
+
+Run the same checks locally from a shell with `psql` installed and an empty disposable database by applying the migration, then the preparation and fixture SQL files in order. Do not run these test fixtures against a production database.
