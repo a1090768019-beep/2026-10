@@ -6,6 +6,7 @@ using System.Text.Json;
 using BusinessERP.Api;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Configuration;
@@ -39,7 +40,7 @@ public sealed class AccountingApiIntegrationTests
         {
             var companiesBody = await companiesResponse.Content.ReadAsStringAsync();
             Assert.True(companiesResponse.StatusCode == HttpStatusCode.OK,
-                $"GET companies returned {(int)companiesResponse.StatusCode}: {companiesBody}");
+                $"GET companies returned {(int)companiesResponse.StatusCode}: {companiesBody}{Environment.NewLine}{TestExceptionHandler.LastException}");
             using var companies = JsonDocument.Parse(companiesBody);
             Assert.Contains(companies.RootElement.EnumerateArray(),
                 company => company.GetProperty("id").GetGuid() == CompanyA);
@@ -215,6 +216,7 @@ public sealed class ApiTestFactory : WebApplicationFactory<Program>
 
         builder.ConfigureTestServices(services =>
         {
+            services.AddSingleton<IExceptionHandler, TestExceptionHandler>();
             services.AddAuthentication(options =>
             {
                 options.DefaultScheme = TestAuthHandler.SchemeName;
@@ -256,6 +258,17 @@ public sealed class TestAuthHandler(
         var principal = new ClaimsPrincipal(identity);
         var ticket = new AuthenticationTicket(principal, SchemeName);
         return Task.FromResult(AuthenticateResult.Success(ticket));
+    }
+}
+
+public sealed class TestExceptionHandler : IExceptionHandler
+{
+    public static string? LastException { get; private set; }
+
+    public ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
+    {
+        LastException = exception.ToString();
+        return ValueTask.FromResult(false);
     }
 }
 
