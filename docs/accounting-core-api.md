@@ -68,3 +68,12 @@ These locks complement, rather than replace, the database unique indexes and tri
 - التصنيفات: `StandardRated`, `ZeroRated`, `Exempt`، `OutsideScope`. أي تصنيف غير قياسي يتطلب سببًا نصيًا. الحساب يستخدم `decimal`، ويقرّب قيمة البند والضريبة إلى منزلتين عشريتين باستخدام `MidpointRounding.AwayFromZero`.
 - `documentStatus=PREVIEW_ONLY`: لا تُحفظ المعاينة ولا تمثل فاتورة ضريبية أو دليل توافق ZATCA. لم تُضف أعمدة ضريبة للمسودات المحفوظة، ولا يوجد ترحيل ضريبة/إيراد/ذمم أو إصدار نهائي.
 - يُطبّق 15% فقط على البند المصنف StandardRated صراحةً. يجب مراجعة تصنيف كل توريد وقواعد الهيئة قبل أي استخدام قانوني.
+
+
+## حفظ حساب VAT على مسودة بيع (migration 0003)
+
+- `POST /api/v1/companies/{companyId}/sales-invoice-drafts/{invoiceId}/calculate-vat` يستقبل لكل بند `lineNumber`, `discountAmount`, `treatment`, و`treatmentReason` عند الحاجة.
+- الخادم لا يثق في مبالغ/كميات/أسعار ضريبية من العميل؛ يقرأ الكمية والوصف والسعر من البنود المحفوظة ويحسب بواسطة `SaudiVatCalculator`.
+- تُحدّث حقول تصنيف/خصم/VAT للبنود، وإجماليات الرأس، وسجل التدقيق ضمن معاملة PostgreSQL واحدة. قيود قاعدة البيانات المؤجلة تطابق إجماليات الرأس مع مجموع البنود.
+- `GET /api/v1/companies/{companyId}/sales-invoice-drafts` يعرض `taxCalculationStatus` وVAT والإجمالي إن كانت الحسابات محفوظة. `NOT_CALCULATED` تعني غير مصنفة؛ `CALCULATED` تعني حسابًا داخليًا محفوظًا فقط.
+- يمكن إعادة الحساب طالما بقيت الحالة `DRAFT`. لا يوجد إصدار نهائي/منع تعديل بعد الإصدار، ولا قيد ذمم/إيراد/ضريبة في GL، ولا تحصيل، ولا XML/QR/توقيع أو إرسال/إقرار ZATCA. لا تُسلّم المسودة كفاتورة قانونية.
