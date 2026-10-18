@@ -220,3 +220,25 @@ test('persisted VAT endpoint calculates from stored invoice lines and updates he
   assert.match(migration, /actual_vat <> expected_vat/);
   assert.match(program, /MapSalesDraftVatEndpoints/);
 });
+
+
+test('sales draft GL posting is tenant-bound, balanced, immutable after post and idempotent by source', async () => {
+  const migration = await read('database/migrations/0004_sales_draft_ledger_posting.sql');
+  const role = await read('database/tests/prepare-runtime-role.sql');
+  const ci = await read('.github/workflows/ci.yml');
+  const endpoint = await read('src/server/BusinessERP.Api/Endpoints/SalesDraftLedgerPostingEndpoints.cs');
+  const program = await read('src/server/BusinessERP.Api/Program.cs');
+  assert.match(migration, /ACCOUNTING_POSTED/);
+  assert.match(migration, /fk_sales_invoice_draft_posted_journal/);
+  assert.match(migration, /guard_sales_invoice_draft_header_mutation/);
+  assert.match(migration, /guard_sales_invoice_draft_line_mutation/);
+  assert.match(migration, /linked_source_type <> 'SALES_INVOICE_DRAFT'/);
+  assert.match(role, /accounting_posted_journal_entry_id/);
+  assert.match(ci, /database\/migrations\/0004_sales_draft_ledger_posting\.sql/);
+  assert.match(endpoint, /sales-invoice-drafts\/\{invoiceId:guid\}\/post-to-ledger/);
+  assert.match(endpoint, /SALES_INVOICE_DRAFT/);
+  assert.match(endpoint, /Status = "APPROVED"/);
+  assert.match(endpoint, /Status = "POSTED"/);
+  assert.match(endpoint, /sales_draft_vat_not_calculated/);
+  assert.match(program, /MapSalesDraftLedgerPostingEndpoints/);
+});

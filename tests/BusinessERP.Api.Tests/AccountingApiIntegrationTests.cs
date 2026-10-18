@@ -468,6 +468,158 @@ public sealed class AccountingApiIntegrationTests
             Assert.Equal(0m, balance.RootElement.GetProperty("difference").GetDecimal());
         }
 
+        // A draft with no persisted VAT calculation must not create a journal entry.
+        var unclassifiedNumber = "UNCLASSIFIED-" + Guid.NewGuid().ToString("N")[..8].ToUpperInvariant();
+        using var unclassifiedDraftResponse = await client.PostAsJsonAsync(
+            $"/api/v1/companies/{CompanyA}/sales-invoice-drafts",
+            new
+            {
+                customerId,
+                invoiceNumber = unclassifiedNumber,
+                issueDate = new DateOnly(2026, 2, 18),
+                dueDate = (DateOnly?)null,
+                notes = "لا يرحل قبل تصنيف VAT",
+                lines = new[] { new { description = "خدمة غير مصنفة", quantity = 1m, unitPrice = 10m } }
+            });
+        Assert.Equal(HttpStatusCode.Created, unclassifiedDraftResponse.StatusCode);
+        using var unclassifiedDraftJson = await ParseJsonAsync(unclassifiedDraftResponse);
+        var unclassifiedDraftId = unclassifiedDraftJson.RootElement.GetProperty("id").GetGuid();
+
+        var receivableAccountId = await CreateTestAccountAsync(
+            client, CompanyA, "AR-CI-" + Guid.NewGuid().ToString("N")[..8].ToUpperInvariant(),
+            "ذمم العملاء", "Trade receivables", "ASSET", "DEBIT");
+        var revenueAccountId = await CreateTestAccountAsync(
+            client, CompanyA, "REV-CI-" + Guid.NewGuid().ToString("N")[..8].ToUpperInvariant(),
+            "إيرادات المبيعات", "Sales revenue", "REVENUE", "CREDIT");
+        var outputVatAccountId = await CreateTestAccountAsync(
+            client, CompanyA, "VAT-CI-" + Guid.NewGuid().ToString("N")[..8].ToUpperInvariant(),
+            "ضريبة قيمة مضافة مستحقة", "Output VAT payable", "LIABILITY", "CREDIT");
+
+        var unclassifiedPostingRequest = new
+        {
+            fiscalPeriodId = PeriodA,
+            entryNumber = "SD-UNCLASS-" + unclassifiedDraftId.ToString("N")[..8].ToUpperInvariant(),
+            receivableAccountId,
+            revenueAccountId,
+            outputVatAccountId
+        };
+        using (var blockedPosting = await client.PostAsJsonAsync(
+            $"/api/v1/companies/{CompanyA}/sales-invoice-drafts/{unclassifiedDraftId}/post-to-ledger",
+            unclassifiedPostingRequest))
+        {
+            Assert.Equal(HttpStatusCode.Conflict, blockedPosting.StatusCode);
+            using var blockedBody = await ParseJsonAsync(blockedPosting);
+            Assert.Equal("sales_draft_vat_not_calculated", blockedBody.RootElement.GetProperty("error").GetString());
+        }
+
+        var salesPostingEntryNumber = "SD-" + draftId.ToString("N")[..20].ToUpperInvariant();
+        var salesPostingRequest = new
+        {
+            fiscalPeriodId = PeriodA,
+            entryNumber = salesPostingEntryNumber,
+            receivableAccountId,
+            revenueAccountId,
+            outputVatAccountId
+        };
+        using (var salesPostingResponse = await client.PostAsJsonAsync(
+            $"/api/v1/companies/{CompanyA}/sales-invoice-drafts/{draftId}/post-to-ledger",
+            salesPostingRequest))
+        {
+            Assert.True(salesPostingResponse.StatusCode == HttpStatusCode.Created,
+                $"Post sales draft returned {(int)salesPostingResponse.StatusCode}: {await salesPostingResponse.Content.ReadAsStringAsync()}{Environment.NewLine}{TestExceptionHandler.LastException}");
+            using var postedResult = await ParseJsonAsync(salesPostingResponse);
+            Assert.Equal(draftId, postedResult.RootElement.GetProperty("salesInvoiceDraftId").GetGuid());
+            Assert.Equal(salesPostingEntryNumber, postedResult.RootElement.GetProperty("entryNumber").GetString());
+            Assert.Equal("POSTED", postedResult.RootElement.GetProperty("journalEntryStatus").GetString());
+            Assert.Equal(31.86m, postedResult.RootElement.GetProperty("grossAmount").GetDecimal());
+            Assert.Equal(10m, postedResult.RootElement.GetProperty("discountAmount").GetDecimal());
+            Assert.Equal(21.86m, postedResult.RootElement.GetProperty("netAmount").GetDecimal());
+            Assert.Equal(3.13m, postedResult.RootElement.GetProperty("vatAmount").GetDecimal());
+            Assert.Equal(24.99m, postedResult.RootElement.GetProperty("totalAmount").GetDecimal());
+            Assert.False(postedResult.RootElement.GetProperty("alreadyPosted").GetBoolean());
+
+            var salesJournalId = postedResult.RootElement.GetProperty("journalEntryId").GetGuid();
+            using var salesJournalResponse = await client.GetAsync($"/api/v1/journal-entries/{salesJournalId}");
+            Assert.Equal(HttpStatusCode.OK, salesJournalResponse.StatusCode);
+            using var salesJournal = await ParseJsonAsync(salesJournalResponse);
+            Assert.Equal("POSTED", salesJournal.RootElement.GetProperty("status").GetString());
+            Assert.Equal(24.99m, salesJournal.RootElement.GetProperty("totalDebit").GetDecimal());
+            Assert.Equal(24.99m, salesJournal.RootElement.GetProperty("totalCredit").GetDecimal());
+            Assert.Equal(3, salesJournal.RootElement.GetProperty("lines").GetArrayLength());
+            Assert.Equal(receivableAccountId,
+                salesJournal.RootElement.GetProperty("lines")[0].GetProperty("accountId").GetGuid());
+            Assert.Equal(24.99m, salesJournal.RootElement.GetProperty("lines")[0].GetProperty("debit").GetDecimal());
+            Assert.Equal(revenueAccountId,
+                salesJournal.RootElement.GetProperty("lines")[1].GetProperty("accountId").GetGuid());
+            Assert.Equal(21.86m, salesJournal.RootElement.GetProperty("lines")[1].GetProperty("credit").GetDecimal());
+            Assert.Equal(outputVatAccountId,
+                salesJournal.RootElement.GetProperty("lines")[2].GetProperty("accountId").GetGuid());
+            Assert.Equal(3.13m, salesJournal.RootElement.GetProperty("lines")[2].GetProperty("credit").GetDecimal());
+        }
+
+        // Source identity makes retry idempotent: no second posted journal is created for the same draft.
+        using (var repeatedSalesPosting = await client.PostAsJsonAsync(
+            $"/api/v1/companies/{CompanyA}/sales-invoice-drafts/{draftId}/post-to-ledger",
+            salesPostingRequest))
+        {
+            Assert.Equal(HttpStatusCode.OK, repeatedSalesPosting.StatusCode);
+            using var repeated = await ParseJsonAsync(repeatedSalesPosting);
+            Assert.True(repeated.RootElement.GetProperty("alreadyPosted").GetBoolean());
+            Assert.Equal(salesPostingEntryNumber, repeated.RootElement.GetProperty("entryNumber").GetString());
+        }
+
+        using (var recalculateAfterPosting = await client.PostAsJsonAsync(
+            $"/api/v1/companies/{CompanyA}/sales-invoice-drafts/{draftId}/calculate-vat",
+            new
+            {
+                lines = new[]
+                {
+                    new { lineNumber = 1, discountAmount = 10m, treatment = "StandardRated", treatmentReason = (string?)null },
+                    new { lineNumber = 2, discountAmount = 0m, treatment = "Exempt", treatmentReason = "Integration test classification" }
+                }
+            }))
+            Assert.Equal(HttpStatusCode.Conflict, recalculateAfterPosting.StatusCode);
+
+        using (var revenueLedgerResponse = await client.GetAsync(
+            $"/api/v1/companies/{CompanyA}/accounts/{revenueAccountId}/ledger?fromDate=2026-02-01&toDate=2026-02-28"))
+        {
+            Assert.Equal(HttpStatusCode.OK, revenueLedgerResponse.StatusCode);
+            using var revenueLedger = await ParseJsonAsync(revenueLedgerResponse);
+            Assert.Equal(21.86m, revenueLedger.RootElement.GetProperty("totalCredit").GetDecimal());
+        }
+
+        using (var postedIncomeResponse = await client.GetAsync(
+            $"/api/v1/companies/{CompanyA}/reports/income-statement?fromDate=2026-02-01&toDate=2026-02-28"))
+        {
+            Assert.Equal(HttpStatusCode.OK, postedIncomeResponse.StatusCode);
+            using var postedIncome = await ParseJsonAsync(postedIncomeResponse);
+            Assert.Equal(21.86m, postedIncome.RootElement.GetProperty("totalRevenue").GetDecimal());
+            Assert.Equal(0m, postedIncome.RootElement.GetProperty("totalExpenses").GetDecimal());
+            Assert.Equal(21.86m, postedIncome.RootElement.GetProperty("netIncome").GetDecimal());
+        }
+
+        using (var postedBalanceResponse = await client.GetAsync(
+            $"/api/v1/companies/{CompanyA}/reports/balance-sheet?asOfDate=2026-02-28"))
+        {
+            Assert.Equal(HttpStatusCode.OK, postedBalanceResponse.StatusCode);
+            using var postedBalance = await ParseJsonAsync(postedBalanceResponse);
+            Assert.Equal(250.49m, postedBalance.RootElement.GetProperty("totalAssets").GetDecimal());
+            Assert.Equal(3.13m, postedBalance.RootElement.GetProperty("totalLiabilities").GetDecimal());
+            Assert.Equal(247.36m, postedBalance.RootElement.GetProperty("totalEquity").GetDecimal());
+            Assert.Equal(0m, postedBalance.RootElement.GetProperty("difference").GetDecimal());
+        }
+
+        using (var postedDraftList = await client.GetAsync($"/api/v1/companies/{CompanyA}/sales-invoice-drafts"))
+        {
+            Assert.Equal(HttpStatusCode.OK, postedDraftList.StatusCode);
+            using var rows = await ParseJsonAsync(postedDraftList);
+            Assert.Contains(rows.RootElement.EnumerateArray(), row =>
+                row.GetProperty("id").GetGuid() == draftId &&
+                row.GetProperty("status").GetString() == "ACCOUNTING_POSTED" &&
+                row.GetProperty("vatAmount").GetDecimal() == 3.13m &&
+                row.GetProperty("totalAmount").GetDecimal() == 24.99m);
+        }
+
         var reversalNumber = "IT-REV-" + Guid.NewGuid().ToString("N");
         using var reversalResponse = await client.PostAsJsonAsync(
             $"/api/v1/journal-entries/{entryId}/reverse",
@@ -493,6 +645,24 @@ public sealed class AccountingApiIntegrationTests
                 description = "Duplicate reversal must be rejected"
             });
         Assert.Equal(HttpStatusCode.Conflict, duplicateReversal.StatusCode);
+    }
+
+
+    private static async Task<Guid> CreateTestAccountAsync(
+        HttpClient client, Guid companyId, string code, string nameAr, string nameEn,
+        string accountType, string normalBalance)
+    {
+        using var response = await client.PostAsJsonAsync(
+            $"/api/v1/companies/{companyId}/accounts",
+            new
+            {
+                code, nameAr, nameEn, accountType, normalBalance,
+                parentAccountId = (Guid?)null, allowPosting = true
+            });
+        Assert.True(response.StatusCode == HttpStatusCode.Created,
+            $"Create {accountType} test account returned {(int)response.StatusCode}: {await response.Content.ReadAsStringAsync()}");
+        using var json = await ParseJsonAsync(response);
+        return json.RootElement.GetProperty("id").GetGuid();
     }
 
     private static object NewJournalPayload(string entryNumber, string description, decimal amount) => new
