@@ -28,9 +28,25 @@ BEGIN
     IF EXISTS (SELECT 1 FROM companies WHERE id = '22222222-2222-4222-8222-222222222201') THEN
         RAISE EXCEPTION 'RLS smoke failed: tenant A can see tenant B company';
     END IF;
-    IF EXISTS (SELECT 1 FROM customers) OR EXISTS (SELECT 1 FROM sales_invoice_drafts)
+    IF (SELECT count(*) FROM customers) <> 1
+       OR NOT EXISTS (SELECT 1 FROM customers WHERE id = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1')
+       OR EXISTS (SELECT 1 FROM customers WHERE id = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc2')
+       OR EXISTS (SELECT 1 FROM sales_invoice_drafts)
        OR EXISTS (SELECT 1 FROM sales_invoice_draft_lines) THEN
-        RAISE EXCEPTION 'Sales RLS smoke failed: tenant A unexpectedly sees unseeded sales rows';
+        RAISE EXCEPTION 'Sales RLS smoke failed: tenant A did not see only its customer rows';
+    END IF;
+
+    BEGIN
+        INSERT INTO customers (id, tenant_id, company_id, customer_code, name)
+        VALUES ('dddddddd-dddd-4ddd-8ddd-ddddddddddd1',
+                '22222222-2222-4222-8222-222222222222',
+                '22222222-2222-4222-8222-222222222201',
+                'CROSS-TENANT-WRITE', 'Must not be created by tenant A');
+    EXCEPTION WHEN insufficient_privilege THEN
+        blocked := true;
+    END;
+    IF NOT blocked THEN
+        RAISE EXCEPTION 'Sales RLS smoke failed: tenant A wrote a customer row for tenant B';
     END IF;
 
     IF (SELECT count(*) FROM tenant_subscriptions) <> 1 OR NOT EXISTS (
@@ -99,5 +115,18 @@ BEGIN
         RAISE EXCEPTION 'Line smoke failed: line with both debit and credit was accepted';
     END IF;
 END $$;
+
+-- Switching the tenant context inside the same transaction must also isolate tenant B.
+SELECT set_config('app.tenant_id', '22222222-2222-4222-8222-222222222222', true);
+DO $
+BEGIN
+    IF (SELECT count(*) FROM companies) <> 1
+       OR NOT EXISTS (SELECT 1 FROM companies WHERE id = '22222222-2222-4222-8222-222222222201')
+       OR (SELECT count(*) FROM customers) <> 1
+       OR NOT EXISTS (SELECT 1 FROM customers WHERE id = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc2')
+       OR EXISTS (SELECT 1 FROM customers WHERE id = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1') THEN
+        RAISE EXCEPTION 'Sales RLS smoke failed: tenant B saw cross-tenant customer or company data';
+    END IF;
+END $;
 
 COMMIT;
