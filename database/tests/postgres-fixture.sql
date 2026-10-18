@@ -1,8 +1,20 @@
 -- Run as the disposable PostgreSQL admin on a fresh CI database after 0001_initial.sql.
 -- Fixed IDs make the smoke assertions explicit and repeatable.
+INSERT INTO subscription_plans
+    (id, code, name, billing_interval, price, currency, limits_json, is_active)
+VALUES
+    ('33333333-3333-4333-8333-333333333333', 'CI-STARTER', 'CI Starter', 'MONTHLY', 0.0000, 'SAR',
+     '{"companies":1,"users":3,"entriesPerMonth":1000}'::jsonb, true);
+
 INSERT INTO tenants (id, slug, name, status) VALUES
 ('11111111-1111-4111-8111-111111111111', 'ci-tenant-a', 'CI Tenant A', 'ACTIVE'),
 ('22222222-2222-4222-8222-222222222222', 'ci-tenant-b', 'CI Tenant B', 'ACTIVE');
+
+INSERT INTO tenant_subscriptions
+    (id, tenant_id, subscription_plan_id, status, starts_at, ends_at)
+VALUES
+    ('11111111-1111-4111-8111-111111111109', '11111111-1111-4111-8111-111111111111',
+     '33333333-3333-4333-8333-333333333333', 'ACTIVE', '2026-01-01T00:00:00Z', '2027-01-01T00:00:00Z');
 
 INSERT INTO users (id, oidc_subject, email, display_name) VALUES
 ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'ci-subject-a', 'ci-a@example.invalid', 'CI User A'),
