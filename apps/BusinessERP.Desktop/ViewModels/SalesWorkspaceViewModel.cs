@@ -653,7 +653,7 @@ public sealed class SalesWorkspaceViewModel : INotifyPropertyChanged
         }
     }
 
-    private async Task PostSelectedDraftToLedgerAsync()
+    public async Task PostSelectedDraftToLedgerAsync()
     {
         if (_apiClient is null || SelectedCompany is null || SelectedDraft is null)
             return;
