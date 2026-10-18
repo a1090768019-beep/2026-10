@@ -31,6 +31,13 @@ public partial class SalesWorkspaceControl : UserControl
         Keyboard.Focus(InvoiceNumberTextBox);
     }
 
+    public async Task SaveCurrentDraftAsync()
+    {
+        await SaveCurrentDraftAsync();
+    }
+
+    public Task PostSelectedDraftToLedgerAsync() => _viewModel.PostSelectedDraftToLedgerAsync();
+
     private async void CreateInvoiceDraftButton_Click(object sender, RoutedEventArgs e)
     {
         InvoiceLinesGrid.CommitEdit(DataGridEditingUnit.Cell, true);
