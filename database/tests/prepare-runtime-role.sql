@@ -31,3 +31,7 @@ TO erp_ci_runtime;
 -- Audit is append-only for the application role.
 GRANT SELECT, INSERT ON audit_logs TO erp_ci_runtime;
 REVOKE UPDATE, DELETE, TRUNCATE ON audit_logs FROM erp_ci_runtime;
+
+
+-- Sales API currently creates and reads customers and invoice drafts; it does not edit/delete them.
+GRANT SELECT, INSERT ON customers, sales_invoice_drafts, sales_invoice_draft_lines TO erp_ci_runtime;

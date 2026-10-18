@@ -1,3 +1,4 @@
+using System.Text.Json;
 using BusinessERP.Application.Abstractions;
 using BusinessERP.Infrastructure.Persistence;
 using BusinessERP.Infrastructure.Tenancy;
@@ -89,6 +90,20 @@ public static class CustomerEndpoints
             if (!companyExists)
                 return Results.NotFound(new { error = "company_not_found" });
 
+            var customerLockKey = "customer-code:" + tenant.TenantId.ToString("D") + ":" +
+                                  companyId.ToString("D") + ":" + code;
+            await db.Database.ExecuteSqlInterpolatedAsync(
+                $"SELECT pg_advisory_xact_lock(hashtextextended({customerLockKey}, 0))", token);
+            var existing = await db.Database.SqlQuery<int>($"""
+                SELECT count(*)::integer AS "Value"
+                  FROM customers
+                 WHERE tenant_id = {tenant.TenantId}
+                   AND company_id = {companyId}
+                   AND customer_code = {code}
+                """).SingleAsync(token);
+            if (existing != 0)
+                return Results.Conflict(new { error = "customer_code_conflict" });
+
             var id = await db.Database.SqlQuery<Guid>($"""
                 INSERT INTO customers
                     (tenant_id, company_id, customer_code, name, email, phone, tax_number)
@@ -112,6 +127,15 @@ public static class CustomerEndpoints
                    AND id = {id}
                 """).SingleAsync(token);
 
+            db.AuditLogs.Add(new AuditLogRecord
+            {
+                Id = Guid.NewGuid(), TenantId = tenant.TenantId, UserId = tenant.UserId,
+                Action = "CUSTOMER_CREATED", EntityType = "Customer", EntityId = id.ToString("D"),
+                IpAddress = null,
+                DetailsJson = JsonSerializer.Serialize(new { Code = code, Name = name }),
+                CreatedAt = DateTime.UtcNow
+            });
+            await db.SaveChangesAsync(token);
             return Results.Created($"/api/v1/companies/{companyId}/customers/{id}", created);
         }, ct);
     }

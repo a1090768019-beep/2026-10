@@ -2,8 +2,11 @@
 -- No tenant context must reveal no tenant-owned rows.
 DO $$
 BEGIN
-    IF EXISTS (SELECT 1 FROM tenants) OR EXISTS (SELECT 1 FROM companies) THEN
-        RAISE EXCEPTION 'RLS smoke failed: tenant rows visible without app.tenant_id';
+    IF EXISTS (SELECT 1 FROM tenants) OR EXISTS (SELECT 1 FROM companies)
+       OR EXISTS (SELECT 1 FROM customers)
+       OR EXISTS (SELECT 1 FROM sales_invoice_drafts)
+       OR EXISTS (SELECT 1 FROM sales_invoice_draft_lines) THEN
+        RAISE EXCEPTION 'RLS smoke failed: tenant-owned rows visible without app.tenant_id';
     END IF;
 END $$;
 
@@ -24,6 +27,10 @@ BEGIN
     END IF;
     IF EXISTS (SELECT 1 FROM companies WHERE id = '22222222-2222-4222-8222-222222222201') THEN
         RAISE EXCEPTION 'RLS smoke failed: tenant A can see tenant B company';
+    END IF;
+    IF EXISTS (SELECT 1 FROM customers) OR EXISTS (SELECT 1 FROM sales_invoice_drafts)
+       OR EXISTS (SELECT 1 FROM sales_invoice_draft_lines) THEN
+        RAISE EXCEPTION 'Sales RLS smoke failed: tenant A unexpectedly sees unseeded sales rows';
     END IF;
 
     IF (SELECT count(*) FROM tenant_subscriptions) <> 1 OR NOT EXISTS (

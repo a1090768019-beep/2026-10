@@ -63,6 +63,93 @@ public sealed class AccountingApiIntegrationTests
 
         SetTenant(client, TenantA);
 
+        // Customer master records are tenant-scoped, audited and protect the unique customer code.
+        var customerCode = "CUST-" + Guid.NewGuid().ToString("N")[..12].ToUpperInvariant();
+        using var customerResponse = await client.PostAsJsonAsync($"/api/v1/companies/{CompanyA}/customers", new
+        {
+            code = customerCode,
+            name = "عميل اختبار API",
+            email = "sales@example.invalid",
+            taxNumber = "300000000000003"
+        });
+        Assert.Equal(HttpStatusCode.Created, customerResponse.StatusCode);
+        using var customerJson = await ParseJsonAsync(customerResponse);
+        var customerId = customerJson.RootElement.GetProperty("id").GetGuid();
+        Assert.Equal(customerCode, customerJson.RootElement.GetProperty("code").GetString());
+
+        using var duplicateCustomer = await client.PostAsJsonAsync($"/api/v1/companies/{CompanyA}/customers", new
+        {
+            code = customerCode,
+            name = "تكرار يجب رفضه"
+        });
+        Assert.Equal(HttpStatusCode.Conflict, duplicateCustomer.StatusCode);
+
+        // Persisted sales invoice draft lines must equal their header subtotal exactly.
+        var invoiceNumber = "DRAFT-" + Guid.NewGuid().ToString("N")[..12].ToUpperInvariant();
+        using var draftResponse = await client.PostAsJsonAsync(
+            $"/api/v1/companies/{CompanyA}/sales-invoice-drafts",
+            new
+            {
+                customerId,
+                invoiceNumber,
+                issueDate = new DateOnly(2026, 2, 15),
+                dueDate = new DateOnly(2026, 3, 15),
+                notes = "مسودة داخلية غير ضريبية",
+                lines = new[]
+                {
+                    new { description = "خدمة أولى", quantity = 2.5m, unitPrice = 12.3456m },
+                    new { description = "خدمة ثانية", quantity = 3m, unitPrice = 0.3333m }
+                }
+            });
+        Assert.Equal(HttpStatusCode.Created, draftResponse.StatusCode);
+        using var draftJson = await ParseJsonAsync(draftResponse);
+        var draftId = draftJson.RootElement.GetProperty("id").GetGuid();
+        Assert.Equal("DRAFT", draftJson.RootElement.GetProperty("status").GetString());
+        Assert.Equal(31.8639m, draftJson.RootElement.GetProperty("subtotalAmount").GetDecimal());
+        Assert.Equal("عميل اختبار API", draftJson.RootElement.GetProperty("customerName").GetString());
+        Assert.Equal(2, draftJson.RootElement.GetProperty("lines").GetArrayLength());
+        Assert.False(draftJson.RootElement.TryGetProperty("vatAmount", out _));
+
+        using (var duplicateDraft = await client.PostAsJsonAsync(
+            $"/api/v1/companies/{CompanyA}/sales-invoice-drafts",
+            new
+            {
+                customerId, invoiceNumber, issueDate = new DateOnly(2026, 2, 15),
+                dueDate = (DateOnly?)null, notes = "", lines = new[]
+                {
+                    new { description = "بند", quantity = 1m, unitPrice = 1m }
+                }
+            }))
+            Assert.Equal(HttpStatusCode.Conflict, duplicateDraft.StatusCode);
+
+        using (var draftList = await client.GetAsync($"/api/v1/companies/{CompanyA}/sales-invoice-drafts"))
+        {
+            Assert.Equal(HttpStatusCode.OK, draftList.StatusCode);
+            using var rows = await ParseJsonAsync(draftList);
+            Assert.Contains(rows.RootElement.EnumerateArray(),
+                row => row.GetProperty("id").GetGuid() == draftId &&
+                       row.GetProperty("lineCount").GetInt32() == 2);
+        }
+
+        using (var draftDetails = await client.GetAsync(
+            $"/api/v1/companies/{CompanyA}/sales-invoice-drafts/{draftId}"))
+        {
+            Assert.Equal(HttpStatusCode.OK, draftDetails.StatusCode);
+            using var details = await ParseJsonAsync(draftDetails);
+            Assert.Equal(31.8639m, details.RootElement.GetProperty("subtotalAmount").GetDecimal());
+            Assert.Equal(30.864m, details.RootElement.GetProperty("lines")[0].GetProperty("lineAmount").GetDecimal());
+        }
+
+        using (var invalidDraft = await client.PostAsJsonAsync(
+            $"/api/v1/companies/{CompanyA}/sales-invoice-drafts",
+            new
+            {
+                customerId, invoiceNumber = "INVALID-" + Guid.NewGuid().ToString("N")[..8].ToUpperInvariant(),
+                issueDate = new DateOnly(2026, 2, 15), dueDate = (DateOnly?)null, notes = "",
+                lines = new[] { new { description = "كمية صفر", quantity = 0m, unitPrice = 10m } }
+            }))
+            Assert.Equal(HttpStatusCode.BadRequest, invalidDraft.StatusCode);
+
         // Two overlapping fiscal-year requests for the same new company must not both commit.
         using var newCompanyResponse = await client.PostAsJsonAsync("/api/v1/companies", new
         {

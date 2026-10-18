@@ -89,6 +89,7 @@ app.MapAccountingEndpoints();
 app.MapChartOfAccountsTemplateEndpoints();
 app.MapSubscriptionEndpoints();
 app.MapCustomerEndpoints();
+app.MapSalesInvoiceDraftEndpoints();
 app.Run();
 
 public partial class Program { }

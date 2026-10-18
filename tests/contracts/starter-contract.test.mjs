@@ -135,3 +135,28 @@ test('SaaS subscription endpoints expose active plans and tenant-scoped subscrip
   assert.match(records, /class SubscriptionPlanRecord/);
   assert.match(records, /class TenantSubscriptionRecord/);
 });
+
+
+test('sales invoice drafts are tenant-scoped, exact-decimal internal documents and are migrated before runtime-role setup', async () => {
+  const migration = await read('database/migrations/0002_sales_invoice_drafts.sql');
+  const role = await read('database/tests/prepare-runtime-role.sql');
+  const ci = await read('.github/workflows/ci.yml');
+  const api = await read('src/server/BusinessERP.Api/Endpoints/SalesInvoiceDraftEndpoints.cs');
+  const customerApi = await read('src/server/BusinessERP.Api/Endpoints/CustomerEndpoints.cs');
+  const program = await read('src/server/BusinessERP.Api/Program.cs');
+  assert.match(migration, /CREATE TABLE customers/);
+  assert.match(migration, /CREATE TABLE sales_invoice_drafts/);
+  assert.match(migration, /CREATE TABLE sales_invoice_draft_lines/);
+  assert.match(migration, /numeric\(20,4\)/);
+  assert.match(migration, /DEFERRABLE INITIALLY DEFERRED/);
+  assert.match(migration, /ENABLE ROW LEVEL SECURITY/);
+  assert.match(migration, /WITH CHECK \(tenant_id = app_current_tenant_id\(\)\)/);
+  assert.match(role, /GRANT SELECT, INSERT ON customers, sales_invoice_drafts, sales_invoice_draft_lines/);
+  assert.match(ci, /database\/migrations\/0002_sales_invoice_drafts\.sql/);
+  assert.match(customerApi, /CUSTOMER_CREATED/);
+  assert.match(customerApi, /customer-code:/);
+  assert.match(api, /sales-invoice-number:/);
+  assert.match(api, /SALES_INVOICE_DRAFT_CREATED/);
+  assert.match(api, /MidpointRounding\.AwayFromZero/);
+  assert.match(program, /MapSalesInvoiceDraftEndpoints/);
+});
