@@ -259,6 +259,15 @@ public sealed class SalesWorkspaceViewModel : INotifyPropertyChanged
     public bool SearchLoadedData(string searchText)
     {
         var term = (searchText ?? "").Trim();
+        if (term.Length == 0)
+        {
+            _tableSearchTerm = "";
+            CustomersView.Refresh();
+            DraftsView.Refresh();
+            StatusMessage = "تم مسح البحث وإظهار جميع العملاء والمسودات المحمّلة.";
+            StatusIsError = false;
+            return false;
+        }
         if (term.Length < 2)
         {
             StatusMessage = "اكتب حرفين على الأقل للبحث في بيانات المستأجر المحمّلة حاليًا.";
@@ -308,6 +317,9 @@ public sealed class SalesWorkspaceViewModel : INotifyPropertyChanged
             return;
         }
 
+        _tableSearchTerm = "";
+        CustomersView.Refresh();
+        DraftsView.Refresh();
         InvoiceNumber = "SI-" + DateTime.Now.ToString("yyyyMMdd-HHmmss", System.Globalization.CultureInfo.InvariantCulture);
         InvoiceNotes = "";
         DraftIssueDate = DateTime.Today;
