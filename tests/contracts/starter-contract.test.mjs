@@ -288,6 +288,7 @@ test('WPF workspace tables support filtering, sorting, virtualization and keyboa
   assert.match(code, /case Key\.F:/);
   assert.match(code, /case Key\.N:/);
   assert.match(code, /case Key\.R:/);
+  assert.match(code, /case Key\.S when/);
   assert.match(view, /ItemsSource="{Binding CustomersView}"/);
   assert.match(view, /ItemsSource="{Binding DraftsView}"/);
   assert.match(view, /CanUserSortColumns/);
