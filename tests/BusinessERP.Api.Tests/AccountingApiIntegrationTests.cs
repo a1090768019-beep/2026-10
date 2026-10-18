@@ -310,6 +310,27 @@ public sealed class AccountingApiIntegrationTests
             Assert.Equal(125.50m, trialBalance.RootElement.GetProperty("totalCreditMovement").GetDecimal());
         }
 
+        using (var incomeResponse = await client.GetAsync(
+            $"/api/v1/companies/{CompanyA}/reports/income-statement?fromDate=2026-02-01&toDate=2026-02-28"))
+        {
+            Assert.Equal(HttpStatusCode.OK, incomeResponse.StatusCode);
+            using var income = await ParseJsonAsync(incomeResponse);
+            Assert.Equal(0m, income.RootElement.GetProperty("totalRevenue").GetDecimal());
+            Assert.Equal(0m, income.RootElement.GetProperty("totalExpenses").GetDecimal());
+            Assert.Equal(0m, income.RootElement.GetProperty("netIncome").GetDecimal());
+        }
+
+        using (var balanceResponse = await client.GetAsync(
+            $"/api/v1/companies/{CompanyA}/reports/balance-sheet?asOfDate=2026-02-28"))
+        {
+            Assert.Equal(HttpStatusCode.OK, balanceResponse.StatusCode);
+            using var balance = await ParseJsonAsync(balanceResponse);
+            Assert.Equal(225.50m, balance.RootElement.GetProperty("totalAssets").GetDecimal());
+            Assert.Equal(0m, balance.RootElement.GetProperty("totalLiabilities").GetDecimal());
+            Assert.Equal(225.50m, balance.RootElement.GetProperty("totalEquity").GetDecimal());
+            Assert.Equal(0m, balance.RootElement.GetProperty("difference").GetDecimal());
+        }
+
         var reversalNumber = "IT-REV-" + Guid.NewGuid().ToString("N");
         using var reversalResponse = await client.PostAsJsonAsync(
             $"/api/v1/journal-entries/{entryId}/reverse",
