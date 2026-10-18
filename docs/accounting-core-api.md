@@ -57,3 +57,7 @@ The templates are starter charts, not authoritative accounting policy. Review ac
 Journal creation obtains PostgreSQL transaction-scoped advisory locks for the normalized tenant/company entry number and, when supplied, the idempotency key before checking for an existing record. Retries with the same key can therefore read the committed first result instead of racing into a unique-index exception; concurrent reuse of the same entry number is returned as a regular conflict. Reversal requests serialize on the original entry before checking whether a reversal already exists. Fiscal-year creation serializes overlap checks per company.
 
 These locks complement, rather than replace, the database unique indexes and triggers. The CI PostgreSQL smoke tests exercise the database enforcement layer; the lock behavior is also covered by source-contract checks. A dedicated high-concurrency API load test remains a release-hardening task.
+
+
+## شريحة العملاء ومسودات المبيعات
+طبّق 0002_sales_invoice_drafts.sql بعد bootstrap. مسارات العملاء تعرض/تنشئ العملاء، ومسارات sales-invoice-drafts تعرض/تنشئ مسودات داخلية ببنود محفوظة ومجموع متحقق منه. تستخدم قاعدة البيانات RLS ومفاتيح مركبة وقيدًا مؤجلًا لمطابقة الإجمالي. لا توجد VAT أو إصدار قانوني نهائي أو GL posting أو تحصيل أو إشعارات دائنة؛ لا تستخدم المسودة كفاتورة ضريبية.
