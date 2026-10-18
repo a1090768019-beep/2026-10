@@ -95,6 +95,7 @@ dotnet run --project src/server/BusinessERP.Api/BusinessERP.Api.csproj --urls ht
 | GET / POST | `/companies/{companyId}/customers` | عرض/إنشاء العملاء |
 | GET / POST | `/companies/{companyId}/sales-invoice-drafts` | عرض/إنشاء مسودات مبيعات داخلية |
 | GET | `/companies/{companyId}/sales-invoice-drafts/{invoiceId}` | تفاصيل المسودة وبنودها |
+| POST | `/companies/{companyId}/sales-vat-preview` | معاينة داخلية غير محفوظة لضريبة القيمة المضافة؛ ليست فاتورة نظامية |
 
 تفاصيل DTOs، وقواعد صلاحيات الأدوار، ومتطلبات الإعداد موجودة في `docs/accounting-core-api.md`. تفاصيل واجهات الاشتراك وحدودها موجودة في `docs/subscriptions.md`؛ حالة الأهلية هناك للعرض فقط ولا تمنع الوصول ولا تثبت تحصيل دفعة. الحسابات تتطلب رمزًا واسمًا عربيًا وإنجليزيًا ونوعًا ورصيدًا طبيعيًا. إنشاء القيد يتطلب فترة مفتوحة، وحسابات نشطة وقابلة للترحيل، وسطرين على الأقل ومجموع مدين مساويًا لمجموع دائن.
 

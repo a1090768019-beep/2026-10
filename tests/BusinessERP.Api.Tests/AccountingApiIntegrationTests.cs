@@ -191,6 +191,69 @@ public sealed class AccountingApiIntegrationTests
             }))
             Assert.Equal(HttpStatusCode.BadRequest, invalidDraft.StatusCode);
 
+        // VAT preview uses explicit treatment, decimal amounts and the authenticated tenant/company.
+        using (var vatPreviewResponse = await client.PostAsJsonAsync(
+            $"/api/v1/companies/{CompanyA}/sales-vat-preview",
+            new
+            {
+                lines = new[]
+                {
+                    new
+                    {
+                        description = "خدمة خاضعة",
+                        quantity = 1m,
+                        unitPrice = 100m,
+                        discountAmount = 10m,
+                        treatment = "StandardRated"
+                    },
+                    new
+                    {
+                        description = "توريد مصنف معفى للاختبار",
+                        quantity = 2m,
+                        unitPrice = 50m,
+                        discountAmount = 0m,
+                        treatment = "Exempt",
+                        treatmentReason = "Integration test classification"
+                    }
+                }
+            }))
+        {
+            Assert.True(vatPreviewResponse.StatusCode == HttpStatusCode.OK,
+                $"VAT preview returned {(int)vatPreviewResponse.StatusCode}: {await vatPreviewResponse.Content.ReadAsStringAsync()}");
+            using var preview = await ParseJsonAsync(vatPreviewResponse);
+            Assert.Equal("PREVIEW_ONLY", preview.RootElement.GetProperty("documentStatus").GetString());
+            Assert.Equal("SAR", preview.RootElement.GetProperty("currencyCode").GetString());
+            Assert.Equal(200m, preview.RootElement.GetProperty("grossAmount").GetDecimal());
+            Assert.Equal(10m, preview.RootElement.GetProperty("discountAmount").GetDecimal());
+            Assert.Equal(190m, preview.RootElement.GetProperty("netAmount").GetDecimal());
+            Assert.Equal(13.5m, preview.RootElement.GetProperty("vatAmount").GetDecimal());
+            Assert.Equal(203.5m, preview.RootElement.GetProperty("totalAmount").GetDecimal());
+            Assert.Equal("StandardRated", preview.RootElement.GetProperty("lines")[0].GetProperty("treatment").GetString());
+            Assert.Equal("Exempt", preview.RootElement.GetProperty("lines")[1].GetProperty("treatment").GetString());
+        }
+
+        using (var invalidVatPreview = await client.PostAsJsonAsync(
+            $"/api/v1/companies/{CompanyA}/sales-vat-preview",
+            new
+            {
+                lines = new[]
+                {
+                    new { description = "تصنيف غير مكتمل", quantity = 1m, unitPrice = 10m, discountAmount = 0m, treatment = "Exempt", treatmentReason = "" }
+                }
+            }))
+            Assert.Equal(HttpStatusCode.BadRequest, invalidVatPreview.StatusCode);
+
+        using (var unknownVatTreatment = await client.PostAsJsonAsync(
+            $"/api/v1/companies/{CompanyA}/sales-vat-preview",
+            new
+            {
+                lines = new[]
+                {
+                    new { description = "تصنيف غير معروف", quantity = 1m, unitPrice = 10m, discountAmount = 0m, treatment = "UndeclaredTreatment" }
+                }
+            }))
+            Assert.Equal(HttpStatusCode.BadRequest, unknownVatTreatment.StatusCode);
+
         // Two overlapping fiscal-year requests for the same new company must not both commit.
         using var newCompanyResponse = await client.PostAsJsonAsync("/api/v1/companies", new
         {

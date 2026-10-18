@@ -6,6 +6,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../BusinessERP.Application/BusinessERP.Application.csproj" />
+    <ProjectReference Include="../BusinessERP.Domain/BusinessERP.Domain.csproj" />
     <ProjectReference Include="../BusinessERP.Infrastructure/BusinessERP.Infrastructure.csproj" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.0" />
