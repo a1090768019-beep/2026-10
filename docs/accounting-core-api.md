@@ -51,3 +51,9 @@ The desktop WPF shell is not yet wired to these business endpoints and does not 
 The bootstrap migration seeds six templates: trade, services, contracting, restaurants, manufacturing, and real estate. Template records are shared platform reference data and are not governed by tenant RLS; the runtime role should have read-only access. Applying a template creates account records in the selected tenant/company transaction and records an audit entry. The endpoint refuses to run if the company already has any account rows, avoiding destructive or ambiguous merging.
 
 The templates are starter charts, not authoritative accounting policy. Review account names, codes, VAT treatment, cost recognition, and regulatory obligations with an accounting professional. Specialized manufacturing, construction, restaurant, and real-estate costing workflows are not implemented merely by seeding these account names.
+
+## Concurrent write safety
+
+Journal creation obtains PostgreSQL transaction-scoped advisory locks for the normalized tenant/company entry number and, when supplied, the idempotency key before checking for an existing record. Retries with the same key can therefore read the committed first result instead of racing into a unique-index exception; concurrent reuse of the same entry number is returned as a regular conflict. Reversal requests serialize on the original entry before checking whether a reversal already exists. Fiscal-year creation serializes overlap checks per company.
+
+These locks complement, rather than replace, the database unique indexes and triggers. The CI PostgreSQL smoke tests exercise the database enforcement layer; the lock behavior is also covered by source-contract checks. A dedicated high-concurrency API load test remains a release-hardening task.
