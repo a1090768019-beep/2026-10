@@ -168,7 +168,10 @@ public sealed class ErpApiException(HttpStatusCode statusCode, string message) :
 
 public sealed record ApiCompany(Guid Id, string Name, string BaseCurrency, string? TaxNumber, DateTime CreatedAt);
 public sealed record CreateCompanyApiRequest(string Name, string BaseCurrency = "SAR", string? TaxNumber = null);
-public sealed record ApiAccount(Guid Id, string Code, string NameAr, string NameEn, string AccountType, string NormalBalance, Guid? ParentAccountId, bool IsActive, bool AllowPosting);
+public sealed record ApiAccount(Guid Id, string Code, string NameAr, string NameEn, string AccountType, string NormalBalance, Guid? ParentAccountId, bool IsActive, bool AllowPosting)
+{
+    public string DisplayName => $"{Code} — {NameAr} ({NameEn})";
+}
 public sealed record ApiFiscalPeriod(Guid Id, Guid FiscalYearId, int PeriodNumber, DateOnly StartDate, DateOnly EndDate, string Status)
 {
     public string DisplayName => $"الفترة {PeriodNumber}: {StartDate:yyyy-MM-dd} — {EndDate:yyyy-MM-dd} ({Status})";
