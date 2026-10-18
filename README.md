@@ -75,6 +75,8 @@ dotnet run --project src/server/BusinessERP.Api/BusinessERP.Api.csproj --urls ht
 | POST | `/journal-entries/{entryId}/cancel` | إلغاء مسودة أو قيد معتمد غير مرحل |
 | POST | `/journal-entries/{entryId}/reverse` | إنشاء قيد عكسي وترحيله ضمن معاملة واحدة |
 | GET | `/companies/{companyId}/reports/trial-balance?fromDate=2026-01-01&toDate=2026-12-31` | ميزان المراجعة: الحركات للفترة والأرصدة حتى تاريخ النهاية |
+| GET | `/companies/{companyId}/reports/income-statement?fromDate=YYYY-MM-DD&toDate=YYYY-MM-DD` | قائمة دخل أولية من قيود الإيراد والمصروف المرحلة فقط |
+| GET | `/companies/{companyId}/reports/balance-sheet?asOfDate=YYYY-MM-DD` | ميزانية أولية من الأرصدة المرحلة حتى التاريخ، مع الأرباح غير المقفلة ضمن حقوق الملكية |
 | GET | `/subscription-plans` | كتالوج الخطط النشطة الذي يضبطه مشغل المنصة |
 | GET | `/subscription` | حالة اشتراك المستأجر والخطة والتواريخ والحدود المسجلة |
 | GET / POST | `/companies/{companyId}/customers` | عرض/إنشاء العملاء |
@@ -82,6 +84,9 @@ dotnet run --project src/server/BusinessERP.Api/BusinessERP.Api.csproj --urls ht
 | GET | `/companies/{companyId}/sales-invoice-drafts/{invoiceId}` | تفاصيل المسودة وبنودها |
 
 تفاصيل DTOs، وقواعد صلاحيات الأدوار، ومتطلبات الإعداد موجودة في `docs/accounting-core-api.md`. تفاصيل واجهات الاشتراك وحدودها موجودة في `docs/subscriptions.md`؛ حالة الأهلية هناك للعرض فقط ولا تمنع الوصول ولا تثبت تحصيل دفعة. الحسابات تتطلب رمزًا واسمًا عربيًا وإنجليزيًا ونوعًا ورصيدًا طبيعيًا. إنشاء القيد يتطلب فترة مفتوحة، وحسابات نشطة وقابلة للترحيل، وسطرين على الأقل ومجموع مدين مساويًا لمجموع دائن.
+
+
+**حدود التقارير المالية:** تقارير الدخل والميزانية أولية وتجمع الحركات المرحلة فقط. لم ينفذ تقرير التدفقات النقدية لأن تصنيف التدفقات والحركات غير النقدية لم يُعتمد بعد، كما تحتاج القوائم إلى مراجعة سياسات الإقفال المحاسبي قبل الاستخدام الرسمي.
 
 ### قوالب دليل الحسابات
 
