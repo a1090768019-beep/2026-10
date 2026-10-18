@@ -245,6 +245,75 @@ public sealed class SalesWorkspaceViewModel : INotifyPropertyChanged
         await RefreshAsync();
     }
 
+    public bool SearchLoadedData(string searchText)
+    {
+        var term = (searchText ?? "").Trim();
+        if (term.Length < 2)
+        {
+            StatusMessage = "اكتب حرفين على الأقل للبحث في بيانات المستأجر المحمّلة حاليًا.";
+            StatusIsError = true;
+            return false;
+        }
+
+        var matchingCompanies = Companies.Where(x =>
+            Contains(x.Name, term) || Contains(x.BaseCurrency, term) || Contains(x.TaxNumber, term)).ToList();
+        var matchingCustomers = Customers.Where(x =>
+            Contains(x.Code, term) || Contains(x.Name, term) || Contains(x.Email, term) ||
+            Contains(x.Phone, term) || Contains(x.TaxNumber, term)).ToList();
+        var matchingAccounts = Accounts.Where(x =>
+            Contains(x.Code, term) || Contains(x.NameAr, term) || Contains(x.NameEn, term)).ToList();
+        var matchingDrafts = Drafts.Where(x =>
+            Contains(x.InvoiceNumber, term) || Contains(x.CustomerName, term) ||
+            Contains(x.Status, term) || Contains(x.TaxCalculationStatus, term)).ToList();
+
+        if (matchingCustomers.Count == 0 && matchingAccounts.Count == 0 && matchingDrafts.Count == 0 &&
+            matchingCompanies.Count == 0)
+        {
+            StatusMessage = $"لم يتم العثور على «{term}» في الشركات والعملاء والحسابات والمسودات المحمّلة.";
+            StatusIsError = false;
+            return false;
+        }
+
+        if (matchingCustomers.Count > 0)
+            SelectedCustomer = matchingCustomers[0];
+        if (matchingDrafts.Count > 0)
+            SelectedDraft = matchingDrafts[0];
+
+        StatusMessage = $"نتائج «{term}»: شركات {matchingCompanies.Count} · عملاء {matchingCustomers.Count} · حسابات {matchingAccounts.Count} · مسودات {matchingDrafts.Count}. البحث ضمن البيانات المحمّلة للمستأجر الحالي فقط.";
+        StatusIsError = false;
+        return matchingCustomers.Count > 0 || matchingAccounts.Count > 0 || matchingDrafts.Count > 0;
+    }
+
+    public void PrepareNewDraft()
+    {
+        if (_apiClient is null || SelectedCompany is null)
+        {
+            StatusMessage = "سجّل الدخول وفعّل المستأجر واختر الشركة قبل إنشاء مسودة.";
+            StatusIsError = true;
+            return;
+        }
+
+        InvoiceNumber = "SI-" + DateTime.Now.ToString("yyyyMMdd-HHmmss", System.Globalization.CultureInfo.InvariantCulture);
+        InvoiceNotes = "";
+        DraftIssueDate = DateTime.Today;
+        DraftDueDate = null;
+        OnPropertyChanged(nameof(InvoiceNumber));
+        OnPropertyChanged(nameof(InvoiceNotes));
+        OnPropertyChanged(nameof(DraftIssueDate));
+        OnPropertyChanged(nameof(DraftDueDate));
+        foreach (var line in InvoiceLines)
+            line.PropertyChanged -= InvoiceLine_PropertyChanged;
+        InvoiceLines.Clear();
+        SelectedInvoiceLine = null;
+        AddInvoiceLine();
+        ClearVatPreview("مسودة جديدة؛ راجع تصنيف VAT قبل الحفظ.");
+        StatusMessage = "تم تجهيز نموذج مسودة جديدة. لم تُحفظ أي بيانات بعد.";
+        StatusIsError = false;
+    }
+
+    private static bool Contains(string? source, string term) =>
+        !string.IsNullOrEmpty(source) && source.Contains(term, StringComparison.OrdinalIgnoreCase);
+
     public async Task RefreshAsync()
     {
         if (_apiClient is null)
