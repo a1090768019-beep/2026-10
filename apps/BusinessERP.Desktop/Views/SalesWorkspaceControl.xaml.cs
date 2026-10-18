@@ -25,4 +25,11 @@ public partial class SalesWorkspaceControl : UserControl
         InvoiceLinesGrid.CommitEdit(DataGridEditingUnit.Row, true);
         await _viewModel.CreateInvoiceDraftAsync();
     }
+
+    private async void CalculateVatPreviewButton_Click(object sender, RoutedEventArgs e)
+    {
+        InvoiceLinesGrid.CommitEdit(DataGridEditingUnit.Cell, true);
+        InvoiceLinesGrid.CommitEdit(DataGridEditingUnit.Row, true);
+        await _viewModel.CalculateVatPreviewAsync();
+    }
 }

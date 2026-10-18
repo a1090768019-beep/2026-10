@@ -146,6 +146,19 @@
                                 <DataGridTextColumn Header="الوصف" Binding="{Binding Description, UpdateSourceTrigger=PropertyChanged}" Width="*" />
                                 <DataGridTextColumn Header="الكمية" Binding="{Binding Quantity, UpdateSourceTrigger=PropertyChanged}" Width="90" />
                                 <DataGridTextColumn Header="السعر" Binding="{Binding UnitPrice, UpdateSourceTrigger=PropertyChanged}" Width="95" />
+                                <DataGridTemplateColumn Header="معاملة الضريبة" Width="130">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate><TextBlock Text="{Binding VatTreatment}" VerticalAlignment="Center" /></DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                    <DataGridTemplateColumn.CellEditingTemplate>
+                                        <DataTemplate>
+                                            <ComboBox ItemsSource="{Binding DataContext.VatTreatmentOptions, RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}}"
+                                                      DisplayMemberPath="Label" SelectedValuePath="Value"
+                                                      SelectedValue="{Binding VatTreatment, UpdateSourceTrigger=PropertyChanged}" />
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellEditingTemplate>
+                                </DataGridTemplateColumn>
+                                <DataGridTextColumn Header="سبب التصنيف" Binding="{Binding TreatmentReason, UpdateSourceTrigger=PropertyChanged}" Width="140" />
                                 <DataGridTextColumn Header="القيمة" Binding="{Binding LineAmount, StringFormat=N4}" IsReadOnly="True" Width="95" />
                             </DataGrid.Columns>
                         </DataGrid>
@@ -154,6 +167,15 @@
                             <Button Grid.Column="0" Content="إضافة بند" Command="{Binding AddInvoiceLineCommand}" Margin="0,4,4,8" />
                             <Button Grid.Column="1" Content="حذف البند المحدد" Command="{Binding RemoveInvoiceLineCommand}" Background="#EEF2F8" Foreground="#344054" Margin="4,4,0,8" />
                         </Grid>
+                        <Button Content="معاينة ضريبة القيمة المضافة (غير محفوظة)" Click="CalculateVatPreviewButton_Click"
+                                HorizontalAlignment="Stretch" Background="#EAF0FF" Foreground="#315CC4" FontWeight="SemiBold" Padding="10,9" />
+                        <Border Background="#F6F8FC" BorderBrush="#E0E6F0" BorderThickness="1" CornerRadius="8" Padding="10" Margin="0,0,0,8">
+                            <StackPanel>
+                                <TextBlock Text="{Binding VatPreviewStatus}" TextWrapping="Wrap" Foreground="#344054" FontSize="12" />
+                                <TextBlock Text="{Binding VatPreviewSummary}" TextWrapping="Wrap" Foreground="#19243A" FontWeight="SemiBold" Margin="0,6,0,0" />
+                                <TextBlock Text="الحساب معاينة مؤقتة فقط. تصنيف الضريبة ونتيجتها لا يُحفظان في مسودة البيع ولا يمثلان فاتورة ZATCA." TextWrapping="Wrap" Foreground="#8A6A20" FontSize="11" Margin="0,6,0,0" />
+                            </StackPanel>
+                        </Border>
                         <TextBlock Text="ملاحظات" Foreground="#69758D" FontSize="12" />
                         <TextBox Text="{Binding InvoiceNotes, UpdateSourceTrigger=PropertyChanged}" />
                         <Button Content="حفظ المسودة في قاعدة البيانات" Click="CreateInvoiceDraftButton_Click" HorizontalAlignment="Stretch" FontWeight="SemiBold" Padding="12,11" />

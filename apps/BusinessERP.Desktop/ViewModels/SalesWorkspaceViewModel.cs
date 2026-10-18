@@ -1,5 +1,6 @@
 using System.Net.Http;
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
@@ -17,11 +18,31 @@ public sealed class SalesWorkspaceViewModel : INotifyPropertyChanged
     private bool _statusIsError;
     private bool _isBusy;
     private bool _loadingCompanies;
+    private SalesVatPreviewApiResult? _vatPreview;
+    private string _vatPreviewStatus = "معاينة VAT غير محفوظة. اختر تصنيفًا لكل بند ثم اطلب المعاينة.";
 
     public ObservableCollection<ApiCompany> Companies { get; } = [];
     public ObservableCollection<ApiCustomer> Customers { get; } = [];
     public ObservableCollection<SalesInvoiceDraftListItem> Drafts { get; } = [];
     public ObservableCollection<InvoiceLineInput> InvoiceLines { get; } = [];
+
+    public IReadOnlyList<SalesVatTreatmentOption> VatTreatmentOptions { get; } =
+    [
+        new("StandardRated", "خاضعة 15%"),
+        new("ZeroRated", "صفرية"),
+        new("Exempt", "معفاة"),
+        new("OutsideScope", "خارج النطاق")
+    ];
+
+    public string VatPreviewStatus
+    {
+        get => _vatPreviewStatus;
+        private set { if (_vatPreviewStatus == value) return; _vatPreviewStatus = value; OnPropertyChanged(); }
+    }
+
+    public string VatPreviewSummary => _vatPreview is null
+        ? "لا توجد معاينة حالية."
+        : $"الصافي: {_vatPreview.NetAmount:N2} {_vatPreview.CurrencyCode}  |  VAT: {_vatPreview.VatAmount:N2}  |  الإجمالي: {_vatPreview.TotalAmount:N2}";
 
     public string CompanyName { get; set; } = "";
     public string BaseCurrency { get; set; } = "SAR";
@@ -43,6 +64,7 @@ public sealed class SalesWorkspaceViewModel : INotifyPropertyChanged
         {
             if (ReferenceEquals(_selectedCompany, value)) return;
             _selectedCompany = value;
+            ClearVatPreview("تغيرت الشركة؛ أعد حساب معاينة VAT.");
             OnPropertyChanged();
             OnPropertyChanged(nameof(SelectedCompanyCurrency));
             NotifyCommands();
@@ -96,20 +118,18 @@ public sealed class SalesWorkspaceViewModel : INotifyPropertyChanged
         RefreshCommand = new AsyncRelayCommand(RefreshAsync, () => _apiClient is not null && !IsBusy);
         CreateCompanyCommand = new AsyncRelayCommand(CreateCompanyAsync, () => _apiClient is not null && !IsBusy);
         CreateCustomerCommand = new AsyncRelayCommand(CreateCustomerAsync, () => _apiClient is not null && SelectedCompany is not null && !IsBusy);
-        AddInvoiceLineCommand = new RelayCommand(() =>
-        {
-            InvoiceLines.Add(new InvoiceLineInput());
-        }, () => SelectedCompany is not null && !IsBusy);
+        AddInvoiceLineCommand = new RelayCommand(AddInvoiceLine, () => SelectedCompany is not null && !IsBusy);
         RemoveInvoiceLineCommand = new RelayCommand(() =>
         {
             if (SelectedInvoiceLine is not null)
             {
+                SelectedInvoiceLine.PropertyChanged -= InvoiceLine_PropertyChanged;
                 InvoiceLines.Remove(SelectedInvoiceLine);
                 SelectedInvoiceLine = null;
             }
         }, () => SelectedInvoiceLine is not null && !IsBusy);
 
-        InvoiceLines.Add(new InvoiceLineInput());
+        AddInvoiceLine();
     }
 
     public async Task SetApiClientAsync(ErpApiClient? apiClient)
@@ -122,6 +142,7 @@ public sealed class SalesWorkspaceViewModel : INotifyPropertyChanged
             Drafts.Clear();
             SelectedCompany = null;
             SelectedCustomer = null;
+            ClearVatPreview("سجّل الدخول وفعّل المستأجر قبل حساب معاينة VAT.");
             StatusMessage = "سجّل الدخول ثم فعّل معرّف المستأجر للوصول إلى البيانات المحفوظة.";
             StatusIsError = false;
             NotifyCommands();
@@ -382,9 +403,11 @@ public sealed class SalesWorkspaceViewModel : INotifyPropertyChanged
             InvoiceNotes = "";
             OnPropertyChanged(nameof(InvoiceNumber));
             OnPropertyChanged(nameof(InvoiceNotes));
+            foreach (var line in InvoiceLines) line.PropertyChanged -= InvoiceLine_PropertyChanged;
             InvoiceLines.Clear();
-            InvoiceLines.Add(new InvoiceLineInput());
+            AddInvoiceLine();
             OnPropertyChanged(nameof(InvoiceLines));
+            ClearVatPreview("تم حفظ المسودة؛ لم يتم حفظ VAT ضمن المستند.");
 
             var refreshed = await LoadCompanyDataAsync();
             if (refreshed)
@@ -415,6 +438,87 @@ public sealed class SalesWorkspaceViewModel : INotifyPropertyChanged
         }
     }
 
+    public async Task CalculateVatPreviewAsync()
+    {
+        if (_apiClient is null || SelectedCompany is null)
+        {
+            StatusMessage = "سجّل الدخول وفعّل المستأجر قبل حساب معاينة VAT.";
+            StatusIsError = true;
+            return;
+        }
+
+        var inputLines = InvoiceLines.ToList();
+        if (inputLines.Count is < 1 or > 500 ||
+            inputLines.Any(x => string.IsNullOrWhiteSpace(x.Description) || x.Quantity <= 0m || x.UnitPrice < 0m))
+        {
+            StatusMessage = "للمعاينة، أدخل من 1 إلى 500 بندًا بوصف وكمية موجبة وسعر غير سالب.";
+            StatusIsError = true;
+            return;
+        }
+
+        if (inputLines.Any(x => x.VatTreatment != "StandardRated" && string.IsNullOrWhiteSpace(x.TreatmentReason)))
+        {
+            StatusMessage = "أدخل سبب التصنيف لكل بند غير خاضع للمعدل القياسي.";
+            StatusIsError = true;
+            return;
+        }
+
+        IsBusy = true;
+        ClearVatPreview("جارٍ حساب معاينة VAT من API…");
+        try
+        {
+            var lines = inputLines.Select(x => new SalesVatPreviewLineApiRequest(
+                x.Description.Trim(), x.Quantity, x.UnitPrice, 0m, x.VatTreatment,
+                x.VatTreatment == "StandardRated" ? null : NullIfBlank(x.TreatmentReason))).ToList();
+            var result = await _apiClient.CalculateSalesVatPreviewAsync(
+                SelectedCompany.Id, new CalculateSalesVatPreviewApiRequest(lines));
+            _vatPreview = result;
+            OnPropertyChanged(nameof(VatPreviewSummary));
+            VatPreviewStatus = result.Message;
+            StatusMessage = $"تم حساب معاينة VAT غير المحفوظة لإجمالي {result.TotalAmount:N2} {result.CurrencyCode}.";
+            StatusIsError = false;
+        }
+        catch (ErpApiException ex)
+        {
+            ClearVatPreview("تعذر حساب معاينة VAT.");
+            StatusMessage = ex.Message;
+            StatusIsError = true;
+        }
+        catch (HttpRequestException)
+        {
+            ClearVatPreview("تعذر حساب معاينة VAT.");
+            StatusMessage = "تعذر الاتصال بالخادم أثناء معاينة VAT.";
+            StatusIsError = true;
+        }
+        finally
+        {
+            IsBusy = false;
+            NotifyCommands();
+        }
+    }
+
+    private void AddInvoiceLine()
+    {
+        var line = new InvoiceLineInput();
+        line.PropertyChanged += InvoiceLine_PropertyChanged;
+        InvoiceLines.Add(line);
+    }
+
+    private void InvoiceLine_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(InvoiceLineInput.Description) or nameof(InvoiceLineInput.Quantity) or
+            nameof(InvoiceLineInput.UnitPrice) or nameof(InvoiceLineInput.VatTreatment) or
+            nameof(InvoiceLineInput.TreatmentReason))
+            ClearVatPreview("تغيرت بيانات البنود؛ أعد حساب معاينة VAT.");
+    }
+
+    private void ClearVatPreview(string message)
+    {
+        _vatPreview = null;
+        VatPreviewStatus = message;
+        OnPropertyChanged(nameof(VatPreviewSummary));
+    }
+
     private static string? NullIfBlank(string value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     private void NotifyCommands()
@@ -435,6 +539,8 @@ public sealed class InvoiceLineInput : INotifyPropertyChanged
     private string _description = "";
     private decimal _quantity = 1m;
     private decimal _unitPrice;
+    private string _vatTreatment = "StandardRated";
+    private string _treatmentReason = "";
 
     public string Description
     {
@@ -452,6 +558,18 @@ public sealed class InvoiceLineInput : INotifyPropertyChanged
     {
         get => _unitPrice;
         set { if (_unitPrice == value) return; _unitPrice = value; OnPropertyChanged(); OnPropertyChanged(nameof(LineAmount)); }
+    }
+
+    public string VatTreatment
+    {
+        get => _vatTreatment;
+        set { if (_vatTreatment == value) return; _vatTreatment = value; OnPropertyChanged(); }
+    }
+
+    public string TreatmentReason
+    {
+        get => _treatmentReason;
+        set { if (_treatmentReason == value) return; _treatmentReason = value; OnPropertyChanged(); }
     }
 
     public decimal LineAmount
@@ -495,3 +613,5 @@ public sealed class RelayCommand(Action execute, Func<bool>? canExecute = null) 
     public void Execute(object? parameter) => execute();
     public void RaiseCanExecuteChanged() => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
 }
+
+public sealed record SalesVatTreatmentOption(string Value, string Label);

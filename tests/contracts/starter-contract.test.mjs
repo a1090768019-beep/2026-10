@@ -186,3 +186,18 @@ test('Saudi VAT preview requires explicit treatment, decimal rounding and tenant
   assert.match(endpoint, /SaudiVatCalculator\.Calculate/);
   assert.match(program, /MapSalesVatPreviewEndpoints/);
 });
+
+
+test('WPF sales workspace sends VAT preview to the API and labels it as non-persistent', async () => {
+  const apiClient = await read('apps/BusinessERP.Desktop/Services/ErpApiClient.cs');
+  const viewModel = await read('apps/BusinessERP.Desktop/ViewModels/SalesWorkspaceViewModel.cs');
+  const view = await read('apps/BusinessERP.Desktop/Views/SalesWorkspaceControl.xaml');
+  const codeBehind = await read('apps/BusinessERP.Desktop/Views/SalesWorkspaceControl.xaml.cs');
+  assert.match(apiClient, /sales-vat-preview/);
+  assert.match(viewModel, /CalculateSalesVatPreviewAsync/);
+  assert.match(viewModel, /TreatmentReason/);
+  assert.match(viewModel, /PREVIEW_ONLY|preview/i);
+  assert.match(view, /CalculateVatPreviewButton_Click/);
+  assert.match(view, /لا يُحفظان في مسودة البيع/);
+  assert.match(codeBehind, /await _viewModel\.CalculateVatPreviewAsync\(\)/);
+});

@@ -38,6 +38,11 @@ public sealed class ErpApiClient(HttpClient httpClient, Guid tenantId)
         SendJsonAsync<SalesInvoiceDraftDetails>(
             HttpMethod.Post, $"/api/v1/companies/{companyId:D}/sales-invoice-drafts", request, ct);
 
+    public Task<SalesVatPreviewApiResult> CalculateSalesVatPreviewAsync(
+        Guid companyId, CalculateSalesVatPreviewApiRequest request, CancellationToken ct = default) =>
+        SendJsonAsync<SalesVatPreviewApiResult>(
+            HttpMethod.Post, $"/api/v1/companies/{companyId:D}/sales-vat-preview", request, ct);
+
     private async Task<IReadOnlyList<T>> GetListAsync<T>(string path, CancellationToken ct)
     {
         using var response = await SendAsync(HttpMethod.Get, path, null, ct);
@@ -157,3 +162,16 @@ public sealed record SalesInvoiceDraftDetails(
     DateOnly? DueDate, string CurrencyCode, string CustomerName, string? CustomerTaxNumber,
     decimal SubtotalAmount, string Notes, string Status, DateTime CreatedAt, IReadOnlyList<SalesInvoiceDraftLine> Lines);
 public sealed record SalesInvoiceDraftLine(Guid Id, int LineNumber, string Description, decimal Quantity, decimal UnitPrice, decimal LineAmount);
+
+
+public sealed record CalculateSalesVatPreviewApiRequest(IReadOnlyList<SalesVatPreviewLineApiRequest> Lines);
+public sealed record SalesVatPreviewLineApiRequest(
+    string Description, decimal Quantity, decimal UnitPrice, decimal DiscountAmount,
+    string Treatment, string? TreatmentReason = null);
+public sealed record SalesVatPreviewApiResult(
+    Guid CompanyId, string CurrencyCode, string DocumentStatus, string Message,
+    decimal GrossAmount, decimal DiscountAmount, decimal NetAmount, decimal VatAmount, decimal TotalAmount,
+    IReadOnlyList<SalesVatPreviewLineApiResult> Lines);
+public sealed record SalesVatPreviewApiLineResult(
+    int LineNumber, string Description, string Treatment, decimal GrossAmount, decimal DiscountAmount,
+    decimal NetAmount, decimal VatRatePercent, decimal VatAmount, decimal TotalAmount, string? TreatmentReason);
