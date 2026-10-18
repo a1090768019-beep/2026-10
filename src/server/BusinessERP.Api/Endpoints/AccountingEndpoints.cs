@@ -163,6 +163,8 @@ public static class AccountingEndpoints
         return await runner.ExecuteAsync<IResult>(async (db, token) =>
         {
             if (!await db.Companies.AnyAsync(x => x.Id == companyId, token)) return Results.NotFound();
+            // Serialize year creation per company so two concurrent requests cannot both pass the overlap check.
+            await AcquireTransactionLockAsync(db, $"fiscal-year-overlap:{tenant.TenantId:D}:{companyId:D}", token);
             var overlaps = await db.FiscalYears.AnyAsync(x => x.CompanyId == companyId && request.StartDate <= x.EndDate && request.EndDate >= x.StartDate, token);
             if (overlaps) return Results.Conflict(new { error = "fiscal_year_overlap", message = "تتداخل السنة المالية مع سنة موجودة." });
 
@@ -234,8 +236,13 @@ public static class AccountingEndpoints
             if (company is null) return Results.NotFound();
             if (!string.Equals(normalizedCurrency, company.BaseCurrency.Trim(), StringComparison.OrdinalIgnoreCase))
                 return Results.ValidationProblem(new Dictionary<string, string[]> { ["currencyCode"] = [$"النسخة الحالية تقبل القيود بعملة الشركة الأساسية فقط ({company.BaseCurrency.Trim()}). لا تستخدم عملة أخرى قبل تفعيل محاسبة العملات وأسعار الصرف."] });
+
+            // Transaction-scoped advisory locks turn application-level uniqueness checks into race-safe checks.
+            // Keep lock ordering stable: entry number first, then idempotency key.
+            await AcquireTransactionLockAsync(db, $"journal-entry-number:{tenant.TenantId:D}:{companyId:D}:{entryNumber}", token);
             if (idempotencyKey is not null)
             {
+                await AcquireTransactionLockAsync(db, $"journal-entry-idempotency:{tenant.TenantId:D}:{companyId:D}:{idempotencyKey}", token);
                 var replay = await db.JournalEntries.AsNoTracking().SingleOrDefaultAsync(x => x.CompanyId == companyId && x.IdempotencyKey == idempotencyKey, token);
                 if (replay is not null)
                 {
@@ -516,10 +523,14 @@ public static class AccountingEndpoints
         {
             var original = await db.JournalEntries.SingleOrDefaultAsync(x => x.Id == entryId, token);
             if (original is null) return Results.NotFound();
+
+            // Serialize reversals of the same source entry and then protect the reversal number.
+            await AcquireTransactionLockAsync(db, $"journal-reversal:{tenant.TenantId:D}:{original.CompanyId:D}:{original.Id:D}", token);
             if (original.Status != "POSTED" || original.ReversalOfEntryId is not null)
                 return Results.Conflict(new { error = "only_original_posted_entries_can_be_reversed" });
             if (await db.JournalEntries.AnyAsync(x => x.CompanyId == original.CompanyId && x.ReversalOfEntryId == original.Id, token))
                 return Results.Conflict(new { error = "journal_entry_already_reversed" });
+            await AcquireTransactionLockAsync(db, $"journal-entry-number:{tenant.TenantId:D}:{original.CompanyId:D}:{number}", token);
             if (await db.JournalEntries.AnyAsync(x => x.CompanyId == original.CompanyId && x.EntryNumber == number, token))
                 return Results.Conflict(new { error = "journal_entry_number_exists" });
             var period = await db.FiscalPeriods.SingleOrDefaultAsync(x => x.Id == request.FiscalPeriodId && x.CompanyId == original.CompanyId, token);
@@ -611,6 +622,12 @@ public static class AccountingEndpoints
     };
 
     private static bool HasRole(ITenantContext tenant, params string[] allowedRoles) => allowedRoles.Contains(tenant.RoleCode, StringComparer.OrdinalIgnoreCase);
+
+    private static Task<int> AcquireTransactionLockAsync(ErpDbContext db, string lockKey, CancellationToken cancellationToken) =>
+        db.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({lockKey}, 0))",
+            cancellationToken);
+
     private static bool HasSupportedMoneyPrecision(decimal value) => value >= 0m && value <= 9_999_999_999_999_999.9999m && decimal.Round(value, 4, MidpointRounding.ToEven) == value;
     private static string ComputeHash(CreateJournalEntryRequest request) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(request, JsonOptions))));
     private static CompanyDto ToDto(CompanyRecord x) => new(x.Id, x.Name, x.BaseCurrency.Trim(), x.TaxNumber, x.CreatedAt);
