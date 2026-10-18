@@ -38,6 +38,13 @@ public sealed class ErpApiClient(HttpClient httpClient, Guid tenantId)
         SendJsonAsync<SalesInvoiceDraftDetails>(
             HttpMethod.Post, $"/api/v1/companies/{companyId:D}/sales-invoice-drafts", request, ct);
 
+    public Task<PersistedSalesDraftVatResult> CalculateAndPersistSalesDraftVatAsync(
+        Guid companyId, Guid invoiceId, ApplySalesDraftVatApiRequest request, CancellationToken ct = default) =>
+        SendJsonAsync<PersistedSalesDraftVatResult>(
+            HttpMethod.Post,
+            $"/api/v1/companies/{companyId:D}/sales-invoice-drafts/{invoiceId:D}/calculate-vat",
+            request, ct);
+
     public Task<SalesVatPreviewApiResult> CalculateSalesVatPreviewAsync(
         Guid companyId, CalculateSalesVatPreviewApiRequest request, CancellationToken ct = default) =>
         SendJsonAsync<SalesVatPreviewApiResult>(
@@ -173,5 +180,17 @@ public sealed record SalesVatPreviewApiResult(
     decimal GrossAmount, decimal DiscountAmount, decimal NetAmount, decimal VatAmount, decimal TotalAmount,
     IReadOnlyList<SalesVatPreviewApiLineResult> Lines);
 public sealed record SalesVatPreviewApiLineResult(
+    int LineNumber, string Description, string Treatment, decimal GrossAmount, decimal DiscountAmount,
+    decimal NetAmount, decimal VatRatePercent, decimal VatAmount, decimal TotalAmount, string? TreatmentReason);
+
+
+public sealed record ApplySalesDraftVatApiRequest(IReadOnlyList<ApplySalesDraftVatLineApiRequest> Lines);
+public sealed record ApplySalesDraftVatLineApiRequest(
+    int LineNumber, decimal DiscountAmount, string Treatment, string? TreatmentReason = null);
+public sealed record PersistedSalesDraftVatResult(
+    Guid InvoiceId, Guid CompanyId, string TaxCalculationStatus, string Message,
+    decimal GrossAmount, decimal DiscountAmount, decimal NetAmount, decimal VatAmount, decimal TotalAmount,
+    IReadOnlyList<PersistedSalesDraftVatLineResult> Lines);
+public sealed record PersistedSalesDraftVatLineResult(
     int LineNumber, string Description, string Treatment, decimal GrossAmount, decimal DiscountAmount,
     decimal NetAmount, decimal VatRatePercent, decimal VatAmount, decimal TotalAmount, string? TreatmentReason);

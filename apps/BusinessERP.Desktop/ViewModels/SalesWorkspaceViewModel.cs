@@ -383,7 +383,9 @@ public sealed class SalesWorkspaceViewModel : INotifyPropertyChanged
 
         var lines = InvoiceLines.Select(x => new CreateSalesInvoiceDraftLineApiRequest(
             x.Description.Trim(), x.Quantity, x.UnitPrice)).ToList();
-        if (lines.Count == 0 || lines.Any(x => string.IsNullOrWhiteSpace(x.Description) || x.Quantity <= 0m || x.UnitPrice < 0m))
+        if (lines.Count == 0 || lines.Any(x => string.IsNullOrWhiteSpace(x.Description) || x.Quantity <= 0m || x.UnitPrice < 0m) ||
+            InvoiceLines.Any(x => x.DiscountAmount < 0m ||
+                (x.VatTreatment != "StandardRated" && string.IsNullOrWhiteSpace(x.TreatmentReason))))
         {
             StatusMessage = "تأكد من وجود بند واحد على الأقل، ووصف لكل بند، وكمية موجبة وسعر غير سالب.";
             StatusIsError = true;
@@ -399,6 +401,28 @@ public sealed class SalesWorkspaceViewModel : INotifyPropertyChanged
                     DateOnly.FromDateTime(DraftIssueDate.Value.Date),
                     DraftDueDate.HasValue ? DateOnly.FromDateTime(DraftDueDate.Value.Date) : null,
                     NullIfBlank(InvoiceNotes), lines));
+
+            PersistedSalesDraftVatResult taxResult;
+            try
+            {
+                var vatLines = InvoiceLines.Select((line, index) =>
+                    new ApplySalesDraftVatLineApiRequest(
+                        index + 1, line.DiscountAmount, line.VatTreatment,
+                        line.VatTreatment == "StandardRated" ? null : NullIfBlank(line.TreatmentReason))).ToList();
+                taxResult = await _apiClient.CalculateAndPersistSalesDraftVatAsync(
+                    SelectedCompany.Id, created.Id, new ApplySalesDraftVatApiRequest(vatLines));
+            }
+            catch (ErpApiException taxError)
+            {
+                // The draft exists but the tax calculation did not commit. Prevent accidental duplicate-number retry.
+                InvoiceNumber = "";
+                OnPropertyChanged(nameof(InvoiceNumber));
+                await LoadCompanyDataAsync();
+                StatusMessage = $"حُفظت المسودة {created.InvoiceNumber}، لكن لم يُحفظ حساب VAT: {taxError.Message}. المسودة غير نهائية وغير مصنفة بالكامل.";
+                StatusIsError = true;
+                return;
+            }
+
             InvoiceNumber = "";
             InvoiceNotes = "";
             OnPropertyChanged(nameof(InvoiceNumber));
@@ -407,17 +431,17 @@ public sealed class SalesWorkspaceViewModel : INotifyPropertyChanged
             InvoiceLines.Clear();
             AddInvoiceLine();
             OnPropertyChanged(nameof(InvoiceLines));
-            ClearVatPreview("تم حفظ المسودة؛ لم يتم حفظ VAT ضمن المستند.");
+            ClearVatPreview("تم حفظ حساب VAT داخل المسودة؛ المستند غير نهائي ولا يُرسل إلى ZATCA.");
 
             var refreshed = await LoadCompanyDataAsync();
             if (refreshed)
             {
-                StatusMessage = $"تم حفظ المسودة {created.InvoiceNumber} بإجمالي فرعي {created.SubtotalAmount:N4} {created.CurrencyCode}. هذه مسودة داخلية غير ضريبية.";
+                StatusMessage = $"تم حفظ المسودة {created.InvoiceNumber}: الصافي {taxResult.NetAmount:N2}، VAT {taxResult.VatAmount:N2}، الإجمالي {taxResult.TotalAmount:N2} {created.CurrencyCode}. مسودة داخلية غير نهائية.";
                 StatusIsError = false;
             }
             else
             {
-                StatusMessage = $"تم حفظ المسودة {created.InvoiceNumber}، لكن تعذر تحديث القائمة. اضغط «تحديث البيانات» لإعادة التحميل.";
+                StatusMessage = $"تم حفظ المسودة {created.InvoiceNumber} والإجمالي {taxResult.TotalAmount:N2} {created.CurrencyCode}، لكن تعذر تحديث القائمة. اضغط «تحديث البيانات» لإعادة التحميل.";
                 StatusIsError = true;
             }
         }
@@ -468,7 +492,7 @@ public sealed class SalesWorkspaceViewModel : INotifyPropertyChanged
         try
         {
             var lines = inputLines.Select(x => new SalesVatPreviewLineApiRequest(
-                x.Description.Trim(), x.Quantity, x.UnitPrice, 0m, x.VatTreatment,
+                x.Description.Trim(), x.Quantity, x.UnitPrice, x.DiscountAmount, x.VatTreatment,
                 x.VatTreatment == "StandardRated" ? null : NullIfBlank(x.TreatmentReason))).ToList();
             var result = await _apiClient.CalculateSalesVatPreviewAsync(
                 SelectedCompany.Id, new CalculateSalesVatPreviewApiRequest(lines));
@@ -507,7 +531,7 @@ public sealed class SalesWorkspaceViewModel : INotifyPropertyChanged
     private void InvoiceLine_PropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName is nameof(InvoiceLineInput.Description) or nameof(InvoiceLineInput.Quantity) or
-            nameof(InvoiceLineInput.UnitPrice) or nameof(InvoiceLineInput.VatTreatment) or
+            nameof(InvoiceLineInput.UnitPrice) or nameof(InvoiceLineInput.DiscountAmount) or nameof(InvoiceLineInput.VatTreatment) or
             nameof(InvoiceLineInput.TreatmentReason))
             ClearVatPreview("تغيرت بيانات البنود؛ أعد حساب معاينة VAT.");
     }
@@ -539,6 +563,7 @@ public sealed class InvoiceLineInput : INotifyPropertyChanged
     private string _description = "";
     private decimal _quantity = 1m;
     private decimal _unitPrice;
+    private decimal _discountAmount;
     private string _vatTreatment = "StandardRated";
     private string _treatmentReason = "";
 
@@ -558,6 +583,12 @@ public sealed class InvoiceLineInput : INotifyPropertyChanged
     {
         get => _unitPrice;
         set { if (_unitPrice == value) return; _unitPrice = value; OnPropertyChanged(); OnPropertyChanged(nameof(LineAmount)); }
+    }
+
+    public decimal DiscountAmount
+    {
+        get => _discountAmount;
+        set { if (_discountAmount == value) return; _discountAmount = value; OnPropertyChanged(); OnPropertyChanged(nameof(LineAmount)); }
     }
 
     public string VatTreatment
