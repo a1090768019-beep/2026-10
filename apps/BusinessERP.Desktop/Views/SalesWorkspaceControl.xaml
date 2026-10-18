@@ -148,15 +148,13 @@
                                 <DataGridTextColumn Header="السعر" Binding="{Binding UnitPrice, UpdateSourceTrigger=PropertyChanged}" Width="95" />
                                 <DataGridTemplateColumn Header="معاملة الضريبة" Width="130">
                                     <DataGridTemplateColumn.CellTemplate>
-                                        <DataTemplate><TextBlock Text="{Binding VatTreatment}" VerticalAlignment="Center" /></DataTemplate>
-                                    </DataGridTemplateColumn.CellTemplate>
-                                    <DataGridTemplateColumn.CellEditingTemplate>
                                         <DataTemplate>
                                             <ComboBox ItemsSource="{Binding DataContext.VatTreatmentOptions, RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}}"
                                                       DisplayMemberPath="Label" SelectedValuePath="Value"
-                                                      SelectedValue="{Binding VatTreatment, UpdateSourceTrigger=PropertyChanged}" />
+                                                      SelectedValue="{Binding VatTreatment, UpdateSourceTrigger=PropertyChanged}"
+                                                      ToolTip="راجع انطباق المعاملة الضريبية على التوريد" />
                                         </DataTemplate>
-                                    </DataGridTemplateColumn.CellEditingTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
                                 <DataGridTextColumn Header="سبب التصنيف" Binding="{Binding TreatmentReason, UpdateSourceTrigger=PropertyChanged}" Width="140" />
                                 <DataGridTextColumn Header="القيمة" Binding="{Binding LineAmount, StringFormat=N4}" IsReadOnly="True" Width="95" />

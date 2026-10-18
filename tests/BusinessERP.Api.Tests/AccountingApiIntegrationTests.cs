@@ -23,6 +23,7 @@ public sealed class AccountingApiIntegrationTests
     private static readonly Guid TenantA = Guid.Parse("11111111-1111-4111-8111-111111111111");
     private static readonly Guid TenantB = Guid.Parse("22222222-2222-4222-8222-222222222222");
     private static readonly Guid CompanyA = Guid.Parse("11111111-1111-4111-8111-111111111101");
+    private static readonly Guid CompanyB = Guid.Parse("22222222-2222-4222-8222-222222222201");
     private static readonly Guid PeriodA = Guid.Parse("11111111-1111-4111-8111-111111111103");
     private static readonly Guid CashAccountA = Guid.Parse("11111111-1111-4111-8111-111111111104");
     private static readonly Guid EquityAccountA = Guid.Parse("11111111-1111-4111-8111-111111111105");
@@ -254,6 +255,25 @@ public sealed class AccountingApiIntegrationTests
                 }
             }))
             Assert.Equal(HttpStatusCode.BadRequest, unknownVatTreatment.StatusCode);
+
+        using (var crossTenantVatPreview = await client.PostAsJsonAsync(
+            $"/api/v1/companies/{CompanyB}/sales-vat-preview",
+            new
+            {
+                lines = new[]
+                {
+                    new
+                    {
+                        description = "محاولة عبور مستأجر",
+                        quantity = 1m,
+                        unitPrice = 10m,
+                        discountAmount = 0m,
+                        treatment = "StandardRated",
+                        treatmentReason = (string?)null
+                    }
+                }
+            }))
+            Assert.Equal(HttpStatusCode.NotFound, crossTenantVatPreview.StatusCode);
 
         // Two overlapping fiscal-year requests for the same new company must not both commit.
         using var newCompanyResponse = await client.PostAsJsonAsync("/api/v1/companies", new

@@ -199,5 +199,6 @@ test('WPF sales workspace sends VAT preview to the API and labels it as non-pers
   assert.match(viewModel, /PREVIEW_ONLY|preview/i);
   assert.match(view, /CalculateVatPreviewButton_Click/);
   assert.match(view, /لا يُحفظان في مسودة البيع/);
+  assert.match(view, /DisplayMemberPath="Label"/);
   assert.match(codeBehind, /await _viewModel\.CalculateVatPreviewAsync\(\)/);
 });
