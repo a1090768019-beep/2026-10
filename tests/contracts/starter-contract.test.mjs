@@ -117,3 +117,21 @@ test('concurrent accounting uniqueness checks are serialized inside the transact
   assert.match(api, /fiscal-year-overlap:/);
   assert.match(api, /Keep lock ordering stable/);
 });
+
+test('SaaS subscription endpoints expose active plans and tenant-scoped subscription status without claiming billing integration', async () => {
+  const api = await read('src/server/BusinessERP.Api/Endpoints/SubscriptionEndpoints.cs');
+  const program = await read('src/server/BusinessERP.Api/Program.cs');
+  const context = await read('src/server/BusinessERP.Infrastructure/Persistence/ErpDbContext.cs');
+  const records = await read('src/server/BusinessERP.Infrastructure/Persistence/Records.cs');
+  assert.match(program, /MapSubscriptionEndpoints/);
+  assert.match(api, /"\/subscription-plans"/);
+  assert.match(api, /"\/subscription"/);
+  assert.match(api, /s\.TenantId == tenant\.TenantId/);
+  assert.match(api, /Status\.Equals\("TRIALING"/);
+  assert.match(api, /Status\.Equals\("ACTIVE"/);
+  assert.match(api, /does not represent collected payment|لا يمثل تحصيلًا/);
+  assert.match(context, /DbSet<SubscriptionPlanRecord>/);
+  assert.match(context, /DbSet<TenantSubscriptionRecord>/);
+  assert.match(records, /class SubscriptionPlanRecord/);
+  assert.match(records, /class TenantSubscriptionRecord/);
+});
