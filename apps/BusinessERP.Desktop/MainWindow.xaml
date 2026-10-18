@@ -114,7 +114,22 @@
             </Border>
 
             <Grid Grid.Row="2">
-                <ScrollViewer x:Name="DashboardPanel" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="34" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <Border Grid.Row="0" Background="#F1F4F9" BorderBrush="#DDE5F0" BorderThickness="0,0,0,1" Padding="12,0">
+                    <StackPanel Orientation="Horizontal" FlowDirection="RightToLeft" VerticalAlignment="Center">
+                        <Button x:Name="OverviewWorkspaceTab" Content="⌂ الرئيسية" Tag="Overview" Click="RibbonNavigate_Click"
+                                Style="{StaticResource RibbonTabButtonStyle}" />
+                        <Button x:Name="SalesWorkspaceTab" Content="▤ مبيعات العملاء" Tag="Sales" Click="RibbonNavigate_Click"
+                                Style="{StaticResource RibbonTabButtonStyle}" />
+                        <Button x:Name="ReportsWorkspaceTab" Content="▥ التقارير المالية" Tag="Reports" Click="RibbonNavigate_Click"
+                                Style="{StaticResource RibbonTabButtonStyle}" />
+                        <TextBlock Text="تبويبات مساحة العمل" Foreground="#98A1B3" FontSize="10" VerticalAlignment="Center" Margin="12,0,0,0" />
+                    </StackPanel>
+                </Border>
+                <ScrollViewer Grid.Row="1" x:Name="DashboardPanel" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <StackPanel Margin="28,24,28,26" FlowDirection="RightToLeft">
                         <Border Background="#EAF0FF" CornerRadius="18" Padding="28" Margin="0,0,0,20">
                             <Grid>
@@ -293,7 +308,7 @@
                     </StackPanel>
                 </ScrollViewer>
 
-                <ScrollViewer x:Name="ModulePlaceholderPanel" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+                <ScrollViewer Grid.Row="1" x:Name="ModulePlaceholderPanel" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="30" FlowDirection="RightToLeft">
                         <Border Background="White" BorderBrush="{StaticResource BorderBrushSoft}" BorderThickness="1" CornerRadius="18" Padding="30">
                             <StackPanel>
@@ -312,7 +327,7 @@
                         </Border>
                     </StackPanel>
                 </ScrollViewer>
-                <views:SalesWorkspaceControl x:Name="SalesWorkspacePanel" Visibility="Collapsed" />
+                <views:SalesWorkspaceControl Grid.Row="1" x:Name="SalesWorkspacePanel" Visibility="Collapsed" />
             </Grid>
 
             <Border Grid.Row="3" Background="#F1F4F9" BorderBrush="#DDE5F0" BorderThickness="0,1,0,0" Padding="12,0">
