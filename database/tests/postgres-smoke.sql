@@ -17,7 +17,8 @@ DO $$
 DECLARE
     visible_companies integer;
     posted_rows integer;
-    blocked boolean := false;
+    posted_mutation_blocked boolean := false;
+    cross_tenant_write_blocked boolean := false;
     invalid_line_blocked boolean := false;
     unbalanced_blocked boolean := false;
 BEGIN
@@ -43,9 +44,9 @@ BEGIN
                 '22222222-2222-4222-8222-222222222201',
                 'CROSS-TENANT-WRITE', 'Must not be created by tenant A');
     EXCEPTION WHEN insufficient_privilege THEN
-        blocked := true;
+        cross_tenant_write_blocked := true;
     END;
-    IF NOT blocked THEN
+    IF NOT cross_tenant_write_blocked THEN
         RAISE EXCEPTION 'Sales RLS smoke failed: tenant A wrote a customer row for tenant B';
     END IF;
 
@@ -77,12 +78,12 @@ BEGIN
          WHERE id = '11111111-1111-4111-8111-111111111106';
     EXCEPTION WHEN OTHERS THEN
         IF SQLERRM = 'Posted/cancelled journal entries are immutable; use a reversal/correction' THEN
-            blocked := true;
+            posted_mutation_blocked := true;
         ELSE
             RAISE;
         END IF;
     END;
-    IF NOT blocked THEN
+    IF NOT posted_mutation_blocked THEN
         RAISE EXCEPTION 'Immutability smoke failed: posted journal header was editable';
     END IF;
 
@@ -124,7 +125,11 @@ BEGIN
        OR NOT EXISTS (SELECT 1 FROM companies WHERE id = '22222222-2222-4222-8222-222222222201')
        OR (SELECT count(*) FROM customers) <> 1
        OR NOT EXISTS (SELECT 1 FROM customers WHERE id = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc2')
-       OR EXISTS (SELECT 1 FROM customers WHERE id = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1') THEN
+       OR EXISTS (SELECT 1 FROM customers WHERE id = 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1')
+       OR (SELECT count(*) FROM sales_invoice_drafts) <> 1
+       OR NOT EXISTS (SELECT 1 FROM sales_invoice_drafts WHERE id = '22222222-2222-4222-8222-222222222203')
+       OR (SELECT count(*) FROM sales_invoice_draft_lines) <> 1
+       OR NOT EXISTS (SELECT 1 FROM sales_invoice_draft_lines WHERE id = '22222222-2222-4222-8222-222222222204') THEN
         RAISE EXCEPTION 'Sales RLS smoke failed: tenant B saw cross-tenant customer or company data';
     END IF;
 END $;

@@ -57,16 +57,7 @@ INSERT INTO customers (id, tenant_id, company_id, customer_code, name, tax_numbe
  '22222222-2222-4222-8222-222222222201', 'CI-CUSTOMER-B', 'Tenant B customer', '300000000000002');
 
 
--- Seed real sales data for tenant B so RLS tests prove cross-tenant invisibility rather than
--- merely testing empty tables. Invoice header + line must commit together due deferred total checks.
-INSERT INTO customers
-    (id, tenant_id, company_id, customer_code, name, tax_number)
-VALUES
-    ('22222222-2222-4222-8222-222222222202',
-     '22222222-2222-4222-8222-222222222222',
-     '22222222-2222-4222-8222-222222222201',
-     'B-CUSTOMER-1', 'CI Tenant B customer', '300000000000003');
-
+-- Seed a real tenant B invoice. Header and lines commit together because of deferred total checks.
 BEGIN;
 INSERT INTO sales_invoice_drafts
     (id, tenant_id, company_id, customer_id, invoice_number, issue_date, currency_code,
@@ -75,9 +66,9 @@ VALUES
     ('22222222-2222-4222-8222-222222222203',
      '22222222-2222-4222-8222-222222222222',
      '22222222-2222-4222-8222-222222222201',
-     '22222222-2222-4222-8222-222222222202',
-     'B-INVOICE-1', '2026-01-10', 'SAR', 'CI Tenant B customer',
-     '300000000000003', 100.0000, 'RLS fixture only', 'DRAFT',
+     'cccccccc-cccc-4ccc-8ccc-ccccccccccc2',
+     'B-INVOICE-1', '2026-01-10', 'SAR', 'Tenant B customer',
+     '300000000000002', 100.0000, 'RLS fixture only', 'DRAFT',
      'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
 INSERT INTO sales_invoice_draft_lines
     (id, tenant_id, company_id, sales_invoice_draft_id, line_number, description, quantity, unit_price, line_amount)
