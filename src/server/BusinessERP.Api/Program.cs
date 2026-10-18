@@ -88,6 +88,7 @@ app.MapGet("/health/ready", async Task<IResult> (IServiceProvider services, ICon
 app.MapAccountingEndpoints();
 app.MapChartOfAccountsTemplateEndpoints();
 app.MapSubscriptionEndpoints();
+app.MapCustomerEndpoints();
 app.Run();
 
 public partial class Program { }
