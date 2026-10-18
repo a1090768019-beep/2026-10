@@ -37,6 +37,7 @@ REVOKE UPDATE, DELETE, TRUNCATE ON audit_logs FROM erp_ci_runtime;
 -- never invoice identity, customer, issue date, base subtotal, source lines, or status.
 GRANT SELECT, INSERT ON customers, sales_invoice_drafts, sales_invoice_draft_lines TO erp_ci_runtime;
 GRANT UPDATE (
+    status, accounting_posted_journal_entry_id, accounting_posted_at,
     tax_calculation_status, gross_amount, discount_amount, net_amount, vat_amount, total_amount
 ) ON sales_invoice_drafts TO erp_ci_runtime;
 GRANT UPDATE (
