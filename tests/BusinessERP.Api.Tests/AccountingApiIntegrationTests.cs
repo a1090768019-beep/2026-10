@@ -200,7 +200,7 @@ public sealed class AccountingApiIntegrationTests
                 lines = new[]
                 {
                     new { lineNumber = 1, discountAmount = 999m, treatment = "StandardRated", treatmentReason = (string?)null },
-                    new { lineNumber = 2, discountAmount = 0m, treatment = "Exempt", treatmentReason = "Integration test classification" }
+                    new { lineNumber = 2, discountAmount = 0m, treatment = "Exempt", treatmentReason = (string?)"Integration test classification" }
                 }
             }))
             Assert.Equal(HttpStatusCode.BadRequest, invalidPersistedTax.StatusCode);
@@ -226,7 +226,7 @@ public sealed class AccountingApiIntegrationTests
                 lines = new[]
                 {
                     new { lineNumber = 1, discountAmount = 10m, treatment = "StandardRated", treatmentReason = (string?)null },
-                    new { lineNumber = 2, discountAmount = 0m, treatment = "Exempt", treatmentReason = "Integration test classification" }
+                    new { lineNumber = 2, discountAmount = 0m, treatment = "Exempt", treatmentReason = (string?)"Integration test classification" }
                 }
             }))
         {
@@ -268,7 +268,7 @@ public sealed class AccountingApiIntegrationTests
                         unitPrice = 50m,
                         discountAmount = 0m,
                         treatment = "Exempt",
-                        treatmentReason = "Integration test classification"
+                        treatmentReason = (string?)"Integration test classification"
                     }
                 }
             }))
@@ -508,7 +508,7 @@ public sealed class AccountingApiIntegrationTests
             unclassifiedPostingRequest))
         {
             Assert.Equal(HttpStatusCode.Conflict, blockedPosting.StatusCode);
-            using var blockedBody = await ParseJsonAsync(blockedPosting);
+            using var blockedBody = JsonDocument.Parse(await blockedPosting.Content.ReadAsStringAsync());
             Assert.Equal("sales_draft_vat_not_calculated", blockedBody.RootElement.GetProperty("error").GetString());
         }
 
@@ -575,7 +575,7 @@ public sealed class AccountingApiIntegrationTests
                 lines = new[]
                 {
                     new { lineNumber = 1, discountAmount = 10m, treatment = "StandardRated", treatmentReason = (string?)null },
-                    new { lineNumber = 2, discountAmount = 0m, treatment = "Exempt", treatmentReason = "Integration test classification" }
+                    new { lineNumber = 2, discountAmount = 0m, treatment = "Exempt", treatmentReason = (string?)"Integration test classification" }
                 }
             }))
             Assert.Equal(HttpStatusCode.Conflict, recalculateAfterPosting.StatusCode);
