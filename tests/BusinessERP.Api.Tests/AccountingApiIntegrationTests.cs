@@ -37,8 +37,10 @@ public sealed class AccountingApiIntegrationTests
 
         using (var companiesResponse = await client.GetAsync("/api/v1/companies"))
         {
-            Assert.Equal(HttpStatusCode.OK, companiesResponse.StatusCode);
-            using var companies = await ParseJsonAsync(companiesResponse);
+            var companiesBody = await companiesResponse.Content.ReadAsStringAsync();
+            Assert.True(companiesResponse.StatusCode == HttpStatusCode.OK,
+                $"GET companies returned {(int)companiesResponse.StatusCode}: {companiesBody}");
+            using var companies = JsonDocument.Parse(companiesBody);
             Assert.Contains(companies.RootElement.EnumerateArray(),
                 company => company.GetProperty("id").GetGuid() == CompanyA);
         }
