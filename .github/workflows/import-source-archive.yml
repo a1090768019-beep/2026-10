@@ -22,7 +22,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cat transfer/part-00.b64 transfer/part-01.b64 transfer/part-02.b64 transfer/part-03.b64 transfer/part-04.b64 transfer/part-05.b64 transfer/part-06.b64 transfer/part-07.b64 transfer/part-08.b64 transfer/part-09.b64 transfer/part-10.b64 transfer/part-11.b64 transfer/part-12.b64 transfer/part-13.b64 transfer/part-14a.b64 transfer/part-14b.b64 transfer/part-15a.b64 transfer/part-15b1.b64 transfer/part-15b2a1.b64 transfer/part-15b2a2.b64 transfer/part-15b2b.b64 > "$RUNNER_TEMP/business-erp.zip.b64"
+          cat transfer/part-00.b64 transfer/part-01.b64 transfer/part-02.b64 transfer/part-03.b64 transfer/part-04.b64 transfer/part-05.b64 transfer/part-06.b64 transfer/part-07.b64 transfer/part-08.b64 transfer/part-09.b64 transfer/part-10.b64 transfer/part-11.b64 transfer/part-12.b64 transfer/part-13.b64 transfer/part-14a.b64 transfer/part-14b.b64 transfer/part-15a.b64 transfer/part-15b1.b64 transfer/tail-01.b64 transfer/tail-02.b64 transfer/tail-03.b64 transfer/tail-04.b64 transfer/tail-05.b64 transfer/tail-06.b64 transfer/tail-07.b64 transfer/tail-08.b64 transfer/tail-09.b64 transfer/tail-10.b64 transfer/tail-11.b64 transfer/tail-12.b64 transfer/tail-13.b64 transfer/tail-14.b64 transfer/tail-15.b64 transfer/tail-16.b64 transfer/tail-17.b64 transfer/tail-18.b64 transfer/part-15b2b.b64 > "$RUNNER_TEMP/business-erp.zip.b64"
           base64 --decode "$RUNNER_TEMP/business-erp.zip.b64" > "$RUNNER_TEMP/business-erp.zip"
           mkdir -p "$RUNNER_TEMP/archive"
           unzip -q "$RUNNER_TEMP/business-erp.zip" -d "$RUNNER_TEMP/archive"
