@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using BusinessERP.Desktop.Services;
 using BusinessERP.Desktop.ViewModels;
 
@@ -18,6 +19,17 @@ public partial class SalesWorkspaceControl : UserControl
     public Task SetApiClientAsync(ErpApiClient? apiClient) => _viewModel.SetApiClientAsync(apiClient);
 
     public Task RefreshAsync() => _viewModel.RefreshAsync();
+
+    public bool SearchLoadedData(string searchText) => _viewModel.SearchLoadedData(searchText);
+
+    public string WorkspaceStatusMessage => _viewModel.StatusMessage;
+
+    public void BeginNewDraft()
+    {
+        _viewModel.PrepareNewDraft();
+        InvoiceNumberTextBox.Focus();
+        Keyboard.Focus(InvoiceNumberTextBox);
+    }
 
     private async void CreateInvoiceDraftButton_Click(object sender, RoutedEventArgs e)
     {
