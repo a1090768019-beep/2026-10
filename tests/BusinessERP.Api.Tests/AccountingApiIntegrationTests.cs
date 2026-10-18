@@ -72,7 +72,8 @@ public sealed class AccountingApiIntegrationTests
             email = "sales@example.invalid",
             taxNumber = "300000000000003"
         });
-        Assert.Equal(HttpStatusCode.Created, customerResponse.StatusCode);
+        Assert.True(customerResponse.StatusCode == HttpStatusCode.Created,
+            $"Create customer returned {(int)customerResponse.StatusCode}: {await customerResponse.Content.ReadAsStringAsync()}{Environment.NewLine}{TestExceptionHandler.LastException}");
         using var customerJson = await ParseJsonAsync(customerResponse);
         var customerId = customerJson.RootElement.GetProperty("id").GetGuid();
         Assert.Equal(customerCode, customerJson.RootElement.GetProperty("code").GetString());
@@ -101,7 +102,8 @@ public sealed class AccountingApiIntegrationTests
                     new { description = "خدمة ثانية", quantity = 3m, unitPrice = 0.3333m }
                 }
             });
-        Assert.Equal(HttpStatusCode.Created, draftResponse.StatusCode);
+        Assert.True(draftResponse.StatusCode == HttpStatusCode.Created,
+            $"Create invoice draft returned {(int)draftResponse.StatusCode}: {await draftResponse.Content.ReadAsStringAsync()}{Environment.NewLine}{TestExceptionHandler.LastException}");
         using var draftJson = await ParseJsonAsync(draftResponse);
         var draftId = draftJson.RootElement.GetProperty("id").GetGuid();
         Assert.Equal("DRAFT", draftJson.RootElement.GetProperty("status").GetString());
