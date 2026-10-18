@@ -33,5 +33,13 @@ GRANT SELECT, INSERT ON audit_logs TO erp_ci_runtime;
 REVOKE UPDATE, DELETE, TRUNCATE ON audit_logs FROM erp_ci_runtime;
 
 
--- Sales API currently creates and reads customers and invoice drafts; it does not edit/delete them.
+-- Sales master data is insert/read only. VAT calculation may update only the reviewed tax columns,
+-- never invoice identity, customer, issue date, base subtotal, source lines, or status.
 GRANT SELECT, INSERT ON customers, sales_invoice_drafts, sales_invoice_draft_lines TO erp_ci_runtime;
+GRANT UPDATE (
+    tax_calculation_status, gross_amount, discount_amount, net_amount, vat_amount, total_amount
+) ON sales_invoice_drafts TO erp_ci_runtime;
+GRANT UPDATE (
+    discount_amount, vat_treatment, vat_treatment_reason, gross_amount, net_amount,
+    vat_rate_percent, vat_amount, total_amount
+) ON sales_invoice_draft_lines TO erp_ci_runtime;
