@@ -1,0 +1,40 @@
+name: Import Business ERP source archive
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'transfer/business-erp-csharp-commercial-core.zip.b64'
+
+permissions:
+  contents: write
+
+jobs:
+  import-source:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Decode and import source files
+        shell: bash
+        run: |
+          set -euo pipefail
+          base64 --decode transfer/business-erp-csharp-commercial-core.zip.b64 > "$RUNNER_TEMP/business-erp.zip"
+          mkdir -p "$RUNNER_TEMP/archive"
+          unzip -q "$RUNNER_TEMP/business-erp.zip" -d "$RUNNER_TEMP/archive"
+          test -d "$RUNNER_TEMP/archive/business-erp"
+          cp -a "$RUNNER_TEMP/archive/business-erp/." .
+          rm -rf transfer
+          rm -f .github/workflows/import-source-archive.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No source changes were imported."
+            exit 1
+          fi
+          git commit -m "Import complete Business ERP C# source"
+          git push origin HEAD:main
