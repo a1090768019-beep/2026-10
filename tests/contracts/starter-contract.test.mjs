@@ -178,7 +178,7 @@ test('Saudi VAT preview requires explicit treatment, decimal rounding and tenant
   const program = await read('src/server/BusinessERP.Api/Program.cs');
   assert.match(calculator, /StandardRatePercent = 15m/);
   assert.match(calculator, /MidpointRounding\.AwayFromZero/);
-  assert.match(calculator, /SalesVatTreatment\.ZeroRated/);
+  assert.match(calculator, /ZeroRated\s*=\s*2/);
   assert.match(calculator, /TreatmentReason/);
   assert.match(endpoint, /sales-vat-preview/);
   assert.match(endpoint, /PREVIEW_ONLY/);
