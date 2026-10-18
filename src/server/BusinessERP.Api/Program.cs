@@ -92,6 +92,7 @@ app.MapCustomerEndpoints();
 app.MapSalesInvoiceDraftEndpoints();
 app.MapSalesVatPreviewEndpoints();
 app.MapSalesDraftVatEndpoints();
+app.MapSalesDraftLedgerPostingEndpoints();
 app.Run();
 
 public partial class Program { }
