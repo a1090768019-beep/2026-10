@@ -7,6 +7,8 @@ public sealed class ErpDbContext(DbContextOptions<ErpDbContext> options) : DbCon
     public DbSet<TenantRecord> Tenants => Set<TenantRecord>();
     public DbSet<UserRecord> Users => Set<UserRecord>();
     public DbSet<TenantMembershipRecord> TenantMemberships => Set<TenantMembershipRecord>();
+    public DbSet<SubscriptionPlanRecord> SubscriptionPlans => Set<SubscriptionPlanRecord>();
+    public DbSet<TenantSubscriptionRecord> TenantSubscriptions => Set<TenantSubscriptionRecord>();
     public DbSet<CompanyRecord> Companies => Set<CompanyRecord>();
     public DbSet<AccountTemplateRecord> AccountTemplates => Set<AccountTemplateRecord>();
     public DbSet<AccountTemplateAccountRecord> AccountTemplateAccounts => Set<AccountTemplateAccountRecord>();
@@ -50,6 +52,36 @@ public sealed class ErpDbContext(DbContextOptions<ErpDbContext> options) : DbCon
             e.Property(x => x.CreatedAt).HasColumnName("created_at").HasColumnType("timestamp with time zone").HasDefaultValueSql("now()");
             e.HasOne<TenantRecord>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne<UserRecord>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<SubscriptionPlanRecord>(e =>
+        {
+            e.ToTable("subscription_plans"); e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.Code).HasColumnName("code").HasMaxLength(64).IsRequired();
+            e.Property(x => x.Name).HasColumnName("name").HasMaxLength(120).IsRequired();
+            e.Property(x => x.BillingInterval).HasColumnName("billing_interval").HasMaxLength(12).IsRequired();
+            e.Property(x => x.Price).HasColumnName("price").HasPrecision(20, 4);
+            e.Property(x => x.Currency).HasColumnName("currency").HasColumnType("char(3)").IsRequired();
+            e.Property(x => x.LimitsJson).HasColumnName("limits_json").HasColumnType("jsonb").IsRequired();
+            e.Property(x => x.IsActive).HasColumnName("is_active");
+            e.Property(x => x.CreatedAt).HasColumnName("created_at").HasColumnType("timestamp with time zone").HasDefaultValueSql("now()");
+            e.HasIndex(x => x.Code).IsUnique();
+        });
+        modelBuilder.Entity<TenantSubscriptionRecord>(e =>
+        {
+            e.ToTable("tenant_subscriptions"); e.HasKey(x => x.Id);
+            e.Property(x => x.Id).HasColumnName("id");
+            e.Property(x => x.TenantId).HasColumnName("tenant_id");
+            e.Property(x => x.SubscriptionPlanId).HasColumnName("subscription_plan_id");
+            e.Property(x => x.Status).HasColumnName("status").HasMaxLength(24).IsRequired();
+            e.Property(x => x.StartsAt).HasColumnName("starts_at").HasColumnType("timestamp with time zone");
+            e.Property(x => x.EndsAt).HasColumnName("ends_at").HasColumnType("timestamp with time zone");
+            e.Property(x => x.ExternalCustomerId).HasColumnName("external_customer_id").HasMaxLength(200);
+            e.Property(x => x.ExternalSubscriptionId).HasColumnName("external_subscription_id").HasMaxLength(200);
+            e.Property(x => x.CreatedAt).HasColumnName("created_at").HasColumnType("timestamp with time zone").HasDefaultValueSql("now()");
+            e.HasAlternateKey(x => new { x.TenantId, x.Id });
+            e.HasOne<TenantRecord>().WithMany().HasForeignKey(x => x.TenantId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne<SubscriptionPlanRecord>().WithMany().HasForeignKey(x => x.SubscriptionPlanId).OnDelete(DeleteBehavior.Restrict);
         });
         modelBuilder.Entity<AccountTemplateRecord>(e =>
         {
