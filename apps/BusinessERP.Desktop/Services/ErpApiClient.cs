@@ -24,6 +24,19 @@ public sealed class ErpApiClient(HttpClient httpClient, Guid tenantId)
     public Task<ApiCompany> CreateCompanyAsync(CreateCompanyApiRequest request, CancellationToken ct = default) =>
         SendJsonAsync<ApiCompany>(HttpMethod.Post, "/api/v1/companies", request, ct);
 
+    public Task<IReadOnlyList<ApiAccount>> GetAccountsAsync(Guid companyId, CancellationToken ct = default) =>
+        GetListAsync<ApiAccount>($"/api/v1/companies/{companyId:D}/accounts", ct);
+
+    public Task<IReadOnlyList<ApiFiscalPeriod>> GetFiscalPeriodsAsync(Guid companyId, CancellationToken ct = default) =>
+        GetListAsync<ApiFiscalPeriod>($"/api/v1/companies/{companyId:D}/fiscal-periods", ct);
+
+    public Task<SalesDraftLedgerPostingApiResult> PostSalesDraftToLedgerAsync(
+        Guid companyId, Guid invoiceId, PostSalesDraftToLedgerApiRequest request, CancellationToken ct = default) =>
+        SendJsonAsync<SalesDraftLedgerPostingApiResult>(
+            HttpMethod.Post,
+            $"/api/v1/companies/{companyId:D}/sales-invoice-drafts/{invoiceId:D}/post-to-ledger",
+            request, ct);
+
     public Task<IReadOnlyList<ApiCustomer>> GetCustomersAsync(Guid companyId, CancellationToken ct = default) =>
         GetListAsync<ApiCustomer>($"/api/v1/companies/{companyId:D}/customers", ct);
 
@@ -155,6 +168,17 @@ public sealed class ErpApiException(HttpStatusCode statusCode, string message) :
 
 public sealed record ApiCompany(Guid Id, string Name, string BaseCurrency, string? TaxNumber, DateTime CreatedAt);
 public sealed record CreateCompanyApiRequest(string Name, string BaseCurrency = "SAR", string? TaxNumber = null);
+public sealed record ApiAccount(Guid Id, string Code, string NameAr, string NameEn, string AccountType, string NormalBalance, Guid? ParentAccountId, bool IsActive, bool AllowPosting);
+public sealed record ApiFiscalPeriod(Guid Id, Guid FiscalYearId, int PeriodNumber, DateOnly StartDate, DateOnly EndDate, string Status)
+{
+    public string DisplayName => $"الفترة {PeriodNumber}: {StartDate:yyyy-MM-dd} — {EndDate:yyyy-MM-dd} ({Status})";
+}
+public sealed record PostSalesDraftToLedgerApiRequest(
+    Guid FiscalPeriodId, string EntryNumber, Guid ReceivableAccountId, Guid RevenueAccountId, Guid? OutputVatAccountId = null);
+public sealed record SalesDraftLedgerPostingApiResult(
+    Guid SalesInvoiceDraftId, Guid JournalEntryId, string EntryNumber, string JournalEntryStatus,
+    DateOnly EntryDate, decimal GrossAmount, decimal DiscountAmount, decimal NetAmount,
+    decimal VatAmount, decimal TotalAmount, bool AlreadyPosted, string Message);
 public sealed record ApiCustomer(Guid Id, string Code, string Name, string? Email, string? Phone, string? TaxNumber, bool IsActive, DateTime CreatedAt);
 public sealed record CreateCustomerApiRequest(string Code, string Name, string? Email = null, string? Phone = null, string? TaxNumber = null);
 public sealed record SalesInvoiceDraftListItem(
