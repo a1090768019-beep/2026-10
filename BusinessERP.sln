@@ -1,0 +1,48 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BusinessERP.Domain", "src\server\BusinessERP.Domain\BusinessERP.Domain.csproj", "{88CBF2E8-6428-4B6C-A9D9-1BAE9B40BB01}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BusinessERP.Application", "src\server\BusinessERP.Application\BusinessERP.Application.csproj", "{88CBF2E8-6428-4B6C-A9D9-1BAE9B40BB02}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BusinessERP.Infrastructure", "src\server\BusinessERP.Infrastructure\BusinessERP.Infrastructure.csproj", "{88CBF2E8-6428-4B6C-A9D9-1BAE9B40BB03}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BusinessERP.Api", "src\server\BusinessERP.Api\BusinessERP.Api.csproj", "{88CBF2E8-6428-4B6C-A9D9-1BAE9B40BB04}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BusinessERP.Domain.Tests", "tests\BusinessERP.Domain.Tests\BusinessERP.Domain.Tests.csproj", "{88CBF2E8-6428-4B6C-A9D9-1BAE9B40BB05}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BusinessERP.Desktop", "apps\BusinessERP.Desktop\BusinessERP.Desktop.csproj", "{88CBF2E8-6428-4B6C-A9D9-1BAE9B40BB06}"
+EndProject
+Global
+    GlobalSection(SolutionConfigurationPlatforms) = preSolution
+        Debug|Any CPU = Debug|Any CPU
+        Release|Any CPU = Release|Any CPU
+    EndGlobalSection
+    GlobalSection(ProjectConfigurationPlatforms) = postSolution
+        {88CBF2E8-6428-4B6C-A9D9-1BAE9B40BB01}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+        {88CBF2E8-6428-4B6C-A9D9-1BAE9B40BB01}.Debug|Any CPU.Build.0 = Debug|Any CPU
+        {88CBF2E8-6428-4B6C-A9D9-1BAE9B40BB01}.Release|Any CPU.ActiveCfg = Release|Any CPU
+        {88CBF2E8-6428-4B6C-A9D9-1BAE9B40BB01}.Release|Any CPU.Build.0 = Release|Any CPU
+        {88CBF2E8-6428-4B6C-A9D9-1BAE9B40BB02}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+        {88CBF2E8-6428-4B6C-A9D9-1BAE9B40BB02}.Debug|Any CPU.Build.0 = Debug|Any CPU
+        {88CBF2E8-6428-4B6C-A9D9-1BAE9B40BB02}.Release|Any CPU.ActiveCfg = Release|Any CPU
+        {88CBF2E8-6428-4B6C-A9D9-1BAE9B40BB02}.Release|Any CPU.Build.0 = Release|Any CPU
+        {88CBF2E8-6428-4B6C-A9D9-1BAE9B40BB03}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+        {88CBF2E8-6428-4B6C-A9D9-1BAE9B40BB03}.Debug|Any CPU.Build.0 = Debug|Any CPU
+        {88CBF2E8-6428-4B6C-A9D9-1BAE9B40BB03}.Release|Any CPU.ActiveCfg = Release|Any CPU
+        {88CBF2E8-6428-4B6C-A9D9-1BAE9B40BB03}.Release|Any CPU.Build.0 = Release|Any CPU
+        {88CBF2E8-6428-4B6C-A9D9-1BAE9B40BB04}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+        {88CBF2E8-6428-4B6C-A9D9-1BAE9B40BB04}.Debug|Any CPU.Build.0 = Debug|Any CPU
+        {88CBF2E8-6428-4B6C-A9D9-1BAE9B40BB04}.Release|Any CPU.ActiveCfg = Release|Any CPU
+        {88CBF2E8-6428-4B6C-A9D9-1BAE9B40BB04}.Release|Any CPU.Build.0 = Release|Any CPU
+        {88CBF2E8-6428-4B6C-A9D9-1BAE9B40BB05}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+        {88CBF2E8-6428-4B6C-A9D9-1BAE9B40BB05}.Debug|Any CPU.Build.0 = Debug|Any CPU
+        {88CBF2E8-6428-4B6C-A9D9-1BAE9B40BB05}.Release|Any CPU.ActiveCfg = Release|Any CPU
+        {88CBF2E8-6428-4B6C-A9D9-1BAE9B40BB05}.Release|Any CPU.Build.0 = Release|Any CPU
+        {88CBF2E8-6428-4B6C-A9D9-1BAE9B40BB06}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+        {88CBF2E8-6428-4B6C-A9D9-1BAE9B40BB06}.Debug|Any CPU.Build.0 = Debug|Any CPU
+        {88CBF2E8-6428-4B6C-A9D9-1BAE9B40BB06}.Release|Any CPU.ActiveCfg = Release|Any CPU
+        {88CBF2E8-6428-4B6C-A9D9-1BAE9B40BB06}.Release|Any CPU.Build.0 = Release|Any CPU
+    EndGlobalSection
+EndGlobal
