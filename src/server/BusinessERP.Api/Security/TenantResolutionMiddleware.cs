@@ -12,7 +12,8 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next, ILogger<Ten
 {
     public async Task InvokeAsync(
         HttpContext http,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        TenantTransactionRunner transactionRunner)
     {
         var cancellationToken = http.RequestAborted;
         if (!http.Request.Path.StartsWithSegments("/api"))
@@ -88,20 +89,25 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next, ILogger<Ten
 
         if (!isSubscriptionRead)
         {
-            var subscription = await db.TenantSubscriptions.AsNoTracking()
-                .Where(x => x.TenantId == tenantId)
-                .OrderByDescending(x => x.StartsAt)
-                .ThenByDescending(x => x.CreatedAt)
-                .Select(x => new { x.Status, x.StartsAt, x.EndsAt })
-                .FirstOrDefaultAsync(cancellationToken);
+            // Subscription rows are protected by PostgreSQL RLS, so this lookup must use the
+            // same transaction-local tenant context as all other tenant data access.
+            var isEntitled = await transactionRunner.ExecuteAsync(async (tenantDb, token) =>
+            {
+                var subscription = await tenantDb.TenantSubscriptions.AsNoTracking()
+                    .Where(x => x.TenantId == tenantId)
+                    .OrderByDescending(x => x.StartsAt)
+                    .ThenByDescending(x => x.CreatedAt)
+                    .Select(x => new { x.Status, x.StartsAt, x.EndsAt })
+                    .FirstOrDefaultAsync(token);
 
-            var now = DateTime.UtcNow;
-            var withinWindow = subscription is not null &&
-                subscription.StartsAt <= now &&
-                (!subscription.EndsAt.HasValue || subscription.EndsAt.Value > now);
-            var isEntitled = withinWindow && subscription is not null &&
-                (subscription.Status.Equals("ACTIVE", StringComparison.OrdinalIgnoreCase) ||
-                 subscription.Status.Equals("TRIALING", StringComparison.OrdinalIgnoreCase));
+                var now = DateTime.UtcNow;
+                var withinWindow = subscription is not null &&
+                    subscription.StartsAt <= now &&
+                    (!subscription.EndsAt.HasValue || subscription.EndsAt.Value > now);
+                return withinWindow && subscription is not null &&
+                    (subscription.Status.Equals("ACTIVE", StringComparison.OrdinalIgnoreCase) ||
+                     subscription.Status.Equals("TRIALING", StringComparison.OrdinalIgnoreCase));
+            }, cancellationToken);
 
             if (!isEntitled)
             {
