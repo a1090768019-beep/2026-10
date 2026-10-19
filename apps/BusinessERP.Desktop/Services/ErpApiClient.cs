@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Globalization;
 
 namespace BusinessERP.Desktop.Services;
 
@@ -36,6 +37,24 @@ public sealed class ErpApiClient(HttpClient httpClient, Guid tenantId)
             HttpMethod.Post,
             $"/api/v1/companies/{companyId:D}/sales-invoice-drafts/{invoiceId:D}/post-to-ledger",
             request, ct);
+
+    public Task<TrialBalanceApiReport> GetTrialBalanceAsync(
+        Guid companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct = default) =>
+        GetObjectAsync<TrialBalanceApiReport>(
+            $"/api/v1/companies/{companyId:D}/reports/trial-balance?fromDate={fromDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}&toDate={toDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}",
+            ct);
+
+    public Task<IncomeStatementApiReport> GetIncomeStatementAsync(
+        Guid companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct = default) =>
+        GetObjectAsync<IncomeStatementApiReport>(
+            $"/api/v1/companies/{companyId:D}/reports/income-statement?fromDate={fromDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}&toDate={toDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}",
+            ct);
+
+    public Task<BalanceSheetApiReport> GetBalanceSheetAsync(
+        Guid companyId, DateOnly asOfDate, CancellationToken ct = default) =>
+        GetObjectAsync<BalanceSheetApiReport>(
+            $"/api/v1/companies/{companyId:D}/reports/balance-sheet?asOfDate={asOfDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}",
+            ct);
 
     public Task<IReadOnlyList<ApiCustomer>> GetCustomersAsync(Guid companyId, CancellationToken ct = default) =>
         GetListAsync<ApiCustomer>($"/api/v1/companies/{companyId:D}/customers", ct);
@@ -77,6 +96,24 @@ public sealed class ErpApiClient(HttpClient httpClient, Guid tenantId)
         catch (JsonException)
         {
             throw new ErpApiException(response.StatusCode, "استجابة الخادم لا تطابق صيغة البيانات المتوقعة.");
+        }
+    }
+
+    private async Task<T> GetObjectAsync<T>(string path, CancellationToken ct)
+    {
+        using var response = await SendAsync(HttpMethod.Get, path, null, ct);
+        var payload = await response.Content.ReadAsStringAsync(ct);
+        if (!response.IsSuccessStatusCode)
+            throw BuildException(response.StatusCode, payload);
+
+        try
+        {
+            return JsonSerializer.Deserialize<T>(payload, JsonOptions)
+                ?? throw new JsonException("Empty JSON response.");
+        }
+        catch (JsonException)
+        {
+            throw new ErpApiException(response.StatusCode, "استجابة التقرير لا تطابق صيغة البيانات المتوقعة.");
         }
     }
 
@@ -197,6 +234,24 @@ public sealed record SalesInvoiceDraftDetails(
     DateOnly? DueDate, string CurrencyCode, string CustomerName, string? CustomerTaxNumber,
     decimal SubtotalAmount, string Notes, string Status, DateTime CreatedAt, IReadOnlyList<SalesInvoiceDraftLine> Lines);
 public sealed record SalesInvoiceDraftLine(Guid Id, int LineNumber, string Description, decimal Quantity, decimal UnitPrice, decimal LineAmount);
+
+public sealed record TrialBalanceApiReport(
+    Guid CompanyId, DateOnly FromDate, DateOnly ToDate, IReadOnlyList<TrialBalanceApiRow> Rows,
+    decimal TotalDebitMovement, decimal TotalCreditMovement, decimal TotalDebitBalance, decimal TotalCreditBalance);
+public sealed record TrialBalanceApiRow(
+    Guid AccountId, string AccountCode, string AccountNameAr, string AccountNameEn, string AccountType,
+    decimal DebitMovement, decimal CreditMovement, decimal DebitBalance, decimal CreditBalance);
+public sealed record FinancialStatementApiRow(Guid? AccountId, string AccountCode, string AccountNameAr, string AccountNameEn, decimal Amount);
+public sealed record IncomeStatementApiReport(
+    Guid CompanyId, DateOnly FromDate, DateOnly ToDate,
+    IReadOnlyList<FinancialStatementApiRow> Revenue, IReadOnlyList<FinancialStatementApiRow> Expenses,
+    decimal TotalRevenue, decimal TotalExpenses, decimal NetIncome);
+public sealed record BalanceSheetApiReport(
+    Guid CompanyId, DateOnly AsOfDate,
+    IReadOnlyList<FinancialStatementApiRow> Assets, IReadOnlyList<FinancialStatementApiRow> Liabilities,
+    IReadOnlyList<FinancialStatementApiRow> Equity, decimal UnclosedEarnings,
+    decimal TotalAssets, decimal TotalLiabilities, decimal TotalEquity, decimal Difference);
+
 
 
 public sealed record CalculateSalesVatPreviewApiRequest(IReadOnlyList<SalesVatPreviewLineApiRequest> Lines);

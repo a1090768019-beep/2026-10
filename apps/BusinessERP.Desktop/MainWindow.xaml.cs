@@ -188,6 +188,8 @@ public partial class MainWindow : Window
             await candidateClient.GetCompaniesAsync();
             _erpApiClient = candidateClient;
             await SalesWorkspacePanel.SetApiClientAsync(candidateClient);
+            if (ReportsWorkspacePanel.Visibility == Visibility.Visible)
+                await ReportsWorkspacePanel.SetApiClientAsync(candidateClient);
             AuthStatusText.Text = $"تم تفعيل المستأجر · {tenantId.ToString("D")[..8]}";
             UpdateRibbonContext();
             RibbonStatusText.Text = $"API متصل · المستأجر {tenantId.ToString("D")[..8]}";
@@ -196,6 +198,7 @@ public partial class MainWindow : Window
         {
             _erpApiClient = null;
             await SalesWorkspacePanel.SetApiClientAsync(null);
+            await ReportsWorkspacePanel.SetApiClientAsync(null);
             AuthStatusText.Text = "تم رفض المستأجر أو صلاحيات المستخدم";
             RibbonStatusText.Text = "تم رفض عضوية المستأجر أو صلاحيات المستخدم";
             if (showErrors)
@@ -205,6 +208,7 @@ public partial class MainWindow : Window
         {
             _erpApiClient = null;
             await SalesWorkspacePanel.SetApiClientAsync(null);
+            await ReportsWorkspacePanel.SetApiClientAsync(null);
             AuthStatusText.Text = "تعذر الاتصال بـ API";
             RibbonStatusText.Text = "تعذر الاتصال بـ API";
             if (showErrors)
@@ -219,6 +223,7 @@ public partial class MainWindow : Window
         // claimed here and can be added once provider end-session policies are configured.
         _erpApiClient = null;
         await SalesWorkspacePanel.SetApiClientAsync(null);
+        await ReportsWorkspacePanel.SetApiClientAsync(null);
         _authenticatedHttpClient?.Dispose();
         _authenticatedHttpClient = null;
         UpdateRibbonContext();
@@ -448,6 +453,7 @@ public partial class MainWindow : Window
             DashboardPanel.Visibility = Visibility.Visible;
             ModulePlaceholderPanel.Visibility = Visibility.Collapsed;
             SalesWorkspacePanel.Visibility = Visibility.Collapsed;
+            ReportsWorkspacePanel.Visibility = Visibility.Collapsed;
             UpdateRibbonContext();
             return;
         }
@@ -456,10 +462,26 @@ public partial class MainWindow : Window
             return;
 
         PageTitle.Text = module.Name;
+        if (string.Equals(key, "Reports", StringComparison.OrdinalIgnoreCase))
+        {
+            DashboardPanel.Visibility = Visibility.Collapsed;
+            ModulePlaceholderPanel.Visibility = Visibility.Collapsed;
+            SalesWorkspacePanel.Visibility = Visibility.Collapsed;
+            ReportsWorkspacePanel.Visibility = Visibility.Visible;
+            if (_erpApiClient is null)
+                await ReportsWorkspacePanel.SetApiClientAsync(null);
+            else
+                await ReportsWorkspacePanel.SetApiClientAsync(_erpApiClient);
+            RibbonStatusText.Text = ReportsWorkspacePanel.WorkspaceStatusMessage;
+            UpdateRibbonContext();
+            return;
+        }
+
         if (string.Equals(key, "Sales", StringComparison.OrdinalIgnoreCase))
         {
             DashboardPanel.Visibility = Visibility.Collapsed;
             ModulePlaceholderPanel.Visibility = Visibility.Collapsed;
+            ReportsWorkspacePanel.Visibility = Visibility.Collapsed;
             SalesWorkspacePanel.Visibility = Visibility.Visible;
             if (_erpApiClient is null)
                 await SalesWorkspacePanel.SetApiClientAsync(null);
@@ -470,6 +492,7 @@ public partial class MainWindow : Window
         }
 
         SalesWorkspacePanel.Visibility = Visibility.Collapsed;
+        ReportsWorkspacePanel.Visibility = Visibility.Collapsed;
         ModulePageTitle.Text = module.Name;
         ModuleCodeText.Text = module.Code;
         ModulePageDescription.Text = module.Description;

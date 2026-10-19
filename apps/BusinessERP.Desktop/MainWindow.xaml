@@ -329,6 +329,7 @@
                     </StackPanel>
                 </ScrollViewer>
                 <views:SalesWorkspaceControl Grid.Row="1" x:Name="SalesWorkspacePanel" Visibility="Collapsed" />
+                <views:ReportsWorkspaceControl Grid.Row="1" x:Name="ReportsWorkspacePanel" Visibility="Collapsed" />
             </Grid>
 
             <Border Grid.Row="3" Background="#F1F4F9" BorderBrush="#DDE5F0" BorderThickness="0,1,0,0" Padding="12,0">

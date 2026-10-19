@@ -296,3 +296,22 @@ test('WPF workspace tables support filtering, sorting, virtualization and keyboa
   assert.match(vm, /CustomersView\.Filter = FilterCustomer/);
   assert.match(vm, /DraftsView\.Filter = FilterDraft/);
 });
+
+
+test('WPF financial reports tab loads real posted-ledger reports from API', async () => {
+  const client = await read('apps/BusinessERP.Desktop/Services/ErpApiClient.cs');
+  const vm = await read('apps/BusinessERP.Desktop/ViewModels/ReportsWorkspaceViewModel.cs');
+  const view = await read('apps/BusinessERP.Desktop/Views/ReportsWorkspaceControl.xaml');
+  const shell = await read('apps/BusinessERP.Desktop/MainWindow.xaml');
+  const code = await read('apps/BusinessERP.Desktop/MainWindow.xaml.cs');
+  assert.match(client, /GetTrialBalanceAsync/);
+  assert.match(client, /GetIncomeStatementAsync/);
+  assert.match(client, /GetBalanceSheetAsync/);
+  assert.match(vm, /Task\.WhenAll\(trialTask, incomeTask, balanceTask\)/);
+  assert.match(vm, /POSTED/);
+  assert.match(view, /ItemsSource="{Binding TrialBalanceRows}"/);
+  assert.match(view, /ItemsSource="{Binding IncomeRows}"/);
+  assert.match(view, /ItemsSource="{Binding BalanceRows}"/);
+  assert.match(shell, /x:Name="ReportsWorkspacePanel"/);
+  assert.match(code, /ReportsWorkspacePanel\.SetApiClientAsync/);
+});
