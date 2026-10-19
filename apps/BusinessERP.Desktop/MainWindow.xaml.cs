@@ -607,6 +607,7 @@ public partial class MainWindow : Window
             PurchasesWorkspacePanel.Visibility = Visibility.Collapsed;
             ReportsWorkspacePanel.Visibility = Visibility.Collapsed;
             InventoryWorkspacePanel.Visibility = Visibility.Collapsed;
+            MembershipWorkspacePanel.Visibility = Visibility.Collapsed;
             SettlementsWorkspacePanel.Visibility = Visibility.Visible;
             if (_erpApiClient is null)
                 await SettlementsWorkspacePanel.SetApiClientAsync(null);
@@ -702,6 +703,7 @@ public partial class MainWindow : Window
         ReportsWorkspacePanel.Visibility = Visibility.Collapsed;
         InventoryWorkspacePanel.Visibility = Visibility.Collapsed;
         SettlementsWorkspacePanel.Visibility = Visibility.Collapsed;
+        MembershipWorkspacePanel.Visibility = Visibility.Collapsed;
         ModulePageTitle.Text = module.Name;
         ModuleCodeText.Text = module.Code;
         ModulePageDescription.Text = module.Description;
