@@ -358,3 +358,19 @@ test('financial report Excel export builds a real XLSX workbook with numeric cel
   assert.match(vm, /CurrentIncomeStatement/);
   assert.match(vm, /CurrentBalanceSheet/);
 });
+
+
+test('WPF report printing uses a paginated RTL FlowDocument and is enabled only for reports', async () => {
+  const view = await read('apps/BusinessERP.Desktop/Views/ReportsWorkspaceControl.xaml.cs');
+  const shell = await read('apps/BusinessERP.Desktop/MainWindow.xaml');
+  const main = await read('apps/BusinessERP.Desktop/MainWindow.xaml.cs');
+  assert.match(shell, /x:Name="RibbonPrintButton"/);
+  assert.match(shell, /Click="RibbonPrint_Click"/);
+  assert.match(main, /RibbonPrintButton\.IsEnabled = reportsAreActive/);
+  assert.match(main, /ReportsWorkspacePanel\.PrintCurrentReport\(\)/);
+  assert.match(view, /PrintDialog/);
+  assert.match(view, /new FlowDocument/);
+  assert.match(view, /DocumentPaginator/);
+  assert.match(view, /FlowDirection = FlowDirection.RightToLeft/);
+  assert.match(view, /PrintDocument/);
+});

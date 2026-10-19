@@ -5,6 +5,8 @@ using System.Text;
 using System.Xml;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
+using System.Windows.Media;
 using Microsoft.Win32;
 using BusinessERP.Desktop.Services;
 using BusinessERP.Desktop.ViewModels;
@@ -37,6 +39,101 @@ public partial class ReportsWorkspaceControl : UserControl
     public Task RefreshAsync() => _viewModel.RefreshAsync();
 
     public string WorkspaceStatusMessage => _viewModel.StatusMessage;
+
+    public string? PrintCurrentReport()
+    {
+        var report = BuildCurrentReport();
+        if (report is null)
+            return "حمّل التقرير أولًا قبل الطباعة.";
+
+        var dialog = new PrintDialog();
+        if (dialog.ShowDialog() != true)
+            return null;
+
+        try
+        {
+            var maxColumns = Math.Max(1, report.Value.Rows.Max(row => row.Length));
+            var document = new FlowDocument
+            {
+                FlowDirection = FlowDirection.RightToLeft,
+                FontFamily = new FontFamily("Segoe UI"),
+                FontSize = 10,
+                PagePadding = new Thickness(28),
+                ColumnWidth = double.PositiveInfinity,
+                PageWidth = dialog.PrintableAreaWidth,
+                PageHeight = dialog.PrintableAreaHeight
+            };
+
+            var title = report.Value.SheetName switch
+            {
+                "TrialBalance" => "ميزان المراجعة",
+                "IncomeStatement" => "قائمة الدخل",
+                "BalanceSheet" => "الميزانية العمومية",
+                _ => "التقرير المالي"
+            };
+            document.Blocks.Add(new Paragraph(new Run("Business ERP · " + title))
+            {
+                FontSize = 18,
+                FontWeight = FontWeights.Bold,
+                TextAlignment = TextAlignment.Right,
+                Margin = new Thickness(0, 0, 0, 14)
+            });
+
+            var table = new Table { CellSpacing = 0 };
+            var contentWidth = Math.Max(250, dialog.PrintableAreaWidth - 56);
+            for (var column = 0; column < maxColumns; column++)
+                table.Columns.Add(new TableColumn { Width = new GridLength(contentWidth / maxColumns) });
+
+            var rowGroup = new TableRowGroup();
+            for (var rowIndex = 0; rowIndex < report.Value.Rows.Count; rowIndex++)
+            {
+                var sourceRow = report.Value.Rows[rowIndex];
+                var tableRow = new TableRow();
+                for (var columnIndex = 0; columnIndex < maxColumns; columnIndex++)
+                {
+                    var value = columnIndex < sourceRow.Length ? sourceRow[columnIndex] : null;
+                    var paragraph = new Paragraph(new Run(FormatPrintValue(value)))
+                    {
+                        Margin = new Thickness(0),
+                        TextAlignment = TextAlignment.Right
+                    };
+                    var cell = new TableCell(paragraph)
+                    {
+                        Padding = new Thickness(4),
+                        BorderBrush = new SolidColorBrush(Color.FromRgb(214, 222, 234)),
+                        BorderThickness = new Thickness(0.5)
+                    };
+                    if (rowIndex == 4)
+                    {
+                        cell.Background = new SolidColorBrush(Color.FromRgb(234, 240, 255));
+                        cell.FontWeight = FontWeights.SemiBold;
+                    }
+                    tableRow.Cells.Add(cell);
+                }
+                rowGroup.Rows.Add(tableRow);
+            }
+            table.RowGroups.Add(rowGroup);
+            document.Blocks.Add(table);
+
+            dialog.PrintDocument(
+                ((IDocumentPaginatorSource)document).DocumentPaginator,
+                "Business ERP - " + title);
+            return "تم إرسال التقرير إلى نظام الطباعة. اختر الطابعة أو Microsoft Print to PDF من نافذة الطباعة إن كان متاحًا.";
+        }
+        catch (Exception)
+        {
+            return "تعذر إرسال التقرير إلى الطابعة. تحقق من إعداد الطابعة وحاول مرة أخرى.";
+        }
+    }
+
+    private static string FormatPrintValue(object? value) => value switch
+    {
+        null => "",
+        decimal amount => amount.ToString("N2", CultureInfo.GetCultureInfo("ar-SA")),
+        DateOnly date => date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+        DateTime date => date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+        _ => Convert.ToString(value, CultureInfo.GetCultureInfo("ar-SA")) ?? ""
+    };
 
     public string? ExportCurrentReportToExcel()
     {

@@ -388,6 +388,19 @@ public partial class MainWindow : Window
         RibbonStatusText.Text = SalesWorkspacePanel.WorkspaceStatusMessage;
     }
 
+    private void RibbonPrint_Click(object sender, RoutedEventArgs e)
+    {
+        if (_erpApiClient is null || ReportsWorkspacePanel.Visibility != Visibility.Visible)
+        {
+            RibbonStatusText.Text = "افتح التقارير المالية وفعّل المستأجر قبل الطباعة.";
+            return;
+        }
+
+        var message = ReportsWorkspacePanel.PrintCurrentReport();
+        if (!string.IsNullOrWhiteSpace(message))
+            RibbonStatusText.Text = message;
+    }
+
     private void RibbonExportExcel_Click(object sender, RoutedEventArgs e)
     {
         if (_erpApiClient is null || ReportsWorkspacePanel.Visibility != Visibility.Visible)
@@ -473,8 +486,10 @@ public partial class MainWindow : Window
         var salesIsActive = _erpApiClient is not null && SalesWorkspacePanel.Visibility == Visibility.Visible;
         RibbonSaveButton.IsEnabled = salesIsActive;
         RibbonPostButton.IsEnabled = salesIsActive;
-        RibbonExportExcelButton.IsEnabled = _erpApiClient is not null &&
+        var reportsAreActive = _erpApiClient is not null &&
             ReportsWorkspacePanel.Visibility == Visibility.Visible;
+        RibbonExportExcelButton.IsEnabled = reportsAreActive;
+        RibbonPrintButton.IsEnabled = reportsAreActive;
     }
 
     private async Task NavigateToKeyAsync(string key)

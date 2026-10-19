@@ -97,7 +97,8 @@
                                 <Button Content="حذف" IsEnabled="False" ToolTip="الحذف غير مفعّل للمستندات المحاسبية؛ استخدم مسار تصحيح معتمد." Padding="10,8" />
                             </StackPanel>
                             <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="0,0,10,0">
-                                <Button Content="طباعة" IsEnabled="False" ToolTip="الطباعة والمعاينة النهائية لم تُربطا بعد." Padding="10,8" Margin="0,0,4,0" />
+                                <Button x:Name="RibbonPrintButton" Content="طباعة" Click="RibbonPrint_Click" IsEnabled="False"
+                                        ToolTip="يطبع التقرير المالي المحدد متعدد الصفحات عند فتح شاشة التقارير." Padding="10,8" Margin="0,0,4,0" />
                                 <Button x:Name="RibbonExportExcelButton" Content="Excel" Click="RibbonExportExcel_Click" IsEnabled="False"
                                         ToolTip="تصدير التقرير المالي المفتوح إلى ملف Excel حقيقي بصيغة XLSX." Padding="10,8" Margin="0,0,4,0" />
                                 <Button Content="PDF" IsEnabled="False" ToolTip="تصدير PDF غير منفذ لهذه الشاشة." Padding="10,8" />
