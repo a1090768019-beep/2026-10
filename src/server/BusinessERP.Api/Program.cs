@@ -138,6 +138,7 @@ app.MapGet("/health/ready", async Task<IResult> (IServiceProvider services, ICon
 app.MapAccountingEndpoints();
 app.MapChartOfAccountsTemplateEndpoints();
 app.MapSubscriptionEndpoints();
+app.MapTenantMembershipEndpoints();
 app.MapCustomerEndpoints();
 app.MapSupplierEndpoints();
 app.MapPurchaseInvoiceDraftEndpoints();

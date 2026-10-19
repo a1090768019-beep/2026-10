@@ -21,9 +21,12 @@ namespace BusinessERP.Api.Tests;
 public sealed class AccountingApiIntegrationTests
 {
     private static readonly Guid TenantA = Guid.Parse("11111111-1111-4111-8111-111111111111");
+    private static readonly Guid UserA = Guid.Parse("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
     private static readonly Guid TenantB = Guid.Parse("22222222-2222-4222-8222-222222222222");
+    private static readonly Guid UserB = Guid.Parse("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
     private static readonly Guid TenantC = Guid.Parse("33333333-3333-4333-8333-333333333301");
     private static readonly Guid TenantD = Guid.Parse("66666666-6666-4666-8666-666666666601");
+    private static readonly Guid UserE = Guid.Parse("eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee5");
     private static readonly Guid CompanyD = Guid.Parse("66666666-6666-4666-8666-666666666101");
     private static readonly Guid PeriodD = Guid.Parse("66666666-6666-4666-8666-666666666103");
     private static readonly Guid CashAccountD = Guid.Parse("66666666-6666-4666-8666-666666666104");
@@ -61,6 +64,37 @@ public sealed class AccountingApiIntegrationTests
     }
 
     [RequiresApiPostgresFact]
+    public async Task Owner_can_assign_an_existing_identity_user_below_the_active_user_quota()
+    {
+        var connectionString = Environment.GetEnvironmentVariable("BUSINESS_ERP_TEST_CONNECTION");
+        Assert.False(string.IsNullOrWhiteSpace(connectionString));
+
+        using var factory = new ApiTestFactory(connectionString!);
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Test-Subject", "ci-subject-a");
+        SetTenant(client, TenantA);
+
+        using var response = await client.PostAsJsonAsync("/api/v1/memberships", new
+        {
+            userId = UserB,
+            roleCode = "VIEWER"
+        });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        using var member = await ParseJsonAsync(response);
+        Assert.Equal(UserB, member.RootElement.GetProperty("userId").GetGuid());
+        Assert.Equal("VIEWER", member.RootElement.GetProperty("roleCode").GetString());
+        Assert.Equal("ACTIVE", member.RootElement.GetProperty("status").GetString());
+
+        using var listResponse = await client.GetAsync("/api/v1/memberships");
+        Assert.Equal(HttpStatusCode.OK, listResponse.StatusCode);
+        using var list = await ParseJsonAsync(listResponse);
+        Assert.Contains(list.RootElement.EnumerateArray(),
+            row => row.GetProperty("userId").GetGuid() == UserB &&
+                   row.GetProperty("roleCode").GetString() == "VIEWER");
+    }
+
+    [RequiresApiPostgresFact]
     public async Task Company_creation_is_rejected_when_subscription_company_limit_is_reached()
     {
         var connectionString = Environment.GetEnvironmentVariable("BUSINESS_ERP_TEST_CONNECTION");
@@ -84,6 +118,54 @@ public sealed class AccountingApiIntegrationTests
         Assert.Equal("companies", json.RootElement.GetProperty("limitName").GetString());
         Assert.Equal(0, json.RootElement.GetProperty("limit").GetInt32());
         Assert.Equal(0, json.RootElement.GetProperty("current").GetInt32());
+    }
+
+    [RequiresApiPostgresFact]
+    public async Task Last_active_owner_cannot_be_demoted_or_removed()
+    {
+        var connectionString = Environment.GetEnvironmentVariable("BUSINESS_ERP_TEST_CONNECTION");
+        Assert.False(string.IsNullOrWhiteSpace(connectionString));
+
+        using var factory = new ApiTestFactory(connectionString!);
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Test-Subject", "ci-subject-a");
+        SetTenant(client, TenantA);
+
+        using var response = await client.PutAsJsonAsync($"/api/v1/memberships/{UserA:D}", new
+        {
+            roleCode = "VIEWER",
+            status = "ACTIVE"
+        });
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal("last_owner_protection", json.RootElement.GetProperty("error").GetString());
+    }
+
+    [RequiresApiPostgresFact]
+    public async Task User_quota_is_enforced_when_assigning_provisioned_member()
+    {
+        var connectionString = Environment.GetEnvironmentVariable("BUSINESS_ERP_TEST_CONNECTION");
+        Assert.False(string.IsNullOrWhiteSpace(connectionString));
+
+        using var factory = new ApiTestFactory(connectionString!);
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Test-Subject", "ci-subject-d");
+        SetTenant(client, TenantD);
+
+        using var response = await client.PostAsJsonAsync("/api/v1/memberships", new
+        {
+            userId = UserE,
+            roleCode = "VIEWER"
+        });
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        using var json = JsonDocument.Parse(body);
+        Assert.Equal("plan_limit_exceeded", json.RootElement.GetProperty("error").GetString());
+        Assert.Equal("users", json.RootElement.GetProperty("limitName").GetString());
+        Assert.Equal(1, json.RootElement.GetProperty("limit").GetInt32());
+        Assert.Equal(1, json.RootElement.GetProperty("current").GetInt32());
     }
 
     [RequiresApiPostgresFact]

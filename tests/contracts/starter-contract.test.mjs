@@ -399,3 +399,29 @@ test('monthly journal-entry quota is enforced by PostgreSQL and mapped to a stab
   assert.match(apiTests, /Monthly_journal_entry_quota_is_enforced_by_database_for_posting_api/);
   assert.match(docs, /entriesPerMonth/);
 });
+
+
+test('tenant member administration is tenant-scoped, audited, protected against owner lockout, and enforces the active-user plan cap', async () => {
+  const endpoint = await read('src/server/BusinessERP.Api/Endpoints/TenantMembershipEndpoints.cs');
+  const program = await read('src/server/BusinessERP.Api/Program.cs');
+  const fixture = await read('database/tests/postgres-fixture.sql');
+  const apiTests = await read('tests/BusinessERP.Api.Tests/AccountingApiIntegrationTests.cs');
+  const docs = await read('docs/subscriptions.md');
+
+  assert.match(program, /MapTenantMembershipEndpoints/);
+  assert.match(endpoint, /MapGet\("", ListMembers\)/);
+  assert.match(endpoint, /MapPost\("", AssignMember\)/);
+  assert.ok(endpoint.includes('api.MapPut("/{userId:guid}", UpdateMember)'));
+  assert.match(endpoint, /TenantTransactionRunner/);
+  assert.match(endpoint, /CheckActiveUserQuotaAsync/);
+  assert.match(endpoint, /ReadPlanLimit\(limitsJson, "users"\)/);
+  assert.match(endpoint, /tenant-membership-quota:/);
+  assert.match(endpoint, /last_owner_protection/);
+  assert.match(endpoint, /cannot_suspend_self/);
+  assert.match(endpoint, /TENANT_MEMBERSHIP_ASSIGNED/);
+  assert.match(endpoint, /TENANT_MEMBERSHIP_UPDATED/);
+  assert.match(fixture, /ci-subject-e/);
+  assert.match(apiTests, /Owner_can_assign_an_existing_identity_user_below_the_active_user_quota/);
+  assert.match(apiTests, /User_quota_is_enforced_when_assigning_provisioned_member/);
+  assert.match(docs, /users/);
+});

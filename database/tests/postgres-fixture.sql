@@ -30,7 +30,8 @@ INSERT INTO users (id, oidc_subject, email, display_name) VALUES
 ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'ci-subject-a', 'ci-a@example.invalid', 'CI User A'),
 ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'ci-subject-b', 'ci-b@example.invalid', 'CI User B'),
 ('cccccccc-cccc-4ccc-8ccc-ccccccccccc3', 'ci-subject-c', 'ci-c@example.invalid', 'CI User C'),
-('dddddddd-dddd-4ddd-8ddd-ddddddddddd4', 'ci-subject-d', 'ci-d@example.invalid', 'CI User D');
+('dddddddd-dddd-4ddd-8ddd-ddddddddddd4', 'ci-subject-d', 'ci-d@example.invalid', 'CI User D'),
+('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee5', 'ci-subject-e', 'ci-e@example.invalid', 'CI User E');
 
 INSERT INTO tenant_memberships (tenant_id, user_id, status, role_code) VALUES
 ('11111111-1111-4111-8111-111111111111', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'ACTIVE', 'OWNER'),
