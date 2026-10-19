@@ -133,6 +133,8 @@
                                 Style="{StaticResource RibbonTabButtonStyle}" />
                         <Button x:Name="ReportsWorkspaceTab" Content="▥ التقارير المالية" Tag="Reports" Click="RibbonNavigate_Click"
                                 Style="{StaticResource RibbonTabButtonStyle}" />
+                        <Button x:Name="SettingsWorkspaceTab" Content="⚙ المستخدمون والصلاحيات" Tag="Settings" Click="RibbonNavigate_Click"
+                                Style="{StaticResource RibbonTabButtonStyle}" />
                         <TextBlock Text="تبويبات مساحة العمل" Foreground="#98A1B3" FontSize="10" VerticalAlignment="Center" Margin="12,0,0,0" />
                     </StackPanel>
                 </Border>
