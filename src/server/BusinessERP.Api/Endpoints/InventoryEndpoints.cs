@@ -469,7 +469,12 @@ public static partial class InventoryEndpoints
                        i.id, i.item_code, i.barcode, i.name_ar,
                        w.id, w.warehouse_code, w.name,
                        movement.quantity_delta, movement.unit_cost, movement.inventory_value_delta,
-                       movement.notes, movement.created_at, count(*) OVER() AS total_rows
+                       movement.notes, movement.created_at, movement.source_type, movement.transfer_id,
+                       EXISTS (SELECT 1 FROM inventory_movement_accounting_postings AS posting
+                                WHERE posting.tenant_id = movement.tenant_id
+                                  AND posting.company_id = movement.company_id
+                                  AND posting.inventory_movement_id = movement.id) AS is_accounting_posted,
+                       count(*) OVER() AS total_rows
                   FROM inventory_movements AS movement
                   JOIN items AS i ON i.id = movement.item_id AND i.tenant_id = @tenant_id AND i.company_id = @company_id
                   JOIN warehouses AS w ON w.id = movement.warehouse_id AND w.tenant_id = @tenant_id AND w.company_id = @company_id
@@ -494,12 +499,13 @@ public static partial class InventoryEndpoints
             long totalRows = 0;
             while (await reader.ReadAsync(token))
             {
-                totalRows = reader.GetInt64(16);
+                totalRows = reader.GetInt64(19);
                 rows.Add(new InventoryMovementRow(
                     reader.GetGuid(0), reader.GetString(1), reader.GetString(2), DateOnly.FromDateTime(reader.GetDateTime(3)),
                     reader.GetGuid(4), reader.GetString(5), ReadNullableString(reader, 6), reader.GetString(7),
                     reader.GetGuid(8), reader.GetString(9), reader.GetString(10), reader.GetDecimal(11),
-                    reader.GetDecimal(12), reader.GetDecimal(13), reader.GetString(14), reader.GetDateTime(15)));
+                    reader.GetDecimal(12), reader.GetDecimal(13), reader.GetString(14), reader.GetDateTime(15),
+                    reader.GetString(16), reader.IsDBNull(17) ? null : reader.GetGuid(17), reader.GetBoolean(18)));
             }
             return Results.Ok(new InventoryMovementsReport(page, pageSize, totalRows,
                 totalRows == 0 ? 0 : (int)Math.Ceiling(totalRows / (double)pageSize), rows));
@@ -756,7 +762,8 @@ public static partial class InventoryEndpoints
     private sealed record InventoryMovementsReport(int Page, int PageSize, long TotalRows, int TotalPages, IReadOnlyList<InventoryMovementRow> Rows);
     private sealed record InventoryMovementRow(Guid Id, string MovementNumber, string MovementType, DateOnly MovementDate,
         Guid ItemId, string ItemCode, string? Barcode, string ItemNameAr, Guid WarehouseId, string WarehouseCode,
-        string WarehouseName, decimal QuantityDelta, decimal UnitCost, decimal InventoryValueDelta, string Notes, DateTime CreatedAt);
+        string WarehouseName, decimal QuantityDelta, decimal UnitCost, decimal InventoryValueDelta, string Notes, DateTime CreatedAt,
+        string SourceType, Guid? TransferId, bool IsAccountingPosted);
     private sealed record CreateInventoryItemRequest(string? ItemCode, string? Barcode, string? NameAr, string? NameEn, string? UnitCode = "EA", bool TracksSerials = false);
     private sealed record CreateWarehouseRequest(string? Code, string? Name);
     private sealed record InventoryMovementRequest(Guid ItemId, Guid WarehouseId, string? MovementNumber, DateOnly MovementDate,

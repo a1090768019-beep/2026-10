@@ -167,3 +167,49 @@ test('serial tracking is connected to stock receipt, issue, transfer and reporti
   assert.match(codeBehind, /ExportInventorySerialEvents_Click/);
   assert.match(codeBehind, /ExportInventorySerialSummary_Click/);
 });
+
+test('manual inventory receipts/issues post balanced, immutable journals linked once to the stock ledger', async () => {
+  const migration = await read('database/migrations/0010_inventory_movement_ledger_posting.sql');
+  const endpoint = await read('src/server/BusinessERP.Api/Endpoints/InventoryMovementLedgerPostingEndpoints.cs');
+  const program = await read('src/server/BusinessERP.Api/Program.cs');
+  const fixture = await read('database/tests/postgres-fixture.sql');
+  const role = await read('database/tests/prepare-runtime-role.sql');
+  const smoke = await read('database/tests/inventory-accounting-smoke.sql');
+  assert.match(migration, /CREATE TABLE inventory_movement_accounting_postings/);
+  assert.match(migration, /trg_inventory_movement_accounting_link_valid/);
+  assert.match(migration, /DEFERRABLE INITIALLY DEFERRED/);
+  assert.match(migration, /ENABLE ROW LEVEL SECURITY/);
+  assert.match(migration, /prevent_inventory_movement_accounting_mutation/);
+  assert.match(endpoint, /PostInventoryMovementToLedger/);
+  assert.match(endpoint, /INVENTORY_MOVEMENT/);
+  assert.match(endpoint, /fiscal_period_not_open_for_inventory_movement_date/);
+  assert.match(endpoint, /AlreadyPosted/);
+  assert.match(program, /MapInventoryMovementLedgerPostingEndpoints/);
+  assert.match(fixture, /CI Inventory Asset/);
+  assert.match(fixture, /CI Cost of Goods Sold/);
+  assert.match(role, /inventory_movement_accounting_postings TO erp_ci_runtime/);
+  assert.match(smoke, /CI-INV-GL-RCPT-001/);
+  assert.match(smoke, /CI-INV-GL-ISSUE-001/);
+  assert.match(smoke, /tenant B can view tenant A inventory accounting postings/);
+});
+
+test('inventory movement ledger posting is available only for eligible manual movements and displays posted state', async () => {
+  const api = await read('src/server/BusinessERP.Api/Endpoints/InventoryEndpoints.cs');
+  const postingEndpoint = await read('src/server/BusinessERP.Api/Endpoints/InventoryMovementLedgerPostingEndpoints.cs');
+  const client = await read('apps/BusinessERP.Desktop/Services/ErpApiClient.cs');
+  const vm = await read('apps/BusinessERP.Desktop/ViewModels/InventoryWorkspaceViewModel.cs');
+  const view = await read('apps/BusinessERP.Desktop/Views/InventoryWorkspaceControl.xaml');
+  assert.match(api, /is_accounting_posted/);
+  assert.match(api, /SourceType/);
+  assert.match(postingEndpoint, /PostInventoryMovementToLedger/);
+  assert.match(client, /PostInventoryMovementToLedgerAsync/);
+  assert.match(client, /PostInventoryMovementToLedgerApiRequest/);
+  assert.match(vm, /LedgerEligibleMovements/);
+  assert.match(vm, /CanPostInventoryMovementToLedger/);
+  assert.match(vm, /OpenFiscalPeriods/);
+  assert.match(vm, /InventoryAssetAccounts/);
+  assert.match(vm, /CounterpartAccounts/);
+  assert.match(vm, /SelectedLedgerMovement/);
+  assert.match(view, /PostInventoryMovementToLedgerCommand/);
+  assert.match(view, /IsAccountingPosted/);
+});

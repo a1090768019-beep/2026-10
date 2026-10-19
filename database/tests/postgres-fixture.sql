@@ -36,7 +36,9 @@ INSERT INTO fiscal_periods (id, tenant_id, company_id, fiscal_year_id, period_nu
 
 INSERT INTO accounts (id, tenant_id, company_id, code, name_ar, name_en, account_type, normal_balance, is_active, allow_posting) VALUES
 ('11111111-1111-4111-8111-111111111104', '11111111-1111-4111-8111-111111111111', '11111111-1111-4111-8111-111111111101', '1000', 'نقدية الاختبار', 'CI Cash', 'ASSET', 'DEBIT', true, true),
-('11111111-1111-4111-8111-111111111105', '11111111-1111-4111-8111-111111111111', '11111111-1111-4111-8111-111111111101', '3000', 'حقوق الاختبار', 'CI Equity', 'EQUITY', 'CREDIT', true, true);
+('11111111-1111-4111-8111-111111111105', '11111111-1111-4111-8111-111111111111', '11111111-1111-4111-8111-111111111101', '3000', 'حقوق الاختبار', 'CI Equity', 'EQUITY', 'CREDIT', true, true),
+('11111111-1111-4111-8111-111111111110', '11111111-1111-4111-8111-111111111111', '11111111-1111-4111-8111-111111111101', '1200', 'مخزون الاختبار', 'CI Inventory Asset', 'ASSET', 'DEBIT', true, true),
+('11111111-1111-4111-8111-111111111111', '11111111-1111-4111-8111-111111111111', '11111111-1111-4111-8111-111111111101', '5000', 'تكلفة البضاعة المباعة', 'CI Cost of Goods Sold', 'EXPENSE', 'DEBIT', true, true);
 
 INSERT INTO journal_entries (id, tenant_id, company_id, fiscal_period_id, entry_number, entry_date, description, currency_code, status) VALUES
 ('11111111-1111-4111-8111-111111111106', '11111111-1111-4111-8111-111111111111', '11111111-1111-4111-8111-111111111101', '11111111-1111-4111-8111-111111111103', 'CI-BALANCED-1', '2026-01-15', 'Balanced smoke entry', 'SAR', 'DRAFT'),

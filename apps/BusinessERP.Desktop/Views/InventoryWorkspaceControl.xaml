@@ -286,6 +286,45 @@
             <Border Background="White" BorderBrush="#E3E9F2" BorderThickness="1" CornerRadius="14" Padding="16">
                 <StackPanel>
                     <TextBlock Text="بطاقة حركة المخزون" FontSize="16" FontWeight="SemiBold" />
+                    <TextBlock Text="ترحيل حركة يدوية إلى دفتر الأستاذ" FontSize="15" FontWeight="SemiBold" Margin="0,12,0,4" />
+                    <TextBlock Text="اختر حركة استلام/صرف يدوية غير مرحلة. الاستلام: مدين المخزون ودائن الحساب المقابل؛ الصرف: مدين المصروف ودائن المخزون. التحويل بين المستودعات لا يرحّل عبر هذا المسار."
+                               Foreground="#69758D" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,8" />
+                    <Grid Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="2.1*" />
+                            <ColumnDefinition Width="1.4*" />
+                            <ColumnDefinition Width="1.6*" />
+                            <ColumnDefinition Width="1.6*" />
+                            <ColumnDefinition Width="1.5*" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Margin="0,0,6,0">
+                            <TextBlock Text="حركة المخزون" FontSize="12" Foreground="#69758D" />
+                            <ComboBox ItemsSource="{Binding LedgerEligibleMovements}" SelectedItem="{Binding SelectedLedgerMovement, Mode=TwoWay}"
+                                      DisplayMemberPath="DisplayLabel" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Margin="6,0">
+                            <TextBlock Text="الفترة المالية" FontSize="12" Foreground="#69758D" />
+                            <ComboBox ItemsSource="{Binding OpenFiscalPeriods}" SelectedItem="{Binding SelectedLedgerFiscalPeriod, Mode=TwoWay}"
+                                      DisplayMemberPath="DisplayLabel" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Margin="6,0">
+                            <TextBlock Text="حساب المخزون (أصل)" FontSize="12" Foreground="#69758D" />
+                            <ComboBox ItemsSource="{Binding InventoryAssetAccounts}" SelectedItem="{Binding SelectedInventoryAssetAccount, Mode=TwoWay}"
+                                      DisplayMemberPath="DisplayLabel" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="3" Margin="6,0">
+                            <TextBlock Text="الحساب المقابل" FontSize="12" Foreground="#69758D" />
+                            <ComboBox ItemsSource="{Binding CounterpartAccounts}" SelectedItem="{Binding SelectedCounterpartAccount, Mode=TwoWay}"
+                                      DisplayMemberPath="DisplayLabel" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="4" Margin="6,0">
+                            <TextBlock Text="رقم القيد" FontSize="12" Foreground="#69758D" />
+                            <TextBox Text="{Binding LedgerEntryNumber, UpdateSourceTrigger=PropertyChanged}" Margin="0,4,0,0" />
+                        </StackPanel>
+                    </Grid>
+                    <TextBlock Text="{Binding LedgerPostingSummary}" FontSize="12" Foreground="#39445A" TextWrapping="Wrap" />
+                    <Button Content="ترحيل إلى دفتر الأستاذ" Command="{Binding PostInventoryMovementToLedgerCommand}"
+                            HorizontalAlignment="Left" Margin="0,8,0,0" Background="#146C4A" />
                     <DataGrid ItemsSource="{Binding Movements}" Height="280" Margin="0,8,0,0">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="رقم الحركة" Binding="{Binding MovementNumber}" Width="150" />
@@ -298,6 +337,8 @@
                             <DataGridTextColumn Header="الكمية الموقعة" Binding="{Binding QuantityDelta, StringFormat=N4}" Width="120" />
                             <DataGridTextColumn Header="تكلفة الوحدة" Binding="{Binding UnitCost, StringFormat=N8}" Width="120" />
                             <DataGridTextColumn Header="تغير القيمة" Binding="{Binding InventoryValueDelta, StringFormat=N4}" Width="120" />
+                            <DataGridTextColumn Header="مصدر الحركة" Binding="{Binding SourceType}" Width="110" />
+                            <DataGridCheckBoxColumn Header="مرحلة محاسبيًا" Binding="{Binding IsAccountingPosted}" Width="120" />
                         </DataGrid.Columns>
                     </DataGrid>
                     <TextBlock Text="تدعم هذه المرحلة تتبع الأرقام التسلسلية الاختياري للصنف، والتحويل بين المستودعات، وسجلًا تاريخيًا قابلًا للتصدير. لم يكتمل بعد الجرد الدوري والربط الآلي مع مسودات شراء الموردين وفواتير المبيعات؛ وتعرض الشاشات حاليًا أول 100 صف فقط من تقارير الأرقام."
