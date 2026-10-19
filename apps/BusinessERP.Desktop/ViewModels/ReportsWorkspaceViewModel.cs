@@ -28,6 +28,7 @@ public sealed class ReportsWorkspaceViewModel : INotifyPropertyChanged
     public ObservableCollection<TrialBalanceApiRow> TrialBalanceRows { get; } = [];
     public ObservableCollection<FinancialReportLine> IncomeRows { get; } = [];
     public ObservableCollection<FinancialReportLine> BalanceRows { get; } = [];
+    public ObservableCollection<LegacyReportTemplate> LegacyReportTemplates { get; } = [];
 
     public TrialBalanceApiReport? CurrentTrialBalance => _currentTrialBalance;
     public IncomeStatementApiReport? CurrentIncomeStatement => _currentIncomeStatement;
@@ -114,6 +115,9 @@ public sealed class ReportsWorkspaceViewModel : INotifyPropertyChanged
     public ReportsWorkspaceViewModel()
     {
         LoadReportsCommand = new AsyncRelayCommand(LoadReportsAsync, CanLoadReports);
+        foreach (var report in LegacyReportCatalogService.Load(
+                     System.IO.Path.Combine(AppContext.BaseDirectory, "Reports", "Legacy")))
+            LegacyReportTemplates.Add(report);
     }
 
     public async Task SetApiClientAsync(ErpApiClient? apiClient)

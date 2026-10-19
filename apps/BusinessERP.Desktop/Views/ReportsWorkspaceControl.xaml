@@ -122,6 +122,25 @@
                         </DataGrid>
                     </StackPanel>
                 </TabItem>
+                <TabItem Header="قوالب REPX القديمة">
+                    <DockPanel Margin="12">
+                        <TextBlock DockPanel.Dock="Top"
+                                   Text="قوالب مستوردة من النظام السابق. هذه القائمة تفحص المخططات فقط؛ يلزم ربط مصادر البيانات وتوفير محرك DevExpress متوافق قبل المعاينة أو الطباعة."
+                                   Foreground="#8A6A20" TextWrapping="Wrap" Margin="0,0,0,10" />
+                        <DataGrid ItemsSource="{Binding LegacyReportTemplates}" MinHeight="300">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="اسم الملف" Binding="{Binding FileName}" Width="230" />
+                                <DataGridTextColumn Header="التصنيف" Binding="{Binding Category}" Width="150" />
+                                <DataGridTextColumn Header="إصدار المخطط" Binding="{Binding SerializerVersion}" Width="120" />
+                                <DataGridTextColumn Header="نوع الورق" Binding="{Binding PaperKind}" Width="100" />
+                                <DataGridTextColumn Header="العناصر" Binding="{Binding ControlCount}" Width="75" />
+                                <DataGridTextColumn Header="الحقول" Binding="{Binding BoundFieldCount}" Width="80" />
+                                <DataGridTextColumn Header="أمثلة الحقول" Binding="{Binding BoundFields}" Width="*" />
+                                <DataGridTextColumn Header="حالة الدمج" Binding="{Binding IntegrationStatus}" Width="270" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </DockPanel>
+                </TabItem>
             </TabControl>
             <TextBlock Text="تنبيه: هذه تقارير داخلية أولية من قيود POSTED فقط. تحتاج سياسة الإقفال والمراجعة المحاسبية قبل الاعتماد الرسمي؛ التدفقات النقدية غير متاحة." Foreground="#8A6A20" FontSize="11" TextWrapping="Wrap" Margin="2,12,2,0" />
         </StackPanel>
