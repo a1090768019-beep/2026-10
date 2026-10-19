@@ -370,7 +370,9 @@ public sealed class PurchasesWorkspaceViewModel : INotifyPropertyChanged
                     UnitPrice = line.UnitPrice,
                     DiscountAmount = line.DiscountAmount,
                     VatTreatment = line.VatTreatment == "UNCLASSIFIED" ? "StandardRated" : line.VatTreatment,
-                    VatTreatmentReason = line.VatTreatmentReason ?? ""
+                    VatTreatmentReason = line.VatTreatmentReason ?? "",
+                    VatAmount = line.VatAmount,
+                    TotalAmount = line.TotalAmount
                 });
             }
             OnPropertyChanged(nameof(SelectedDraftDetails));
@@ -552,6 +554,8 @@ public sealed class PurchaseLineEditor : INotifyPropertyChanged
     private decimal _discountAmount;
     private string _vatTreatment = "StandardRated";
     private string _vatTreatmentReason = "";
+    private decimal? _vatAmount;
+    private decimal? _totalAmount;
     public event PropertyChangedEventHandler? PropertyChanged;
 
     public int LineNumber { get => _lineNumber; set { if (_lineNumber == value) return; _lineNumber = value; OnChanged(); } }
@@ -561,6 +565,8 @@ public sealed class PurchaseLineEditor : INotifyPropertyChanged
     public decimal DiscountAmount { get => _discountAmount; set { if (_discountAmount == value) return; _discountAmount = value; OnChanged(); } }
     public string VatTreatment { get => _vatTreatment; set { if (_vatTreatment == value) return; _vatTreatment = value; OnChanged(); } }
     public string VatTreatmentReason { get => _vatTreatmentReason; set { if (_vatTreatmentReason == value) return; _vatTreatmentReason = value; OnChanged(); } }
+    public decimal? VatAmount { get => _vatAmount; set { if (_vatAmount == value) return; _vatAmount = value; OnChanged(); } }
+    public decimal? TotalAmount { get => _totalAmount; set { if (_totalAmount == value) return; _totalAmount = value; OnChanged(); } }
 
     private void OnChanged([CallerMemberName] string? property = null) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(property));
