@@ -142,6 +142,90 @@
                     </Border>
                 </Grid>
             </TabItem>
+            <TabItem Header="أعمار الذمم">
+                <Grid Margin="0,10,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <Border Grid.Row="0" Background="White" CornerRadius="10" Padding="12" Margin="0,0,0,10">
+                        <DockPanel LastChildFill="False">
+                            <Button DockPanel.Dock="Right" Content="تحديث التقرير" Command="{Binding RefreshAgingReportsCommand}"
+                                    Padding="18,8" MinWidth="120" Margin="12,0,0,0"/>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="عرض الأرصدة حتى تاريخ" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <DatePicker SelectedDate="{Binding AgingAsOfDate}" Width="160" MinHeight="30"/>
+                                <TextBlock Text="تعرض التقارير الفواتير المرحلة والتسويات المرحلة بتاريخ التقرير فقط."
+                                           Foreground="#64748B" VerticalAlignment="Center" Margin="14,0,0,0"/>
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
+                    <TabControl Grid.Row="1" Background="Transparent" BorderThickness="0">
+                        <TabItem Header="الذمم المدينة">
+                            <Grid Margin="0,8,0,0">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <TextBlock Grid.Row="0" Text="{Binding ReceivablesAgingSummary}" FontWeight="SemiBold"
+                                           Margin="4,0,4,10" TextWrapping="Wrap"/>
+                                <DataGrid Grid.Row="1" ItemsSource="{Binding ReceivablesAgingRows}" AutoGenerateColumns="False"
+                                          IsReadOnly="True" CanUserAddRows="False" HeadersVisibility="Column"
+                                          GridLinesVisibility="Horizontal" MinHeight="180">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="رقم الفاتورة" Binding="{Binding DocumentNumber}" Width="130"/>
+                                        <DataGridTextColumn Header="العميل" Binding="{Binding PartyName}" Width="*"/>
+                                        <DataGridTextColumn Header="تاريخ الإصدار" Binding="{Binding IssueDate, StringFormat=yyyy-MM-dd}" Width="110"/>
+                                        <DataGridTextColumn Header="تاريخ الاستحقاق" Binding="{Binding DueDate, StringFormat=yyyy-MM-dd}" Width="115"/>
+                                        <DataGridTextColumn Header="قيمة الفاتورة" Binding="{Binding InvoiceAmount, StringFormat=N2}" Width="115"/>
+                                        <DataGridTextColumn Header="المخصص" Binding="{Binding SettledAmount, StringFormat=N2}" Width="100"/>
+                                        <DataGridTextColumn Header="المتبقي" Binding="{Binding OutstandingAmount, StringFormat=N2}" Width="110"/>
+                                        <DataGridTextColumn Header="أيام التأخير" Binding="{Binding DaysPastDue}" Width="90"/>
+                                        <DataGridTextColumn Header="فئة التأخير" Binding="{Binding AgingBucketLabel}" Width="150"/>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                                <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Left" Margin="0,10,0,0">
+                                    <Button Content="السابق" Command="{Binding PreviousReceivablesAgingPageCommand}" Padding="14,6"/>
+                                    <TextBlock Text="{Binding ReceivablesAgingPageLabel}" VerticalAlignment="Center" Margin="12,0"/>
+                                    <Button Content="التالي" Command="{Binding NextReceivablesAgingPageCommand}" Padding="14,6"/>
+                                </StackPanel>
+                            </Grid>
+                        </TabItem>
+                        <TabItem Header="الذمم الدائنة">
+                            <Grid Margin="0,8,0,0">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <TextBlock Grid.Row="0" Text="{Binding PayablesAgingSummary}" FontWeight="SemiBold"
+                                           Margin="4,0,4,10" TextWrapping="Wrap"/>
+                                <DataGrid Grid.Row="1" ItemsSource="{Binding PayablesAgingRows}" AutoGenerateColumns="False"
+                                          IsReadOnly="True" CanUserAddRows="False" HeadersVisibility="Column"
+                                          GridLinesVisibility="Horizontal" MinHeight="180">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="رقم الفاتورة" Binding="{Binding DocumentNumber}" Width="130"/>
+                                        <DataGridTextColumn Header="المورد" Binding="{Binding PartyName}" Width="*"/>
+                                        <DataGridTextColumn Header="تاريخ الإصدار" Binding="{Binding IssueDate, StringFormat=yyyy-MM-dd}" Width="110"/>
+                                        <DataGridTextColumn Header="تاريخ الاستحقاق" Binding="{Binding DueDate, StringFormat=yyyy-MM-dd}" Width="115"/>
+                                        <DataGridTextColumn Header="قيمة الفاتورة" Binding="{Binding InvoiceAmount, StringFormat=N2}" Width="115"/>
+                                        <DataGridTextColumn Header="المخصص" Binding="{Binding SettledAmount, StringFormat=N2}" Width="100"/>
+                                        <DataGridTextColumn Header="المتبقي" Binding="{Binding OutstandingAmount, StringFormat=N2}" Width="110"/>
+                                        <DataGridTextColumn Header="أيام التأخير" Binding="{Binding DaysPastDue}" Width="90"/>
+                                        <DataGridTextColumn Header="فئة التأخير" Binding="{Binding AgingBucketLabel}" Width="150"/>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                                <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Left" Margin="0,10,0,0">
+                                    <Button Content="السابق" Command="{Binding PreviousPayablesAgingPageCommand}" Padding="14,6"/>
+                                    <TextBlock Text="{Binding PayablesAgingPageLabel}" VerticalAlignment="Center" Margin="12,0"/>
+                                    <Button Content="التالي" Command="{Binding NextPayablesAgingPageCommand}" Padding="14,6"/>
+                                </StackPanel>
+                            </Grid>
+                        </TabItem>
+                    </TabControl>
+                </Grid>
+            </TabItem>
         </TabControl>
 
         <Border Grid.Row="3" Background="White" CornerRadius="10" Padding="12" Margin="0,12,0,0">
