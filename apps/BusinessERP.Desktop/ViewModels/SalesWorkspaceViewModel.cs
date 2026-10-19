@@ -19,6 +19,8 @@ public sealed class SalesWorkspaceViewModel : INotifyPropertyChanged
     private ApiAccount? _selectedReceivableAccount;
     private ApiAccount? _selectedRevenueAccount;
     private ApiAccount? _selectedOutputVatAccount;
+    private ApiAccount? _selectedInventoryAssetAccount;
+    private ApiAccount? _selectedCostOfGoodsSoldAccount;
     private string _journalEntryNumber = "";
     private string _tableSearchTerm = "";
     private InvoiceLineInput? _selectedInvoiceLine;
@@ -31,12 +33,16 @@ public sealed class SalesWorkspaceViewModel : INotifyPropertyChanged
 
     public ObservableCollection<ApiCompany> Companies { get; } = [];
     public ObservableCollection<ApiCustomer> Customers { get; } = [];
+    public ObservableCollection<InventoryItemApiDto> InventoryItems { get; } = [];
+    public ObservableCollection<InventoryWarehouseApiDto> InventoryWarehouses { get; } = [];
     public ObservableCollection<SalesInvoiceDraftListItem> Drafts { get; } = [];
     public ObservableCollection<ApiAccount> Accounts { get; } = [];
     public ObservableCollection<ApiFiscalPeriod> FiscalPeriods { get; } = [];
     public ObservableCollection<ApiAccount> ReceivableAccounts { get; } = [];
     public ObservableCollection<ApiAccount> RevenueAccounts { get; } = [];
     public ObservableCollection<ApiAccount> OutputVatAccounts { get; } = [];
+    public ObservableCollection<ApiAccount> InventoryAssetAccounts { get; } = [];
+    public ObservableCollection<ApiAccount> CostOfGoodsSoldAccounts { get; } = [];
     public ObservableCollection<InvoiceLineInput> InvoiceLines { get; } = [];
     public ICollectionView CustomersView { get; }
     public ICollectionView DraftsView { get; }
@@ -151,6 +157,18 @@ public sealed class SalesWorkspaceViewModel : INotifyPropertyChanged
         set { if (ReferenceEquals(_selectedOutputVatAccount, value)) return; _selectedOutputVatAccount = value; OnPropertyChanged(); NotifyCommands(); }
     }
 
+    public ApiAccount? SelectedInventoryAssetAccount
+    {
+        get => _selectedInventoryAssetAccount;
+        set { if (ReferenceEquals(_selectedInventoryAssetAccount, value)) return; _selectedInventoryAssetAccount = value; OnPropertyChanged(); NotifyCommands(); }
+    }
+
+    public ApiAccount? SelectedCostOfGoodsSoldAccount
+    {
+        get => _selectedCostOfGoodsSoldAccount;
+        set { if (ReferenceEquals(_selectedCostOfGoodsSoldAccount, value)) return; _selectedCostOfGoodsSoldAccount = value; OnPropertyChanged(); NotifyCommands(); }
+    }
+
     public string JournalEntryNumber
     {
         get => _journalEntryNumber;
@@ -251,6 +269,8 @@ public sealed class SalesWorkspaceViewModel : INotifyPropertyChanged
             ReceivableAccounts.Clear();
             RevenueAccounts.Clear();
             OutputVatAccounts.Clear();
+            InventoryItems.Clear(); InventoryWarehouses.Clear(); InventoryAssetAccounts.Clear(); CostOfGoodsSoldAccounts.Clear();
+            SelectedInventoryAssetAccount = null; SelectedCostOfGoodsSoldAccount = null;
             SelectedCompany = null;
             SelectedCustomer = null;
             SelectedDraft = null;
@@ -453,10 +473,12 @@ public sealed class SalesWorkspaceViewModel : INotifyPropertyChanged
         {
             var companyId = SelectedCompany.Id;
             var customerTask = _apiClient.GetCustomersAsync(companyId);
+            var inventoryItemsTask = _apiClient.GetInventoryItemsAsync(companyId);
+            var inventoryWarehousesTask = _apiClient.GetInventoryWarehousesAsync(companyId);
             var draftTask = _apiClient.GetSalesInvoiceDraftsAsync(companyId);
             var accountTask = _apiClient.GetAccountsAsync(companyId);
             var periodTask = _apiClient.GetFiscalPeriodsAsync(companyId);
-            await Task.WhenAll(customerTask, draftTask, accountTask, periodTask);
+            await Task.WhenAll(customerTask, inventoryItemsTask, inventoryWarehousesTask, draftTask, accountTask, periodTask);
             var customers = await customerTask;
             var drafts = await draftTask;
             var accounts = await accountTask;
@@ -465,6 +487,10 @@ public sealed class SalesWorkspaceViewModel : INotifyPropertyChanged
             Customers.Clear();
             foreach (var customer in customers)
                 Customers.Add(customer);
+            InventoryItems.Clear();
+            foreach (var item in await inventoryItemsTask) InventoryItems.Add(item);
+            InventoryWarehouses.Clear();
+            foreach (var warehouse in await inventoryWarehousesTask) InventoryWarehouses.Add(warehouse);
             Drafts.Clear();
             foreach (var draft in drafts)
                 Drafts.Add(draft);
@@ -490,6 +516,10 @@ public sealed class SalesWorkspaceViewModel : INotifyPropertyChanged
                 SelectedRevenueAccount = RevenueAccounts.FirstOrDefault();
             if (SelectedOutputVatAccount is null || !OutputVatAccounts.Any(x => x.Id == SelectedOutputVatAccount.Id))
                 SelectedOutputVatAccount = OutputVatAccounts.FirstOrDefault();
+            if (SelectedInventoryAssetAccount is null || !InventoryAssetAccounts.Any(x => x.Id == SelectedInventoryAssetAccount.Id))
+                SelectedInventoryAssetAccount = InventoryAssetAccounts.FirstOrDefault();
+            if (SelectedCostOfGoodsSoldAccount is null || !CostOfGoodsSoldAccounts.Any(x => x.Id == SelectedCostOfGoodsSoldAccount.Id))
+                SelectedCostOfGoodsSoldAccount = CostOfGoodsSoldAccounts.FirstOrDefault();
 
             StatusMessage = $"الشركة: {SelectedCompany.Name} · العملاء {Customers.Count} · مسودات البيع {Drafts.Count} · الحسابات {Accounts.Count} · الفترات {FiscalPeriods.Count}.";
             StatusIsError = false;
@@ -632,7 +662,8 @@ public sealed class SalesWorkspaceViewModel : INotifyPropertyChanged
         }
 
         var lines = InvoiceLines.Select(x => new CreateSalesInvoiceDraftLineApiRequest(
-            x.Description.Trim(), x.Quantity, x.UnitPrice)).ToList();
+            x.Description.Trim(), x.Quantity, x.UnitPrice, x.InventoryItemId, x.InventoryWarehouseId,
+            ParseSerialNumbers(x.SerialNumbersText))).ToList();
         if (lines.Count == 0 || lines.Any(x => string.IsNullOrWhiteSpace(x.Description) || x.Quantity <= 0m || x.UnitPrice < 0m) ||
             InvoiceLines.Any(x => x.DiscountAmount < 0m ||
                 (x.VatTreatment != "StandardRated" && string.IsNullOrWhiteSpace(x.TreatmentReason))))
@@ -741,7 +772,8 @@ public sealed class SalesWorkspaceViewModel : INotifyPropertyChanged
                     entryNumber,
                     SelectedReceivableAccount!.Id,
                     SelectedRevenueAccount!.Id,
-                    draft.VatAmount.GetValueOrDefault() > 0m ? SelectedOutputVatAccount!.Id : null));
+                    draft.VatAmount.GetValueOrDefault() > 0m ? SelectedOutputVatAccount!.Id : null,
+                    SelectedInventoryAssetAccount?.Id, SelectedCostOfGoodsSoldAccount?.Id));
             await LoadCompanyDataAsync();
             SelectedDraft = Drafts.FirstOrDefault(x => x.Id == draft.Id);
             StatusMessage = result.AlreadyPosted
@@ -771,6 +803,8 @@ public sealed class SalesWorkspaceViewModel : INotifyPropertyChanged
         ReceivableAccounts.Clear();
         RevenueAccounts.Clear();
         OutputVatAccounts.Clear();
+        InventoryAssetAccounts.Clear();
+        CostOfGoodsSoldAccounts.Clear();
         foreach (var account in Accounts.Where(x => x.IsActive && x.AllowPosting))
         {
             if (account.AccountType == "ASSET" && account.NormalBalance == "DEBIT")
@@ -779,6 +813,10 @@ public sealed class SalesWorkspaceViewModel : INotifyPropertyChanged
                 RevenueAccounts.Add(account);
             else if (account.AccountType == "LIABILITY" && account.NormalBalance == "CREDIT")
                 OutputVatAccounts.Add(account);
+            if (account.AccountType == "ASSET" && account.NormalBalance == "DEBIT")
+                InventoryAssetAccounts.Add(account);
+            if (account.AccountType == "EXPENSE" && account.NormalBalance == "DEBIT")
+                CostOfGoodsSoldAccounts.Add(account);
         }
         OnPropertyChanged(nameof(Accounts));
         OnPropertyChanged(nameof(FiscalPeriods));
@@ -867,6 +905,10 @@ public sealed class SalesWorkspaceViewModel : INotifyPropertyChanged
     }
 
     private static string? NullIfBlank(string value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    private static string[] ParseSerialNumbers(string? text) =>
+        (text ?? "").Split(new[] { '\r', '\n', ',', ';', '\t' },
+            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(value => value.ToUpperInvariant()).ToArray();
 
     private void NotifyCommands()
     {
@@ -890,6 +932,27 @@ public sealed class InvoiceLineInput : INotifyPropertyChanged
     private decimal _discountAmount;
     private string _vatTreatment = "StandardRated";
     private string _treatmentReason = "";
+    private Guid? _inventoryItemId;
+    private Guid? _inventoryWarehouseId;
+    private string _serialNumbersText = "";
+
+    public Guid? InventoryItemId
+    {
+        get => _inventoryItemId;
+        set { if (_inventoryItemId == value) return; _inventoryItemId = value; OnPropertyChanged(); }
+    }
+
+    public Guid? InventoryWarehouseId
+    {
+        get => _inventoryWarehouseId;
+        set { if (_inventoryWarehouseId == value) return; _inventoryWarehouseId = value; OnPropertyChanged(); }
+    }
+
+    public string SerialNumbersText
+    {
+        get => _serialNumbersText;
+        set { if (_serialNumbersText == value) return; _serialNumbersText = value; OnPropertyChanged(); }
+    }
 
     public string Description
     {
