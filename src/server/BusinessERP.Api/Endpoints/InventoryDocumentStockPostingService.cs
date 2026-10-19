@@ -56,7 +56,7 @@ internal static class InventoryDocumentStockPostingService
     }
 
     public static async Task<InventoryStockBalance> GetBalanceAsync(
-        ErpDbContext db, Guid tenantId, Guid companyId, Guid warehouseId, Guid itemId, CancellationToken ct)
+        ErpDbContext db, Guid tenantId, Guid companyId, Guid warehouseId, Guid itemId, DateOnly asOfDate, CancellationToken ct)
     {
         return await db.Database.SqlQuery<InventoryStockBalance>($"""
             SELECT COALESCE(sum(quantity_delta), 0)::numeric(20,4) AS "Quantity",
@@ -64,6 +64,7 @@ internal static class InventoryDocumentStockPostingService
               FROM inventory_movements
              WHERE tenant_id = {tenantId} AND company_id = {companyId}
                AND warehouse_id = {warehouseId} AND item_id = {itemId}
+               AND movement_date <= {asOfDate}
             """).SingleAsync(ct);
     }
 
