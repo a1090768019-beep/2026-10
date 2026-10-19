@@ -411,7 +411,7 @@ test('tenant member administration is tenant-scoped, audited, protected against 
   assert.match(program, /MapTenantMembershipEndpoints/);
   assert.match(endpoint, /MapGet\("", ListMembers\)/);
   assert.match(endpoint, /MapPost\("", AssignMember\)/);
-  assert.match(endpoint, /MapPut\("\/{userId:guid}", UpdateMember\)/);
+  assert.ok(endpoint.includes('api.MapPut("/{userId:guid}", UpdateMember)'));
   assert.match(endpoint, /TenantTransactionRunner/);
   assert.match(endpoint, /CheckActiveUserQuotaAsync/);
   assert.match(endpoint, /ReadPlanLimit\(limitsJson, "users"\)/);
