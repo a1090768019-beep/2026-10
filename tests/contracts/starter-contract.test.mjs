@@ -425,3 +425,29 @@ test('tenant member administration is tenant-scoped, audited, protected against 
   assert.match(apiTests, /User_quota_is_enforced_when_assigning_provisioned_member/);
   assert.match(docs, /users/);
 });
+
+
+test('WPF settings workspace is connected to tenant member administration APIs', async () => {
+  const api = await read('apps/BusinessERP.Desktop/Services/ErpApiClient.cs');
+  const shellXaml = await read('apps/BusinessERP.Desktop/MainWindow.xaml');
+  const shell = await read('apps/BusinessERP.Desktop/MainWindow.xaml.cs');
+  const view = await read('apps/BusinessERP.Desktop/Views/TenantMembershipWorkspaceControl.xaml');
+  const codeBehind = await read('apps/BusinessERP.Desktop/Views/TenantMembershipWorkspaceControl.xaml.cs');
+  const vm = await read('apps/BusinessERP.Desktop/ViewModels/TenantMembershipWorkspaceViewModel.cs');
+
+  assert.match(api, /GetTenantMembersAsync/);
+  assert.match(api, /AssignTenantMemberAsync/);
+  assert.match(api, /UpdateTenantMemberAsync/);
+  assert.match(shellXaml, /x:Name="SettingsWorkspaceTab"/);
+  assert.match(shellXaml, /x:Name="MembershipWorkspacePanel"/);
+  assert.match(shell, /SetWorkspaceTabStyle\(SettingsWorkspaceTab/);
+  assert.match(shell, /MembershipWorkspacePanel\.SetApiClientAsync/);
+  assert.match(view, /ItemsSource="{Binding Members}"/);
+  assert.match(view, /Click="AssignMember_Click"/);
+  assert.match(view, /Click="UpdateMember_Click"/);
+  assert.match(codeBehind, /AssignMemberAsync/);
+  assert.match(codeBehind, /UpdateMemberAsync/);
+  assert.match(vm, /GetTenantMembersAsync/);
+  assert.match(vm, /AssignTenantMemberApiRequest/);
+  assert.match(vm, /UpdateTenantMemberApiRequest/);
+});
