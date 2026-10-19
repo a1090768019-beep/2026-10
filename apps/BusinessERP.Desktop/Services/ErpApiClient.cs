@@ -345,7 +345,8 @@ public sealed record ApiFiscalPeriod(Guid Id, Guid FiscalYearId, int PeriodNumbe
     public string DisplayLabel => DisplayName;
 }
 public sealed record PostSalesDraftToLedgerApiRequest(
-    Guid FiscalPeriodId, string EntryNumber, Guid ReceivableAccountId, Guid RevenueAccountId, Guid? OutputVatAccountId = null);
+    Guid FiscalPeriodId, string EntryNumber, Guid ReceivableAccountId, Guid RevenueAccountId, Guid? OutputVatAccountId = null,
+    Guid? InventoryAssetAccountId = null, Guid? CostOfGoodsSoldAccountId = null);
 public sealed record SalesDraftLedgerPostingApiResult(
     Guid SalesInvoiceDraftId, Guid JournalEntryId, string EntryNumber, string JournalEntryStatus,
     DateOnly EntryDate, decimal GrossAmount, decimal DiscountAmount, decimal NetAmount,
@@ -424,7 +425,8 @@ public sealed record PurchaseInvoiceDraftListItem(
 public sealed record CreatePurchaseInvoiceDraftApiRequest(
     Guid SupplierId, string PurchaseNumber, string SupplierInvoiceNumber, DateOnly IssueDate, DateOnly? DueDate,
     string? Notes, IReadOnlyList<CreatePurchaseInvoiceDraftLineApiRequest> Lines);
-public sealed record CreatePurchaseInvoiceDraftLineApiRequest(string Description, decimal Quantity, decimal UnitPrice);
+public sealed record CreatePurchaseInvoiceDraftLineApiRequest(string Description, decimal Quantity, decimal UnitPrice,
+    Guid? InventoryItemId = null, Guid? InventoryWarehouseId = null, IReadOnlyList<string>? SerialNumbers = null);
 public sealed record PurchaseInvoiceDraftDetails(
     Guid Id, Guid CompanyId, Guid SupplierId, string PurchaseNumber, string SupplierInvoiceNumber,
     DateOnly IssueDate, DateOnly? DueDate, string CurrencyCode, string SupplierName, string? SupplierTaxNumber,
@@ -435,7 +437,8 @@ public sealed record PurchaseInvoiceDraftDetails(
 public sealed record PurchaseInvoiceDraftLine(
     Guid Id, int LineNumber, string Description, decimal Quantity, decimal UnitPrice, decimal LineAmount,
     decimal DiscountAmount, string VatTreatment, string? VatTreatmentReason, decimal? GrossAmount,
-    decimal? NetAmount, decimal? VatRatePercent, decimal? VatAmount, decimal? TotalAmount);
+    decimal? NetAmount, decimal? VatRatePercent, decimal? VatAmount, decimal? TotalAmount,
+    Guid? InventoryItemId, Guid? InventoryWarehouseId, IReadOnlyList<string> SerialNumbers, decimal? InventoryCostAmount);
 public sealed record ApplyPurchaseDraftVatApiRequest(IReadOnlyList<ApplyPurchaseDraftVatLineApiRequest> Lines);
 public sealed record ApplyPurchaseDraftVatLineApiRequest(int LineNumber, decimal DiscountAmount, string Treatment, string? TreatmentReason = null);
 public sealed record PurchaseDraftVatResult(
@@ -470,12 +473,14 @@ public sealed record SalesInvoiceDraftListItem(
 public sealed record CreateSalesInvoiceDraftApiRequest(
     Guid CustomerId, string InvoiceNumber, DateOnly IssueDate, DateOnly? DueDate,
     string? Notes, IReadOnlyList<CreateSalesInvoiceDraftLineApiRequest> Lines);
-public sealed record CreateSalesInvoiceDraftLineApiRequest(string Description, decimal Quantity, decimal UnitPrice);
+public sealed record CreateSalesInvoiceDraftLineApiRequest(string Description, decimal Quantity, decimal UnitPrice,
+    Guid? InventoryItemId = null, Guid? InventoryWarehouseId = null, IReadOnlyList<string>? SerialNumbers = null);
 public sealed record SalesInvoiceDraftDetails(
     Guid Id, Guid CompanyId, Guid CustomerId, string InvoiceNumber, DateOnly IssueDate,
     DateOnly? DueDate, string CurrencyCode, string CustomerName, string? CustomerTaxNumber,
     decimal SubtotalAmount, string Notes, string Status, DateTime CreatedAt, IReadOnlyList<SalesInvoiceDraftLine> Lines);
-public sealed record SalesInvoiceDraftLine(Guid Id, int LineNumber, string Description, decimal Quantity, decimal UnitPrice, decimal LineAmount);
+public sealed record SalesInvoiceDraftLine(Guid Id, int LineNumber, string Description, decimal Quantity, decimal UnitPrice, decimal LineAmount,
+    Guid? InventoryItemId, Guid? InventoryWarehouseId, IReadOnlyList<string> SerialNumbers, decimal? InventoryCostAmount);
 
 public sealed record TrialBalanceApiReport(
     Guid CompanyId, DateOnly FromDate, DateOnly ToDate, IReadOnlyList<TrialBalanceApiRow> Rows,

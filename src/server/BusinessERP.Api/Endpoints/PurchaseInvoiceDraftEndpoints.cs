@@ -113,6 +113,15 @@ public static class PurchaseInvoiceDraftEndpoints
                 }
 
                 var description = (input.Description ?? "").Trim();
+                var serialNumbers = NormalizeSerialNumbersForDraft(input.SerialNumbers);
+                if (input.InventoryItemId.HasValue != input.InventoryWarehouseId.HasValue)
+                    errors[$"{key}.inventoryItemId"] = ["يجب اختيار الصنف والمستودع معًا."];
+                if (input.SerialNumbers is { Count: > 1000 })
+                    errors[$"{key}.serialNumbers"] = ["لا تقبل أكثر من 1000 رقم تسلسلي في البند."];
+                if (serialNumbers.Distinct(StringComparer.OrdinalIgnoreCase).Count() != serialNumbers.Length)
+                    errors[$"{key}.serialNumbers"] = ["الأرقام التسلسلية في البند مكررة."];
+                if (!input.InventoryItemId.HasValue && serialNumbers.Length > 0)
+                    errors[$"{key}.serialNumbers"] = ["لا يمكن إدخال أرقام تسلسلية لبند غير مرتبط بصنف مخزني."];
                 if (description.Length is < 1 or > 500 || description.Any(char.IsControl))
                     errors[$"{key}.description"] = ["وصف البند مطلوب ولا يتجاوز 500 حرف."];
                 if (input.Quantity <= 0m || input.Quantity > MaxAmount || !HasSupportedPrecision(input.Quantity))
@@ -140,7 +149,8 @@ public static class PurchaseInvoiceDraftEndpoints
                 }
 
                 subtotal = checked(subtotal + lineAmount);
-                lines.Add(new NormalizedLine(description, input.Quantity, input.UnitPrice, lineAmount));
+                lines.Add(new NormalizedLine(description, input.Quantity, input.UnitPrice, lineAmount,
+                    input.InventoryItemId, input.InventoryWarehouseId, serialNumbers));
             }
         }
         if (lines.Count != (request.Lines?.Count ?? 0))
@@ -164,6 +174,60 @@ public static class PurchaseInvoiceDraftEndpoints
                 {
                     ["supplierId"] = ["المورد غير موجود أو غير نشط في هذه الشركة."]
                 });
+
+
+            foreach (var (line, index) in lines.Select((line, index) => (line, index)))
+            {
+                if (line.InventoryItemId.HasValue != line.InventoryWarehouseId.HasValue)
+                    return Results.ValidationProblem(new Dictionary<string, string[]>
+                    {
+                        [$"lines[{index}].inventoryItemId"] = ["يجب اختيار الصنف والمستودع معًا."]
+                    });
+
+                if (!line.InventoryItemId.HasValue)
+                {
+                    if (line.SerialNumbers.Length > 0)
+                        return Results.ValidationProblem(new Dictionary<string, string[]>
+                        {
+                            [$"lines[{index}].serialNumbers"] = ["لا يمكن إدخال أرقام تسلسلية لبند غير مرتبط بصنف مخزني."]
+                        });
+                    continue;
+                }
+
+                var inventoryLookup = await db.Database.SqlQuery<InventoryLineLookup>($"""
+                    SELECT item.tracks_serials AS "TracksSerials",
+                           (item.is_active AND warehouse.is_active) AS "IsActive"
+                      FROM items AS item
+                      JOIN warehouses AS warehouse
+                        ON warehouse.tenant_id = item.tenant_id AND warehouse.company_id = item.company_id
+                     WHERE item.tenant_id = {tenant.TenantId} AND item.company_id = {companyId}
+                       AND item.id = {line.InventoryItemId.Value}
+                       AND warehouse.id = {line.InventoryWarehouseId!.Value}
+                     LIMIT 1
+                    """).SingleOrDefaultAsync(token);
+                if (inventoryLookup is null || !inventoryLookup.IsActive)
+                    return Results.ValidationProblem(new Dictionary<string, string[]>
+                    {
+                        [$"lines[{index}].inventoryItemId"] = ["الصنف أو المستودع غير موجود أو غير نشط في الشركة الحالية."]
+                    });
+
+                if (inventoryLookup.TracksSerials)
+                {
+                    if (line.Quantity != decimal.Truncate(line.Quantity) || line.Quantity > 1000m ||
+                        line.SerialNumbers.Length != (int)line.Quantity)
+                        return Results.ValidationProblem(new Dictionary<string, string[]>
+                        {
+                            [$"lines[{index}].serialNumbers"] = ["الصنف المتسلسل يحتاج رقمًا فريدًا لكل وحدة صحيحة وبحد أقصى 1000 وحدة."]
+                        });
+                }
+                else if (line.SerialNumbers.Length > 0)
+                {
+                    return Results.ValidationProblem(new Dictionary<string, string[]>
+                    {
+                        [$"lines[{index}].serialNumbers"] = ["الصنف المحدد لا يستخدم تتبع الأرقام التسلسلية."]
+                    });
+                }
+            }
 
             var numberLock = $"purchase-number:{tenant.TenantId:D}:{companyId:D}:{purchaseNumber}";
             await db.Database.ExecuteSqlInterpolatedAsync(
@@ -207,9 +271,11 @@ public static class PurchaseInvoiceDraftEndpoints
                 var line = lines[index];
                 await db.Database.ExecuteSqlInterpolatedAsync($"""
                     INSERT INTO purchase_invoice_draft_lines
-                        (tenant_id, company_id, purchase_invoice_draft_id, line_number, description, quantity, unit_price, line_amount)
+                        (tenant_id, company_id, purchase_invoice_draft_id, line_number, description, quantity, unit_price, line_amount,
+                         inventory_item_id, inventory_warehouse_id, serial_numbers)
                     VALUES
-                        ({tenant.TenantId}, {companyId}, {draftId}, {index + 1}, {line.Description}, {line.Quantity}, {line.UnitPrice}, {line.LineAmount})
+                        ({tenant.TenantId}, {companyId}, {draftId}, {index + 1}, {line.Description}, {line.Quantity}, {line.UnitPrice}, {line.LineAmount},
+                         {line.InventoryItemId}, {line.InventoryWarehouseId}, CAST({JsonSerializer.Serialize(line.SerialNumbers)} AS jsonb))
                     """, token);
             }
 
@@ -253,17 +319,26 @@ public static class PurchaseInvoiceDraftEndpoints
             """).SingleOrDefaultAsync(token);
         if (header is null) return null;
 
-        var lines = await db.Database.SqlQuery<PurchaseDraftLineDto>($"""
+        var lineRows = await db.Database.SqlQuery<PurchaseDraftLineRow>($"""
             SELECT id AS "Id", line_number AS "LineNumber", description AS "Description",
                    quantity AS "Quantity", unit_price AS "UnitPrice", line_amount AS "LineAmount",
                    discount_amount AS "DiscountAmount", vat_treatment AS "VatTreatment",
                    vat_treatment_reason AS "VatTreatmentReason", gross_amount AS "GrossAmount",
                    net_amount AS "NetAmount", vat_rate_percent AS "VatRatePercent",
-                   vat_amount AS "VatAmount", total_amount AS "TotalAmount"
+                   vat_amount AS "VatAmount", total_amount AS "TotalAmount",
+                   inventory_item_id AS "InventoryItemId", inventory_warehouse_id AS "InventoryWarehouseId",
+                   serial_numbers::text AS "SerialNumbersJson", inventory_cost_amount AS "InventoryCostAmount"
               FROM purchase_invoice_draft_lines
              WHERE tenant_id = {tenantId} AND company_id = {companyId} AND purchase_invoice_draft_id = {invoiceId}
              ORDER BY line_number
             """).ToListAsync(token);
+        var lines = lineRows.Select(row => new PurchaseDraftLineDto(
+            row.Id, row.LineNumber, row.Description, row.Quantity, row.UnitPrice, row.LineAmount,
+            row.DiscountAmount, row.VatTreatment, row.VatTreatmentReason, row.GrossAmount,
+            row.NetAmount, row.VatRatePercent, row.VatAmount, row.TotalAmount,
+            row.InventoryItemId, row.InventoryWarehouseId,
+            JsonSerializer.Deserialize<string[]>(row.SerialNumbersJson) ?? Array.Empty<string>(),
+            row.InventoryCostAmount)).ToList();
 
         return new PurchaseDraftDetails(
             header.Id, header.CompanyId, header.SupplierId, header.PurchaseNumber, header.SupplierInvoiceNumber,
@@ -284,8 +359,13 @@ public static class PurchaseInvoiceDraftEndpoints
         Guid SupplierId, string? PurchaseNumber, string? SupplierInvoiceNumber,
         DateOnly IssueDate, DateOnly? DueDate, string? Notes,
         IReadOnlyList<CreatePurchaseDraftLineRequest?>? Lines);
-    public sealed record CreatePurchaseDraftLineRequest(string? Description, decimal Quantity, decimal UnitPrice);
-    private sealed record NormalizedLine(string Description, decimal Quantity, decimal UnitPrice, decimal LineAmount);
+    public sealed record CreatePurchaseDraftLineRequest(string? Description, decimal Quantity, decimal UnitPrice,
+        Guid? InventoryItemId = null, Guid? InventoryWarehouseId = null, IReadOnlyList<string>? SerialNumbers = null);
+    private sealed record NormalizedLine(string Description, decimal Quantity, decimal UnitPrice, decimal LineAmount,
+        Guid? InventoryItemId, Guid? InventoryWarehouseId, string[] SerialNumbers);
+    private sealed record InventoryLineLookup(bool TracksSerials, bool IsActive);
+    private static string[] NormalizeSerialNumbersForDraft(IReadOnlyList<string>? input) =>
+        (input ?? Array.Empty<string>()).Select(value => (value ?? "").Trim().ToUpperInvariant()).Where(value => value.Length > 0).ToArray();
     private sealed record SupplierSnapshot(Guid Id, string Name, string? TaxNumber, bool IsActive);
     private sealed record PurchaseDraftHeader(
         Guid Id, Guid CompanyId, Guid SupplierId, string PurchaseNumber, string SupplierInvoiceNumber,
@@ -293,10 +373,16 @@ public static class PurchaseInvoiceDraftEndpoints
         decimal SubtotalAmount, string Notes, string Status, string TaxCalculationStatus,
         decimal? GrossAmount, decimal? DiscountAmount, decimal? NetAmount, decimal? VatAmount, decimal? TotalAmount, DateTime CreatedAt,
         Guid? AccountingPostedJournalEntryId, DateTime? AccountingPostedAt, Guid? AccountingInputVatAccountId);
+    private sealed record PurchaseDraftLineRow(
+        Guid Id, int LineNumber, string Description, decimal Quantity, decimal UnitPrice, decimal LineAmount,
+        decimal DiscountAmount, string VatTreatment, string? VatTreatmentReason, decimal? GrossAmount,
+        decimal? NetAmount, decimal? VatRatePercent, decimal? VatAmount, decimal? TotalAmount,
+        Guid? InventoryItemId, Guid? InventoryWarehouseId, string SerialNumbersJson, decimal? InventoryCostAmount);
     public sealed record PurchaseDraftLineDto(
         Guid Id, int LineNumber, string Description, decimal Quantity, decimal UnitPrice, decimal LineAmount,
         decimal DiscountAmount, string VatTreatment, string? VatTreatmentReason, decimal? GrossAmount,
-        decimal? NetAmount, decimal? VatRatePercent, decimal? VatAmount, decimal? TotalAmount);
+        decimal? NetAmount, decimal? VatRatePercent, decimal? VatAmount, decimal? TotalAmount,
+        Guid? InventoryItemId, Guid? InventoryWarehouseId, IReadOnlyList<string> SerialNumbers, decimal? InventoryCostAmount);
     public sealed record PurchaseDraftDetails(
         Guid Id, Guid CompanyId, Guid SupplierId, string PurchaseNumber, string SupplierInvoiceNumber,
         DateOnly IssueDate, DateOnly? DueDate, string CurrencyCode, string SupplierName, string? SupplierTaxNumber,

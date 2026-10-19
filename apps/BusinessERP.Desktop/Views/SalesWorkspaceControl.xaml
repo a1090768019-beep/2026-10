@@ -154,6 +154,36 @@
                                 <DataGridTextColumn Header="الوصف" Binding="{Binding Description, UpdateSourceTrigger=PropertyChanged}" Width="*" />
                                 <DataGridTextColumn Header="الكمية" Binding="{Binding Quantity, UpdateSourceTrigger=PropertyChanged}" Width="90" />
                                 <DataGridTextColumn Header="السعر" Binding="{Binding UnitPrice, UpdateSourceTrigger=PropertyChanged}" Width="95" />
+                            <DataGridTemplateColumn Header="الصنف المخزني" Width="170">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <ComboBox ItemsSource="{Binding DataContext.InventoryItems, RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}}"
+                                                  DisplayMemberPath="DisplayLabel" SelectedValuePath="Id"
+                                                  SelectedValue="{Binding InventoryItemId, UpdateSourceTrigger=PropertyChanged}"
+                                                  ToolTip="اربط البند بصنف مخزني، أو اتركه فارغًا للبند غير المخزني." />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTemplateColumn Header="المستودع" Width="170">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <ComboBox ItemsSource="{Binding DataContext.InventoryWarehouses, RelativeSource={RelativeSource AncestorType={x:Type DataGrid}}}"
+                                                  DisplayMemberPath="DisplayLabel" SelectedValuePath="Id"
+                                                  SelectedValue="{Binding InventoryWarehouseId, UpdateSourceTrigger=PropertyChanged}"
+                                                  ToolTip="اختر المستودع الذي سيستقبل أو يصرف هذا البند." />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTemplateColumn Header="الأرقام التسلسلية (اختياري)" Width="190">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBox Text="{Binding SerialNumbersText, UpdateSourceTrigger=PropertyChanged}"
+                                                 AcceptsReturn="True" Height="34" VerticalScrollBarVisibility="Auto"
+                                                 ToolTip="رقم لكل وحدة؛ يمكن الفصل بسطر أو فاصلة."
+                                                 VerticalContentAlignment="Top" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
                                 <DataGridTextColumn Header="الخصم" Binding="{Binding DiscountAmount, UpdateSourceTrigger=PropertyChanged}" Width="80" />
                                 <DataGridTemplateColumn Header="معاملة الضريبة" Width="130">
                                     <DataGridTemplateColumn.CellTemplate>
@@ -231,6 +261,22 @@
                                     <StackPanel Grid.Column="1" Margin="5,0,0,0">
                                         <TextBlock Text="حساب الإيرادات (إيراد دائن)" Foreground="#69758D" FontSize="12" />
                                         <ComboBox ItemsSource="{Binding RevenueAccounts}" SelectedItem="{Binding SelectedRevenueAccount, Mode=TwoWay}" DisplayMemberPath="DisplayName" />
+                                    </StackPanel>
+                                </Grid>
+                                <Grid Margin="0,3,0,5">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Margin="0,0,5,0">
+                                        <TextBlock Text="حساب أصل المخزون (مدين)" Foreground="#69758D" FontSize="12" />
+                                        <ComboBox ItemsSource="{Binding InventoryAssetAccounts}" SelectedItem="{Binding SelectedInventoryAssetAccount, Mode=TwoWay}"
+                                                  DisplayMemberPath="DisplayName" ToolTip="مطلوب عند ربط بنود الفاتورة بأصناف مخزنية." />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Margin="5,0,0,0">
+                                        <TextBlock Text="تكلفة البضاعة المباعة (مصروف مدين)" Foreground="#69758D" FontSize="12" />
+                                        <ComboBox ItemsSource="{Binding CostOfGoodsSoldAccounts}" SelectedItem="{Binding SelectedCostOfGoodsSoldAccount, Mode=TwoWay}"
+                                                  DisplayMemberPath="DisplayName" ToolTip="يقابل قيمة المخزون المصروف عند ترحيل البيع." />
                                     </StackPanel>
                                 </Grid>
                                 <TextBlock Text="حساب ضريبة المخرجات (التزام دائن)" Foreground="#69758D" FontSize="12" />

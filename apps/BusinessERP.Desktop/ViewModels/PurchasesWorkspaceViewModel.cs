@@ -45,6 +45,8 @@ public sealed class PurchasesWorkspaceViewModel : INotifyPropertyChanged
 
     public ObservableCollection<ApiCompany> Companies { get; } = [];
     public ObservableCollection<ApiSupplier> Suppliers { get; } = [];
+    public ObservableCollection<InventoryItemApiDto> InventoryItems { get; } = [];
+    public ObservableCollection<InventoryWarehouseApiDto> InventoryWarehouses { get; } = [];
     public ObservableCollection<PurchaseInvoiceDraftListItem> PurchaseDrafts { get; } = [];
     public ObservableCollection<ApiAccount> PurchaseDebitAccounts { get; } = [];
     public ObservableCollection<ApiAccount> PayableAccounts { get; } = [];
@@ -322,15 +324,21 @@ public sealed class PurchasesWorkspaceViewModel : INotifyPropertyChanged
         if (_apiClient is null || SelectedCompany is null) return;
         var companyId = SelectedCompany.Id;
         var suppliersTask = _apiClient.GetSuppliersAsync(companyId);
+        var inventoryItemsTask = _apiClient.GetInventoryItemsAsync(companyId);
+        var inventoryWarehousesTask = _apiClient.GetInventoryWarehousesAsync(companyId);
         var draftsTask = _apiClient.GetPurchaseInvoiceDraftsAsync(companyId);
         var accountsTask = _apiClient.GetAccountsAsync(companyId);
         var periodsTask = _apiClient.GetFiscalPeriodsAsync(companyId);
         var reportTask = _reportFromDate.HasValue && _reportToDate.HasValue && _reportFromDate.Value.Date <= _reportToDate.Value.Date
             ? _apiClient.GetPurchaseVatDetailsReportAsync(companyId, DateOnly.FromDateTime(_reportFromDate.Value.Date), DateOnly.FromDateTime(_reportToDate.Value.Date), 1, ReportPageSize)
             : Task.FromResult<PurchaseVatDetailsApiReport?>(null);
-        await Task.WhenAll(suppliersTask, draftsTask, accountsTask, periodsTask, reportTask!);
+        await Task.WhenAll(suppliersTask, inventoryItemsTask, inventoryWarehousesTask, draftsTask, accountsTask, periodsTask, reportTask!);
         Suppliers.Clear();
         foreach (var supplier in await suppliersTask) Suppliers.Add(supplier);
+        InventoryItems.Clear();
+        foreach (var item in await inventoryItemsTask) InventoryItems.Add(item);
+        InventoryWarehouses.Clear();
+        foreach (var warehouse in await inventoryWarehousesTask) InventoryWarehouses.Add(warehouse);
         PurchaseDrafts.Clear();
         foreach (var draft in await draftsTask) PurchaseDrafts.Add(draft);
 
@@ -412,7 +420,8 @@ public sealed class PurchasesWorkspaceViewModel : INotifyPropertyChanged
                 DueDate.HasValue ? DateOnly.FromDateTime(DueDate.Value.Date) : null,
                 BlankToNull(PurchaseNotes),
                 NewPurchaseLines.Select(line => new CreatePurchaseInvoiceDraftLineApiRequest(
-                    line.Description.Trim(), line.Quantity, line.UnitPrice)).ToArray());
+                    line.Description.Trim(), line.Quantity, line.UnitPrice, line.InventoryItemId, line.InventoryWarehouseId,
+                    ParseSerialNumbers(line.SerialNumbersText))).ToArray());
             var draft = await _apiClient.CreatePurchaseInvoiceDraftAsync(SelectedCompany.Id, request);
             await LoadCompanyDataAsync();
             SelectedPurchaseDraft = PurchaseDrafts.FirstOrDefault(x => x.Id == draft.Id);
@@ -446,7 +455,10 @@ public sealed class PurchasesWorkspaceViewModel : INotifyPropertyChanged
                     VatTreatment = line.VatTreatment == "UNCLASSIFIED" ? "StandardRated" : line.VatTreatment,
                     VatTreatmentReason = line.VatTreatmentReason ?? "",
                     VatAmount = line.VatAmount,
-                    TotalAmount = line.TotalAmount
+                    TotalAmount = line.TotalAmount,
+                    InventoryItemId = line.InventoryItemId,
+                    InventoryWarehouseId = line.InventoryWarehouseId,
+                    SerialNumbersText = string.Join(Environment.NewLine, line.SerialNumbers)
                 });
             }
             OnPropertyChanged(nameof(SelectedDraftDetails));
@@ -595,7 +607,7 @@ public sealed class PurchasesWorkspaceViewModel : INotifyPropertyChanged
 
     private void ClearCompanyRows()
     {
-        Suppliers.Clear(); PurchaseDrafts.Clear(); SelectedDraftLines.Clear(); PurchaseVatRows.Clear();
+        Suppliers.Clear(); InventoryItems.Clear(); InventoryWarehouses.Clear(); PurchaseDrafts.Clear(); SelectedDraftLines.Clear(); PurchaseVatRows.Clear();
         PurchaseDebitAccounts.Clear(); PayableAccounts.Clear(); InputVatAccounts.Clear(); OpenFiscalPeriods.Clear();
         SelectedSupplier = null;
         SelectedPurchaseDebitAccount = null; SelectedPayableAccount = null; SelectedInputVatAccount = null; SelectedFiscalPeriod = null;
@@ -611,6 +623,10 @@ public sealed class PurchasesWorkspaceViewModel : INotifyPropertyChanged
     }
 
     private static string? BlankToNull(string value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    private static string[] ParseSerialNumbers(string? text) =>
+        (text ?? "").Split(new[] { '\r', '\n', ',', ';', '\t' },
+            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(value => value.ToUpperInvariant()).ToArray();
     private static bool HasPrecision(decimal value, int scale) => decimal.Round(value, scale, MidpointRounding.ToEven) == value;
 
     private void NewPurchaseLine_PropertyChanged(object? sender, PropertyChangedEventArgs e) => NotifyCommands();
@@ -676,6 +692,9 @@ public sealed class PurchaseLineEditor : INotifyPropertyChanged
     private string _vatTreatmentReason = "";
     private decimal? _vatAmount;
     private decimal? _totalAmount;
+    private Guid? _inventoryItemId;
+    private Guid? _inventoryWarehouseId;
+    private string _serialNumbersText = "";
     public event PropertyChangedEventHandler? PropertyChanged;
 
     public int LineNumber { get => _lineNumber; set { if (_lineNumber == value) return; _lineNumber = value; OnChanged(); } }
@@ -687,6 +706,9 @@ public sealed class PurchaseLineEditor : INotifyPropertyChanged
     public string VatTreatmentReason { get => _vatTreatmentReason; set { if (_vatTreatmentReason == value) return; _vatTreatmentReason = value; OnChanged(); } }
     public decimal? VatAmount { get => _vatAmount; set { if (_vatAmount == value) return; _vatAmount = value; OnChanged(); } }
     public decimal? TotalAmount { get => _totalAmount; set { if (_totalAmount == value) return; _totalAmount = value; OnChanged(); } }
+    public Guid? InventoryItemId { get => _inventoryItemId; set { if (_inventoryItemId == value) return; _inventoryItemId = value; OnChanged(); } }
+    public Guid? InventoryWarehouseId { get => _inventoryWarehouseId; set { if (_inventoryWarehouseId == value) return; _inventoryWarehouseId = value; OnChanged(); } }
+    public string SerialNumbersText { get => _serialNumbersText; set { if (_serialNumbersText == value) return; _serialNumbersText = value; OnChanged(); } }
 
     private void OnChanged([CallerMemberName] string? property = null) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(property));

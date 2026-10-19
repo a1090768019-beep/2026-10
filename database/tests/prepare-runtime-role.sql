@@ -42,7 +42,7 @@ GRANT UPDATE (
 ) ON sales_invoice_drafts TO erp_ci_runtime;
 GRANT UPDATE (
     discount_amount, vat_treatment, vat_treatment_reason, gross_amount, net_amount,
-    vat_rate_percent, vat_amount, total_amount
+    vat_rate_percent, vat_amount, total_amount, inventory_cost_amount
 ) ON sales_invoice_draft_lines TO erp_ci_runtime;
 
 
@@ -56,7 +56,7 @@ GRANT UPDATE (
 ) ON purchase_invoice_drafts TO erp_ci_runtime;
 GRANT UPDATE (
     discount_amount, vat_treatment, vat_treatment_reason, gross_amount, net_amount,
-    vat_rate_percent, vat_amount, total_amount
+    vat_rate_percent, vat_amount, total_amount, inventory_cost_amount
 ) ON purchase_invoice_draft_lines TO erp_ci_runtime;
 
 GRANT UPDATE (
