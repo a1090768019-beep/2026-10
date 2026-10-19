@@ -142,6 +142,8 @@ jobs:
         run: dotnet test tests/BusinessERP.Domain.Tests/BusinessERP.Domain.Tests.csproj --configuration Release --no-restore
       - name: Build API
         run: dotnet build src/server/BusinessERP.Api/BusinessERP.Api.csproj --configuration Release --no-restore
+      - name: Build API container image
+        run: docker build --file Dockerfile.api --tag business-erp-api:ci .
 
   desktop:
     runs-on: windows-latest
@@ -152,3 +154,13 @@ jobs:
           dotnet-version: 10.0.x
       - name: Build WPF desktop
         run: dotnet build apps/BusinessERP.Desktop/BusinessERP.Desktop.csproj --configuration Release
+      - name: Publish self-contained Windows x64 package
+        run: dotnet publish apps/BusinessERP.Desktop/BusinessERP.Desktop.csproj --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+      - name: Upload Windows x64 package from main
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: BusinessERP-Desktop-win-x64-${{ github.sha }}
+          path: apps/BusinessERP.Desktop/bin/Release/net10.0-windows/win-x64/publish/
+          if-no-files-found: error
+          retention-days: 14
