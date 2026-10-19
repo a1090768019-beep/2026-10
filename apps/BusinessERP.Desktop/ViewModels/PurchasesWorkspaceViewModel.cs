@@ -353,7 +353,7 @@ public sealed class PurchasesWorkspaceViewModel : INotifyPropertyChanged
 
     private async Task LoadSelectedDraftDetailsAsync(Guid draftId)
     {
-        if (_apiClient is null || SelectedCompany is null || IsBusy) return;
+        if (_apiClient is null || SelectedCompany is null) return;
         try
         {
             var detail = await _apiClient.GetPurchaseInvoiceDraftAsync(SelectedCompany.Id, draftId);
