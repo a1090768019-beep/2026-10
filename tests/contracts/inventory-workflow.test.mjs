@@ -34,7 +34,7 @@ test('inventory catalog and stock ledger are tenant-scoped, barcode-unique and i
   assert.match(endpoint, /movement-number:/);
   assert.match(endpoint, /inventory-balance:/);
   assert.match(endpoint, /insufficient_stock/);
-  assert.match(endpoint, /sum\(inventory_value_delta\)/);
+  assert.match(endpoint, /sum\(movement\.inventory_value_delta\)/);
   assert.match(endpoint, /INVENTORY_RECEIPT_RECORDED/);
   assert.match(endpoint, /INVENTORY_ISSUE_RECORDED/);
   assert.match(runtimeGrants, /GRANT SELECT, INSERT ON items, warehouses, inventory_movements/);
