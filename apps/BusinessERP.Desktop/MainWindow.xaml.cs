@@ -226,6 +226,8 @@ public partial class MainWindow : Window
             await SalesWorkspacePanel.SetApiClientAsync(null);
             await ReportsWorkspacePanel.SetApiClientAsync(null);
             await PurchasesWorkspacePanel.SetApiClientAsync(null);
+            await InventoryWorkspacePanel.SetApiClientAsync(null);
+            await SettlementsWorkspacePanel.SetApiClientAsync(null);
             UpdateWorkspaceContext();
             AuthStatusText.Text = "تعذر الاتصال بـ API";
             RibbonStatusText.Text = "تعذر الاتصال بـ API";
@@ -563,6 +565,7 @@ public partial class MainWindow : Window
             PurchasesWorkspacePanel.Visibility = Visibility.Collapsed;
             ReportsWorkspacePanel.Visibility = Visibility.Visible;
             InventoryWorkspacePanel.Visibility = Visibility.Collapsed;
+            SettlementsWorkspacePanel.Visibility = Visibility.Collapsed;
             UpdateWorkspaceContext();
             if (_erpApiClient is null)
                 await ReportsWorkspacePanel.SetApiClientAsync(null);
@@ -600,6 +603,7 @@ public partial class MainWindow : Window
             ReportsWorkspacePanel.Visibility = Visibility.Collapsed;
             PurchasesWorkspacePanel.Visibility = Visibility.Collapsed;
             InventoryWorkspacePanel.Visibility = Visibility.Collapsed;
+            SettlementsWorkspacePanel.Visibility = Visibility.Collapsed;
             SalesWorkspacePanel.Visibility = Visibility.Visible;
             if (_erpApiClient is null)
                 await SalesWorkspacePanel.SetApiClientAsync(null);
@@ -636,6 +640,7 @@ public partial class MainWindow : Window
             SalesWorkspacePanel.Visibility = Visibility.Collapsed;
             PurchasesWorkspacePanel.Visibility = Visibility.Collapsed;
             ReportsWorkspacePanel.Visibility = Visibility.Collapsed;
+            SettlementsWorkspacePanel.Visibility = Visibility.Collapsed;
             InventoryWorkspacePanel.Visibility = Visibility.Visible;
             if (_erpApiClient is null)
                 await InventoryWorkspacePanel.SetApiClientAsync(null);
