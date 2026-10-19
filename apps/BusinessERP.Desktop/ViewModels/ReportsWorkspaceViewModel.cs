@@ -20,11 +20,18 @@ public sealed class ReportsWorkspaceViewModel : INotifyPropertyChanged
     private string _trialBalanceSummary = "لم يتم تحميل ميزان المراجعة.";
     private string _incomeSummary = "لم يتم تحميل قائمة الدخل.";
     private string _balanceSummary = "لم يتم تحميل الميزانية.";
+    private TrialBalanceApiReport? _currentTrialBalance;
+    private IncomeStatementApiReport? _currentIncomeStatement;
+    private BalanceSheetApiReport? _currentBalanceSheet;
     
     public ObservableCollection<ApiCompany> Companies { get; } = [];
     public ObservableCollection<TrialBalanceApiRow> TrialBalanceRows { get; } = [];
     public ObservableCollection<FinancialReportLine> IncomeRows { get; } = [];
     public ObservableCollection<FinancialReportLine> BalanceRows { get; } = [];
+
+    public TrialBalanceApiReport? CurrentTrialBalance => _currentTrialBalance;
+    public IncomeStatementApiReport? CurrentIncomeStatement => _currentIncomeStatement;
+    public BalanceSheetApiReport? CurrentBalanceSheet => _currentBalanceSheet;
 
     public ApiCompany? SelectedCompany
     {
@@ -234,6 +241,9 @@ public sealed class ReportsWorkspaceViewModel : INotifyPropertyChanged
         var trial = await trialTask;
         var income = await incomeTask;
         var balance = await balanceTask;
+        _currentTrialBalance = trial;
+        _currentIncomeStatement = income;
+        _currentBalanceSheet = balance;
 
         TrialBalanceRows.Clear();
         foreach (var row in trial.Rows)
@@ -266,6 +276,9 @@ public sealed class ReportsWorkspaceViewModel : INotifyPropertyChanged
         TrialBalanceRows.Clear();
         IncomeRows.Clear();
         BalanceRows.Clear();
+        _currentTrialBalance = null;
+        _currentIncomeStatement = null;
+        _currentBalanceSheet = null;
         TrialBalanceSummary = "لم يتم تحميل ميزان المراجعة.";
         IncomeSummary = "لم يتم تحميل قائمة الدخل.";
         BalanceSummary = "لم يتم تحميل الميزانية.";

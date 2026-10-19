@@ -334,3 +334,25 @@ test('WPF status bar displays current company and fiscal/report period context',
   assert.match(reportsVm, /AsOfDate:yyyy-MM-dd/);
   assert.match(reportsControl, /WorkspaceContextChanged/);
 });
+
+
+test('financial report Excel export builds a real XLSX workbook with numeric cells and no formulas', async () => {
+  const view = await read('apps/BusinessERP.Desktop/Views/ReportsWorkspaceControl.xaml');
+  const code = await read('apps/BusinessERP.Desktop/Views/ReportsWorkspaceControl.xaml.cs');
+  const shell = await read('apps/BusinessERP.Desktop/MainWindow.xaml');
+  const main = await read('apps/BusinessERP.Desktop/MainWindow.xaml.cs');
+  const vm = await read('apps/BusinessERP.Desktop/ViewModels/ReportsWorkspaceViewModel.cs');
+  assert.match(shell, /x:Name="RibbonExportExcelButton"/);
+  assert.match(shell, /Click="RibbonExportExcel_Click"/);
+  assert.match(main, /RibbonExportExcelButton\.IsEnabled = _erpApiClient is not null/);
+  assert.match(main, /ReportsWorkspacePanel\.ExportCurrentReportToExcel\(\)/);
+  assert.match(view, /x:Name="ReportsTabs"/);
+  assert.match(code, /SaveFileDialog/);
+  assert.match(code, /Excel Workbook \(\*\.xlsx\)/);
+  assert.match(code, /ZipArchive/);
+  assert.match(code, /xl\/worksheets\/sheet1\.xml/);
+  assert.match(code, /WriteString\(Convert\.ToString\(value, CultureInfo\.InvariantCulture\)/);
+  assert.match(vm, /CurrentTrialBalance/);
+  assert.match(vm, /CurrentIncomeStatement/);
+  assert.match(vm, /CurrentBalanceSheet/);
+});

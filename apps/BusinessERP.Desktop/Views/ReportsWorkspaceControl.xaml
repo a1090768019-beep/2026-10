@@ -77,7 +77,7 @@
                 </StackPanel>
             </Border>
 
-            <TabControl FlowDirection="RightToLeft" Background="White" BorderBrush="#DDE5F0">
+            <TabControl x:Name="ReportsTabs" FlowDirection="RightToLeft" Background="White" BorderBrush="#DDE5F0">
                 <TabItem Header="ميزان المراجعة">
                     <StackPanel Margin="12">
                         <TextBlock Text="{Binding TrialBalanceSummary}" FontSize="13" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,8" />
