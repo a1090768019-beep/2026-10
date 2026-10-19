@@ -11,7 +11,7 @@ public sealed class ReportsWorkspaceViewModel : INotifyPropertyChanged
 {
     private ErpApiClient? _apiClient;
     private ApiCompany? _selectedCompany;
-    private DateTime? _fromDate = new(DateTime.Today.Year, 1, 1);
+    private DateTime? _fromDate = new DateTime(DateTime.Today.Year, 1, 1);
     private DateTime? _toDate = DateTime.Today;
     private DateTime? _asOfDate = DateTime.Today;
     private bool _isBusy;
@@ -252,7 +252,7 @@ public sealed class ReportsWorkspaceViewModel : INotifyPropertyChanged
         IncomeSummary = $"الإيرادات {income.TotalRevenue:N2} · المصروفات {income.TotalExpenses:N2} · صافي الدخل {income.NetIncome:N2} {SelectedCurrency}";
         BalanceSummary = $"الأصول {balance.TotalAssets:N2} · الالتزامات {balance.TotalLiabilities:N2} · حقوق الملكية {balance.TotalEquity:N2} · الفرق {balance.Difference:N2} {SelectedCurrency}";
 
-        StatusMessage = "تم تحميل ميزان المراجعة وقائمة الدخل والميزانية من القيود المرحلة فقط. راجع سياسة الإقفال قبل اعتماد التقارير رسميًا.";
+        StatusMessage = "تم تحميل التقارير من القيود بحالة POSTED فقط. راجع سياسة الإقفال قبل اعتماد النتائج رسميًا.";
         StatusIsError = balance.Difference != 0m;
     }
 
