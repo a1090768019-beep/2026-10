@@ -1,0 +1,25 @@
+services:
+  api:
+    image: ${ERP_API_IMAGE:-business-erp-api:local}
+    build:
+      context: ..
+      dockerfile: Dockerfile.api
+    restart: unless-stopped
+    init: true
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_HTTP_PORTS: "8080"
+      ConnectionStrings__Postgres: ${ERP_CONNECTION_STRING:?Define ERP_CONNECTION_STRING in your secret store or protected environment}
+      Authentication__Authority: ${ERP_OIDC_AUTHORITY:?Define ERP_OIDC_AUTHORITY}
+      Authentication__Audience: ${ERP_OIDC_AUDIENCE:?Define ERP_OIDC_AUDIENCE}
+    # Bind to loopback only. Terminate TLS and apply edge rate limits at a trusted reverse proxy.
+    ports:
+      - "127.0.0.1:${ERP_API_PORT:-5080}:8080"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 200
