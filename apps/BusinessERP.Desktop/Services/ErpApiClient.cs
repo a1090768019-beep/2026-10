@@ -68,6 +68,12 @@ public sealed class ErpApiClient(HttpClient httpClient, Guid tenantId)
     public Task<ApiCustomer> CreateCustomerAsync(Guid companyId, CreateCustomerApiRequest request, CancellationToken ct = default) =>
         SendJsonAsync<ApiCustomer>(HttpMethod.Post, $"/api/v1/companies/{companyId:D}/customers", request, ct);
 
+    public Task<IReadOnlyList<ApiAccount>> GetAccountsAsync(Guid companyId, CancellationToken ct = default) =>
+        GetListAsync<ApiAccount>($"/api/v1/companies/{companyId:D}/accounts", ct);
+
+    public Task<IReadOnlyList<ApiFiscalPeriod>> GetFiscalPeriodsAsync(Guid companyId, CancellationToken ct = default) =>
+        GetListAsync<ApiFiscalPeriod>($"/api/v1/companies/{companyId:D}/fiscal-periods", ct);
+
     public Task<IReadOnlyList<ApiSupplier>> GetSuppliersAsync(Guid companyId, CancellationToken ct = default) =>
         GetListAsync<ApiSupplier>($"/api/v1/companies/{companyId:D}/suppliers", ct);
 
@@ -260,12 +266,18 @@ public sealed record SalesDraftLedgerPostingApiResult(
     decimal VatAmount, decimal TotalAmount, bool AlreadyPosted, string Message);
 public sealed record ApiCustomer(Guid Id, string Code, string Name, string? Email, string? Phone, string? TaxNumber, bool IsActive, DateTime CreatedAt);
 public sealed record ApiSupplier(Guid Id, string Code, string Name, string? Email, string? Phone, string? TaxNumber, bool IsActive, DateTime CreatedAt);
+public sealed record ApiAccount(
+    Guid Id, string Code, string NameAr, string NameEn, string AccountType, string NormalBalance,
+    Guid? ParentAccountId, bool IsActive, bool AllowPosting);
+public sealed record ApiFiscalPeriod(Guid Id, Guid FiscalYearId, int PeriodNumber, DateOnly StartDate, DateOnly EndDate, string Status);
+
 public sealed record CreateSupplierApiRequest(string Code, string Name, string? Email = null, string? Phone = null, string? TaxNumber = null);
 public sealed record PurchaseInvoiceDraftListItem(
     Guid Id, string PurchaseNumber, string SupplierInvoiceNumber, DateOnly IssueDate, DateOnly? DueDate,
     string CurrencyCode, Guid SupplierId, string SupplierName, string? SupplierTaxNumber,
     decimal SubtotalAmount, string TaxCalculationStatus, decimal? GrossAmount, decimal? DiscountAmount,
-    decimal? NetAmount, decimal? VatAmount, decimal? TotalAmount, string Status, DateTime CreatedAt, int LineCount);
+    decimal? NetAmount, decimal? VatAmount, decimal? TotalAmount, string Status, DateTime CreatedAt, int LineCount,
+    Guid? AccountingPostedJournalEntryId, DateTime? AccountingPostedAt, Guid? AccountingInputVatAccountId);
 public sealed record CreatePurchaseInvoiceDraftApiRequest(
     Guid SupplierId, string PurchaseNumber, string SupplierInvoiceNumber, DateOnly IssueDate, DateOnly? DueDate,
     string? Notes, IReadOnlyList<CreatePurchaseInvoiceDraftLineApiRequest> Lines);
@@ -275,7 +287,8 @@ public sealed record PurchaseInvoiceDraftDetails(
     DateOnly IssueDate, DateOnly? DueDate, string CurrencyCode, string SupplierName, string? SupplierTaxNumber,
     decimal SubtotalAmount, string Notes, string Status, string TaxCalculationStatus,
     decimal? GrossAmount, decimal? DiscountAmount, decimal? NetAmount, decimal? VatAmount, decimal? TotalAmount,
-    DateTime CreatedAt, IReadOnlyList<PurchaseInvoiceDraftLine> Lines);
+    DateTime CreatedAt, IReadOnlyList<PurchaseInvoiceDraftLine> Lines,
+    Guid? AccountingPostedJournalEntryId, DateTime? AccountingPostedAt, Guid? AccountingInputVatAccountId);
 public sealed record PurchaseInvoiceDraftLine(
     Guid Id, int LineNumber, string Description, decimal Quantity, decimal UnitPrice, decimal LineAmount,
     decimal DiscountAmount, string VatTreatment, string? VatTreatmentReason, decimal? GrossAmount,
