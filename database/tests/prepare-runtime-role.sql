@@ -68,3 +68,4 @@ GRANT UPDATE (
 GRANT SELECT, INSERT ON items, warehouses, inventory_movements, inventory_transfers TO erp_ci_runtime;
 GRANT SELECT, INSERT, UPDATE ON inventory_serial_numbers TO erp_ci_runtime;
 GRANT SELECT, INSERT ON inventory_serial_events TO erp_ci_runtime;
+GRANT SELECT, INSERT ON inventory_movement_accounting_postings TO erp_ci_runtime;
