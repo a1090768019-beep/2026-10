@@ -83,6 +83,6 @@ test('desktop purchases workspace calls API-backed supplier, draft, VAT and repo
   assert.match(codeBehind, /BeginNewPurchaseDraft/);
   assert.match(shell, /PurchasesWorkspacePanel/);
   assert.match(shell, /x:Name="PurchasesWorkspaceTab"/);
-  assert.match(main, /NavigateToKeyAsync\("Purchases"\)/);
+  assert.match(main, /string\\.Equals\\(key, "Purchases", StringComparison\\.OrdinalIgnoreCase\\)/);
   assert.match(main, /PurchasesWorkspacePanel\.SetApiClientAsync/);
 });
