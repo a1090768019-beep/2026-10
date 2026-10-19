@@ -138,7 +138,7 @@ BEGIN
     RAISE EXCEPTION 'Posted sales source line must not be mutable';
   EXCEPTION WHEN check_violation OR insufficient_privilege THEN NULL;
   END;
-END $;
+END $$;
 
 SELECT set_config('app.tenant_id','22222222-2222-4222-8222-222222222222',true);
 DO $$
