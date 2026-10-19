@@ -217,7 +217,6 @@ public partial class MainWindow : Window
             await PurchasesWorkspacePanel.SetApiClientAsync(null);
             await InventoryWorkspacePanel.SetApiClientAsync(null);
             await SettlementsWorkspacePanel.SetApiClientAsync(null);
-        await MembershipWorkspacePanel.SetApiClientAsync(null);
             await MembershipWorkspacePanel.SetApiClientAsync(null);
             UpdateWorkspaceContext();
             AuthStatusText.Text = "تم رفض المستأجر أو صلاحيات المستخدم";
