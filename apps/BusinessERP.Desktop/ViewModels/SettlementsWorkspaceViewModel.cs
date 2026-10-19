@@ -324,7 +324,7 @@ public sealed class SettlementsWorkspaceViewModel : INotifyPropertyChanged
         if (_apiClient is null || SelectedCompany is null || !AgingAsOfDate.HasValue) return;
         await RunBusyAsync(async () =>
         {
-            var client = _apiClient;
+            var client = _apiClient!;
             var companyId = SelectedCompany!.Id;
             var reportDate = DateOnly.FromDateTime(AgingAsOfDate!.Value);
             var receivablesTask = client.GetReceivablesAgingAsync(companyId, reportDate, page: 1, pageSize: 100);
