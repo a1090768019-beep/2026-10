@@ -217,6 +217,7 @@ public static class PurchaseDraftVatEndpoints
         Guid InvoiceId, Guid CompanyId, string TaxCalculationStatus, string Message,
         decimal GrossAmount, decimal DiscountAmount, decimal NetAmount, decimal VatAmount, decimal TotalAmount,
         IReadOnlyList<PurchaseDraftVatLineDto> Lines);
+    private sealed record RequestedVatLine(int LineNumber, decimal DiscountAmount, SalesVatTreatment Treatment, string? TreatmentReason);
     private sealed record PurchaseDraftStatusRow(string Status, string TaxCalculationStatus);
     private sealed record PurchaseDraftVatSourceLine(Guid Id, int LineNumber, string Description, decimal Quantity, decimal UnitPrice);
 }
