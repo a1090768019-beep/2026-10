@@ -112,13 +112,14 @@ public static class PurchaseInvoiceDraftEndpoints
                 var description = (input.Description ?? "").Trim();
                 if (description.Length is < 1 or > 500 || description.Any(char.IsControl))
                     errors[$"{key}.description"] = ["وصف البند مطلوب ولا يتجاوز 500 حرف."];
-                if (input.Quantity <= 0m || !HasSupportedPrecision(input.Quantity))
-                    errors[$"{key}.quantity"] = ["الكمية يجب أن تكون موجبة وبحد أقصى أربع منازل عشرية."];
-                if (input.UnitPrice < 0m || !HasSupportedPrecision(input.UnitPrice))
-                    errors[$"{key}.unitPrice"] = ["سعر الوحدة يجب ألا يكون سالبًا وبحد أقصى أربع منازل عشرية."];
+                if (input.Quantity <= 0m || input.Quantity > MaxAmount || !HasSupportedPrecision(input.Quantity))
+                    errors[$"{key}.quantity"] = ["الكمية يجب أن تكون موجبة وضمن الحد الرقمي المدعوم وبحد أقصى أربع منازل عشرية."];
+                if (input.UnitPrice < 0m || input.UnitPrice > MaxAmount || !HasSupportedPrecision(input.UnitPrice))
+                    errors[$"{key}.unitPrice"] = ["سعر الوحدة يجب أن يكون غير سالب وضمن الحد الرقمي المدعوم وبحد أقصى أربع منازل عشرية."];
 
                 if (description.Length is < 1 or > 500 || description.Any(char.IsControl) ||
-                    input.Quantity <= 0m || input.UnitPrice < 0m ||
+                    input.Quantity <= 0m || input.Quantity > MaxAmount ||
+                    input.UnitPrice < 0m || input.UnitPrice > MaxAmount ||
                     !HasSupportedPrecision(input.Quantity) || !HasSupportedPrecision(input.UnitPrice))
                     continue;
 
