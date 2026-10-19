@@ -52,6 +52,9 @@ GRANT UPDATE (
     tax_calculation_status, gross_amount, discount_amount, net_amount, vat_amount, total_amount
 ) ON purchase_invoice_drafts TO erp_ci_runtime;
 GRANT UPDATE (
+    status, accounting_posted_journal_entry_id, accounting_posted_at, accounting_input_vat_account_id
+) ON purchase_invoice_drafts TO erp_ci_runtime;
+GRANT UPDATE (
     discount_amount, vat_treatment, vat_treatment_reason, gross_amount, net_amount,
     vat_rate_percent, vat_amount, total_amount
 ) ON purchase_invoice_draft_lines TO erp_ci_runtime;
