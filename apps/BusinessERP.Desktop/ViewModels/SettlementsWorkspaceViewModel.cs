@@ -75,9 +75,11 @@ public sealed class SettlementsWorkspaceViewModel : INotifyPropertyChanged
         ? "سندات القبض والصرف · لم يتم اختيار شركة"
         : $"الشركة: {SelectedCompany.Name} · العملة: {SelectedCompany.BaseCurrency} · سندات قبض وصرف مرتبطة بالأستاذ العام";
     public bool CanCreateReceipt => !IsBusy && SelectedCompany is not null && SelectedCustomer is not null &&
-        SelectedSalesInvoice?.Status == "ACCOUNTING_POSTED" && TryAmount(ReceiptAmountText, out var receiptAmount) && receiptAmount > 0;
+        SelectedSalesInvoice?.Status == "ACCOUNTING_POSTED" && SelectedSalesInvoice.CustomerId == SelectedCustomer.Id &&
+        !string.IsNullOrWhiteSpace(ReceiptNumber) && TryAmount(ReceiptAmountText, out var receiptAmount) && receiptAmount > 0;
     public bool CanCreatePayment => !IsBusy && SelectedCompany is not null && SelectedSupplier is not null &&
-        SelectedPurchaseInvoice?.Status == "ACCOUNTING_POSTED" && TryAmount(PaymentAmountText, out var paymentAmount) && paymentAmount > 0;
+        SelectedPurchaseInvoice?.Status == "ACCOUNTING_POSTED" && SelectedPurchaseInvoice.SupplierId == SelectedSupplier.Id &&
+        !string.IsNullOrWhiteSpace(PaymentNumber) && TryAmount(PaymentAmountText, out var paymentAmount) && paymentAmount > 0;
     public bool CanPostReceipt => !IsBusy && SelectedCompany is not null && SelectedReceipt?.Status == "DRAFT" &&
         SelectedPeriod?.Status == "OPEN" && SelectedCashAccount is not null && SelectedReceivableAccount is not null &&
         !string.IsNullOrWhiteSpace(ReceiptEntryNumber);
