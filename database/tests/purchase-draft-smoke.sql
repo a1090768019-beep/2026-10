@@ -124,14 +124,14 @@ END $;
 DO $
 BEGIN
     BEGIN
-        UPDATE purchase_invoice_drafts SET notes = 'should-not-change'
+        UPDATE purchase_invoice_drafts SET vat_amount = 99.00
          WHERE purchase_number = 'PUR-CI-0001';
         RAISE EXCEPTION 'Expected posted purchase header to be immutable';
     EXCEPTION WHEN check_violation THEN
         NULL;
     END;
     BEGIN
-        UPDATE purchase_invoice_draft_lines SET description = 'should-not-change'
+        UPDATE purchase_invoice_draft_lines SET vat_amount = 99.00
          WHERE purchase_invoice_draft_id = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee2';
         RAISE EXCEPTION 'Expected posted purchase line to be immutable';
     EXCEPTION WHEN check_violation THEN
