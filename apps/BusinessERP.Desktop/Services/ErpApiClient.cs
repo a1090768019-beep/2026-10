@@ -68,6 +68,45 @@ public sealed class ErpApiClient(HttpClient httpClient, Guid tenantId)
     public Task<IReadOnlyList<ApiFiscalPeriod>> GetFiscalPeriodsAsync(Guid companyId, CancellationToken ct = default) =>
         GetListAsync<ApiFiscalPeriod>($"/api/v1/companies/{companyId:D}/fiscal-periods", ct);
 
+    public Task<IReadOnlyList<InventoryItemApiDto>> GetInventoryItemsAsync(Guid companyId, CancellationToken ct = default) =>
+        GetListAsync<InventoryItemApiDto>($"/api/v1/companies/{companyId:D}/items", ct);
+
+    public Task<InventoryItemApiDto> CreateInventoryItemAsync(Guid companyId, CreateInventoryItemApiRequest request, CancellationToken ct = default) =>
+        SendJsonAsync<InventoryItemApiDto>(HttpMethod.Post, $"/api/v1/companies/{companyId:D}/items", request, ct);
+
+    public Task<IReadOnlyList<InventoryWarehouseApiDto>> GetInventoryWarehousesAsync(Guid companyId, CancellationToken ct = default) =>
+        GetListAsync<InventoryWarehouseApiDto>($"/api/v1/companies/{companyId:D}/warehouses", ct);
+
+    public Task<InventoryWarehouseApiDto> CreateInventoryWarehouseAsync(Guid companyId, CreateInventoryWarehouseApiRequest request, CancellationToken ct = default) =>
+        SendJsonAsync<InventoryWarehouseApiDto>(HttpMethod.Post, $"/api/v1/companies/{companyId:D}/warehouses", request, ct);
+
+    public Task<StockBalancesApiReport> GetInventoryBalancesAsync(Guid companyId, int page = 1, int pageSize = 100,
+        Guid? itemId = null, Guid? warehouseId = null, CancellationToken ct = default)
+    {
+        var query = $"page={page}&pageSize={pageSize}";
+        if (itemId.HasValue) query += $"&itemId={itemId.Value:D}";
+        if (warehouseId.HasValue) query += $"&warehouseId={warehouseId.Value:D}";
+        return GetObjectAsync<StockBalancesApiReport>($"/api/v1/companies/{companyId:D}/inventory/balances?{query}", ct);
+    }
+
+    public Task<InventoryMovementsApiReport> GetInventoryMovementsAsync(Guid companyId, DateOnly? fromDate = null,
+        DateOnly? toDate = null, Guid? itemId = null, Guid? warehouseId = null,
+        int page = 1, int pageSize = 100, CancellationToken ct = default)
+    {
+        var query = $"page={page}&pageSize={pageSize}";
+        if (fromDate.HasValue) query += $"&fromDate={fromDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}";
+        if (toDate.HasValue) query += $"&toDate={toDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}";
+        if (itemId.HasValue) query += $"&itemId={itemId.Value:D}";
+        if (warehouseId.HasValue) query += $"&warehouseId={warehouseId.Value:D}";
+        return GetObjectAsync<InventoryMovementsApiReport>($"/api/v1/companies/{companyId:D}/inventory/movements?{query}", ct);
+    }
+
+    public Task<InventoryMovementApiResult> ReceiveInventoryStockAsync(Guid companyId, InventoryMovementApiRequest request, CancellationToken ct = default) =>
+        SendJsonAsync<InventoryMovementApiResult>(HttpMethod.Post, $"/api/v1/companies/{companyId:D}/inventory/receipts", request, ct);
+
+    public Task<InventoryMovementApiResult> IssueInventoryStockAsync(Guid companyId, InventoryMovementApiRequest request, CancellationToken ct = default) =>
+        SendJsonAsync<InventoryMovementApiResult>(HttpMethod.Post, $"/api/v1/companies/{companyId:D}/inventory/issues", request, ct);
+
     public Task<IReadOnlyList<ApiSupplier>> GetSuppliersAsync(Guid companyId, CancellationToken ct = default) =>
         GetListAsync<ApiSupplier>($"/api/v1/companies/{companyId:D}/suppliers", ct);
 
@@ -262,6 +301,25 @@ public sealed record SalesDraftLedgerPostingApiResult(
     decimal VatAmount, decimal TotalAmount, bool AlreadyPosted, string Message);
 public sealed record ApiCustomer(Guid Id, string Code, string Name, string? Email, string? Phone, string? TaxNumber, bool IsActive, DateTime CreatedAt);
 public sealed record ApiSupplier(Guid Id, string Code, string Name, string? Email, string? Phone, string? TaxNumber, bool IsActive, DateTime CreatedAt);
+public sealed record CreateInventoryItemApiRequest(string ItemCode, string? Barcode, string NameAr, string NameEn, string? UnitCode = "EA");
+public sealed record InventoryItemApiDto(Guid Id, string ItemCode, string? Barcode, string NameAr, string NameEn, string UnitCode, bool IsActive, DateTime CreatedAt);
+public sealed record CreateInventoryWarehouseApiRequest(string Code, string Name);
+public sealed record InventoryWarehouseApiDto(Guid Id, string Code, string Name, bool IsActive, DateTime CreatedAt);
+public sealed record InventoryMovementApiRequest(Guid ItemId, Guid WarehouseId, string MovementNumber, DateOnly MovementDate,
+    decimal Quantity, decimal? UnitCost = null, string? Notes = null);
+public sealed record InventoryMovementApiResult(Guid Id, string MovementNumber, string MovementType, Guid ItemId,
+    Guid WarehouseId, DateOnly MovementDate, decimal QuantityDelta, decimal UnitCost, decimal InventoryValueDelta,
+    decimal OnHandQuantity, decimal InventoryValue, decimal AverageUnitCost);
+public sealed record StockBalancesApiReport(int Page, int PageSize, long TotalRows, int TotalPages, IReadOnlyList<StockBalanceApiRow> Rows);
+public sealed record StockBalanceApiRow(Guid ItemId, string ItemCode, string? Barcode, string ItemNameAr, string ItemNameEn,
+    string UnitCode, Guid WarehouseId, string WarehouseCode, string WarehouseName, decimal OnHandQuantity,
+    decimal InventoryValue, decimal AverageUnitCost);
+public sealed record InventoryMovementsApiReport(int Page, int PageSize, long TotalRows, int TotalPages,
+    IReadOnlyList<InventoryMovementApiRow> Rows);
+public sealed record InventoryMovementApiRow(Guid Id, string MovementNumber, string MovementType, DateOnly MovementDate,
+    Guid ItemId, string ItemCode, string? Barcode, string ItemNameAr, Guid WarehouseId, string WarehouseCode,
+    string WarehouseName, decimal QuantityDelta, decimal UnitCost, decimal InventoryValueDelta, string Notes, DateTime CreatedAt);
+
 public sealed record CreateSupplierApiRequest(string Code, string Name, string? Email = null, string? Phone = null, string? TaxNumber = null);
 public sealed record PurchaseInvoiceDraftListItem(
     Guid Id, string PurchaseNumber, string SupplierInvoiceNumber, DateOnly IssueDate, DateOnly? DueDate,
