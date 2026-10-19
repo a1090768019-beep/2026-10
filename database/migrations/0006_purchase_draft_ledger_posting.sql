@@ -82,7 +82,8 @@ BEGIN
     ELSE
         IF NEW.status <> 'DRAFT'
            OR NEW.accounting_posted_journal_entry_id IS NOT NULL
-           OR NEW.accounting_posted_at IS NOT NULL THEN
+           OR NEW.accounting_posted_at IS NOT NULL
+           OR NEW.accounting_input_vat_account_id IS NOT NULL THEN
             RAISE EXCEPTION 'Invalid purchase draft status/link transition'
                 USING ERRCODE = '23514';
         END IF;
