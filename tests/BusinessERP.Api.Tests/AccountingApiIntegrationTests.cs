@@ -55,6 +55,31 @@ public sealed class AccountingApiIntegrationTests
     }
 
     [RequiresApiPostgresFact]
+    public async Task Company_creation_is_rejected_when_subscription_company_limit_is_reached()
+    {
+        var connectionString = Environment.GetEnvironmentVariable("BUSINESS_ERP_TEST_CONNECTION");
+        Assert.False(string.IsNullOrWhiteSpace(connectionString));
+
+        using var factory = new ApiTestFactory(connectionString!);
+        using var client = factory.CreateClient();
+        SetTenant(client, TenantA);
+
+        using var response = await client.PostAsJsonAsync("/api/v1/companies", new
+        {
+            name = "شركة إضافية تتجاوز الخطة",
+            baseCurrency = "SAR"
+        });
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        using var json = JsonDocument.Parse(body);
+        Assert.Equal("plan_limit_exceeded", json.RootElement.GetProperty("error").GetString());
+        Assert.Equal("companies", json.RootElement.GetProperty("limitName").GetString());
+        Assert.Equal(1, json.RootElement.GetProperty("limit").GetInt32());
+        Assert.Equal(1, json.RootElement.GetProperty("current").GetInt32());
+    }
+
+    [RequiresApiPostgresFact]
     public async Task Tenant_scoping_idempotency_journal_workflow_and_reports_work_end_to_end()
     {
         var connectionString = Environment.GetEnvironmentVariable("BUSINESS_ERP_TEST_CONNECTION");
