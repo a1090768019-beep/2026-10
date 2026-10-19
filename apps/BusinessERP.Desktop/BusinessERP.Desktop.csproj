@@ -16,4 +16,9 @@
     </None>
       <PackageReference Include="Duende.IdentityModel.OidcClient" Version="7.1.1" />
   </ItemGroup>
+  <ItemGroup>
+    <None Update="Reports/Legacy/**/*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
 </Project>

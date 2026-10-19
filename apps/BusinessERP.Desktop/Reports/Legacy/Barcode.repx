@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<XtraReportsLayoutSerializer SerializerVersion="18.2.7.0" Ref="0" ControlType="DevExpress.XtraReports.UI.XtraReport, DevExpress.XtraReports.v18.2, Version=18.2.7.0, Culture=neutral, PublicKeyToken=b88d1754d700e49a" Name="Report1" SnapGridSize="25" ReportUnit="TenthsOfAMillimeter" Margins="0, 0, 2, 2" PaperKind="Custom" PageWidth="476" PageHeight="273" Version="18.2" ShowPrintStatusDialog="false" ShowPrintMarginsWarning="false" TextAlignment="MiddleLeft" Dpi="254" Font="Arial, 9.75pt">
+  <Bands>
+    <Item1 Ref="1" ControlType="TopMarginBand" Name="TopMargin" SnapLinePadding="0,0,0,0,254" HeightF="2" Dpi="254" />
+    <Item2 Ref="2" ControlType="DetailBand" Name="Detail" HeightF="0" Dpi="254" Visible="false" />
+    <Item3 Ref="3" ControlType="BottomMarginBand" Name="BottomMargin" SnapLinePadding="0,0,2,2,254" HeightF="2" Dpi="254" Visible="false" />
+    <Item4 Ref="4" ControlType="GroupHeaderBand" Name="GroupHeader1" HeightF="254" Dpi="254">
+      <Controls>
+        <Item1 Ref="5" ControlType="XRLabel" Name="label1" Multiline="true" Text="label1" TextAlignment="MiddleCenter" SizeF="350.000031,58.41999" LocationFloat="52.0000076, 3.41665649" Dpi="254" Font="Arial, 9pt" Padding="5,5,0,0,254">
+          <ExpressionBindings>
+            <Item1 Ref="6" Expression="[Foundation]" PropertyName="Text" EventName="BeforePrint" />
+          </ExpressionBindings>
+          <StylePriority Ref="7" UseFont="false" UseTextAlignment="false" />
+        </Item1>
+        <Item2 Ref="8" ControlType="XRLabel" Name="label2" Multiline="true" Text="label1" TextAlignment="MiddleCenter" SizeF="350.000031,58.41999" LocationFloat="52.0000076, 52.8366165" Dpi="254" Font="Arial, 7pt" Padding="5,5,0,0,254">
+          <ExpressionBindings>
+            <Item1 Ref="9" Expression="[ItemName]" PropertyName="Text" EventName="BeforePrint" />
+          </ExpressionBindings>
+          <StylePriority Ref="10" UseFont="false" UseTextAlignment="false" />
+        </Item2>
+        <Item3 Ref="11" ControlType="XRLabel" Name="label3" Multiline="true" Text="label1" TextAlignment="MiddleLeft" SizeF="159.500015,47.83664" LocationFloat="195.5, 107.256607" Dpi="254" Font="Arial, 9.75pt" Padding="5,5,0,0,254">
+          <ExpressionBindings>
+            <Item1 Ref="12" Expression="[price]" PropertyName="Text" EventName="BeforePrint" />
+          </ExpressionBindings>
+          <StylePriority Ref="13" UseFont="false" UseTextAlignment="false" />
+        </Item3>
+        <Item4 Ref="14" ControlType="XRLabel" Name="label4" Multiline="true" Text="ر.س" TextAlignment="MiddleRight" SizeF="71.4375,47.8366547" LocationFloat="119.291687, 110.256592" Dpi="254" Padding="5,5,0,0,254">
+          <StylePriority Ref="15" UseTextAlignment="false" />
+        </Item4>
+        <Item5 Ref="16" ControlType="XRBarCode" Name="barCode1" AutoModule="true" Alignment="TopCenter" TextAlignment="BottomCenter" SizeF="350.000031,100.541672" LocationFloat="44.0000076, 153.458328" Dpi="254" Font="Arial, 8pt" Padding="25,25,0,0,254">
+          <Symbology Ref="17" Name="Code128" CharacterSet="CharsetAuto" />
+          <ExpressionBindings>
+            <Item1 Ref="18" Expression="[Barcode]" PropertyName="Text" EventName="BeforePrint" />
+          </ExpressionBindings>
+          <StylePriority Ref="19" UseFont="false" UseTextAlignment="false" />
+        </Item5>
+      </Controls>
+    </Item4>
+  </Bands>
+</XtraReportsLayoutSerializer>

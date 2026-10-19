@@ -69,6 +69,7 @@ public partial class ReportsWorkspaceControl : UserControl
                 "TrialBalance" => "ميزان المراجعة",
                 "IncomeStatement" => "قائمة الدخل",
                 "BalanceSheet" => "الميزانية العمومية",
+                "SalesVatDetails" => "تفاصيل ضريبة المبيعات",
                 _ => "التقرير المالي"
             };
             document.Blocks.Add(new Paragraph(new Run("Business ERP · " + title))
@@ -227,6 +228,30 @@ public partial class ReportsWorkspaceControl : UserControl
             rows.Add(new object?[] { "الأرباح غير المقفلة", "", "", "", balance.UnclosedEarnings });
             rows.Add(new object?[] { "فرق المعادلة", "", "", "", balance.Difference });
             return ("BalanceSheet", rows);
+        }
+
+        if (ReportsTabs.SelectedIndex == 3 && _viewModel.CurrentSalesVatDetailsReport is { } vat)
+        {
+            var rows = new List<object?[]>
+            {
+                new object?[] { "Business ERP", "تفاصيل ضريبة المبيعات - تقرير داخلي لمسودات محسوبة VAT" },
+                new object?[] { "الشركة", _viewModel.SelectedCompany?.Name ?? "" },
+                new object?[] { "الفترة", $"{vat.FromDate:yyyy-MM-dd} — {vat.ToDate:yyyy-MM-dd}" },
+                new object?[] { "عدد المسودات المحسوبة", vat.InvoiceCount, "عدد البنود", vat.TotalLines },
+                Array.Empty<object?>(),
+                new object?[] { "رقم المسودة", "التاريخ", "العميل", "الرقم الضريبي", "رقم البند", "الوصف", "معالجة VAT", "الكمية", "قبل الخصم", "الخصم", "الصافي", "نسبة VAT", "VAT", "الإجمالي", "الحالة" }
+            };
+            rows.AddRange(vat.Rows.Select(row => new object?[]
+            {
+                row.InvoiceNumber, row.IssueDate, row.CustomerName, row.CustomerTaxNumber,
+                row.LineNumber, row.Description, row.VatTreatment, row.Quantity, row.GrossAmount,
+                row.DiscountAmount, row.NetAmount, row.VatRatePercent, row.VatAmount, row.TotalAmount, row.DocumentStatus
+            }));
+            rows.Add(Array.Empty<object?>());
+            rows.Add(new object?[] { "الإجماليات (كل المسودات بالفترة)", "", "", "", "", "", "", "",
+                vat.GrossAmount, vat.DiscountAmount, vat.NetAmount, "", vat.VatAmount, vat.TotalAmount, vat.ReportKind });
+            rows.Add(new object?[] { "ملاحظة", vat.Message });
+            return ("SalesVatDetails", rows);
         }
 
         return null;
