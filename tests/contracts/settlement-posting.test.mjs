@@ -36,6 +36,9 @@ test('settlement posting is tenant-scoped, balanced, idempotent, and immutable a
     '/supplier-payments',
     '/supplier-payments/{paymentId:guid}/post-to-ledger'
   ]) assert.ok(endpoint.includes(route), 'Missing endpoint route: ' + route);
+  assert.match(endpoint, /customer-receipts\/outstanding-invoices/);
+  assert.match(endpoint, /supplier-payments\/outstanding-invoices/);
+  assert.match(endpoint, /OutstandingAmount/);
   assert.match(endpoint, /customer-invoice-balance:/);
   assert.match(endpoint, /supplier-invoice-balance:/);
   assert.match(endpoint, /period\.Status != "OPEN"/);
