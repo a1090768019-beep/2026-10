@@ -95,6 +95,29 @@
                 </StackPanel>
             </Border>
 
+            <Border Background="White" BorderBrush="#E3E9F2" BorderThickness="1" CornerRadius="14" Padding="16" Margin="0,0,0,14">
+                <StackPanel>
+                    <TextBlock Text="تقييم المخزون بتاريخ سابق" FontSize="16" FontWeight="SemiBold" />
+                    <TextBlock Text="إعادة بناء الكميات والقيم من سجل الحركات حتى التاريخ المحدد. الإجمالي يشمل جميع الصفوف المطابقة حتى عند تقسيم النتائج إلى صفحات، وهو لا يغني عن المطابقة مع دفتر الأستاذ."
+                               Foreground="#69758D" TextWrapping="Wrap" FontSize="11" Margin="0,5,0,8" />
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                        <DatePicker Grid.Column="0" SelectedDate="{Binding ValuationAsOfDate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="170" Margin="0,0,8,0" />
+                        <Button Grid.Column="1" Content="احتساب التقييم" Command="{Binding RefreshInventoryValuationCommand}" />
+                        <TextBlock Grid.Column="2" Text="{Binding ValuationSummary}" VerticalAlignment="Center" Margin="12,0,0,0" FontWeight="SemiBold" TextWrapping="Wrap" />
+                    </Grid>
+                    <DataGrid ItemsSource="{Binding InventoryValuationRows}" Height="220" Margin="0,8,0,0" IsReadOnly="True" AutoGenerateColumns="False">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="الصنف" Binding="{Binding ItemCode}" Width="100" />
+                            <DataGridTextColumn Header="اسم الصنف" Binding="{Binding ItemNameAr}" Width="*" />
+                            <DataGridTextColumn Header="المستودع" Binding="{Binding WarehouseName}" Width="160" />
+                            <DataGridTextColumn Header="الكمية" Binding="{Binding OnHandQuantity, StringFormat=N4}" Width="100" />
+                            <DataGridTextColumn Header="متوسط التكلفة" Binding="{Binding AverageUnitCost, StringFormat=N4}" Width="120" />
+                            <DataGridTextColumn Header="القيمة" Binding="{Binding InventoryValue, StringFormat=N2}" Width="130" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </StackPanel>
+            </Border>
             <Grid Margin="0,0,0,14">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="1.45*" />

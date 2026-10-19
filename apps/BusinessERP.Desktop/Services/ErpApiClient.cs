@@ -89,6 +89,15 @@ public sealed class ErpApiClient(HttpClient httpClient, Guid tenantId)
         return GetObjectAsync<StockBalancesApiReport>($"/api/v1/companies/{companyId:D}/inventory/balances?{query}", ct);
     }
 
+    public Task<InventoryValuationApiReport> GetInventoryValuationAsync(Guid companyId, DateOnly asOfDate,
+        int page = 1, int pageSize = 100, Guid? itemId = null, Guid? warehouseId = null, CancellationToken ct = default)
+    {
+        var query = $"asOfDate={asOfDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}&page={page}&pageSize={pageSize}";
+        if (itemId.HasValue) query += $"&itemId={itemId.Value:D}";
+        if (warehouseId.HasValue) query += $"&warehouseId={warehouseId.Value:D}";
+        return GetObjectAsync<InventoryValuationApiReport>($"/api/v1/companies/{companyId:D}/inventory/valuation?{query}", ct);
+    }
+
     public Task<InventoryMovementsApiReport> GetInventoryMovementsAsync(Guid companyId, DateOnly? fromDate = null,
         DateOnly? toDate = null, Guid? itemId = null, Guid? warehouseId = null,
         int page = 1, int pageSize = 100, CancellationToken ct = default)
@@ -360,6 +369,11 @@ public sealed record InventoryMovementApiResult(Guid Id, string MovementNumber, 
     decimal OnHandQuantity, decimal InventoryValue, decimal AverageUnitCost);
 public sealed record StockBalancesApiReport(int Page, int PageSize, long TotalRows, int TotalPages, IReadOnlyList<StockBalanceApiRow> Rows);
 public sealed record StockBalanceApiRow(Guid ItemId, string ItemCode, string? Barcode, string ItemNameAr, string ItemNameEn,
+    string UnitCode, Guid WarehouseId, string WarehouseCode, string WarehouseName, decimal OnHandQuantity,
+    decimal InventoryValue, decimal AverageUnitCost);
+public sealed record InventoryValuationApiReport(DateOnly AsOfDate, int Page, int PageSize, long TotalRows, int TotalPages,
+    decimal TotalInventoryValue, IReadOnlyList<InventoryValuationApiRow> Rows);
+public sealed record InventoryValuationApiRow(Guid ItemId, string ItemCode, string? Barcode, string ItemNameAr, string ItemNameEn,
     string UnitCode, Guid WarehouseId, string WarehouseCode, string WarehouseName, decimal OnHandQuantity,
     decimal InventoryValue, decimal AverageUnitCost);
 public sealed record InventoryMovementsApiReport(int Page, int PageSize, long TotalRows, int TotalPages,

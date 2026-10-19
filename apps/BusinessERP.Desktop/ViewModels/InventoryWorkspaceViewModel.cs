@@ -25,6 +25,8 @@ public sealed class InventoryWorkspaceViewModel : INotifyPropertyChanged
     private ApiAccount? _selectedInventoryAssetAccount;
     private ApiAccount? _selectedCounterpartAccount;
     private string _ledgerEntryNumber = $"INVGL-{DateTime.Now:yyyyMMddHHmmss}-{Guid.NewGuid():N}";
+    private DateTime? _valuationAsOfDate = DateTime.Today;
+    private decimal _valuationTotalValue;
     private bool _suppressCompanyReload;
     private bool _isBusy;
     private bool _statusIsError;
@@ -54,6 +56,7 @@ public sealed class InventoryWorkspaceViewModel : INotifyPropertyChanged
     public ObservableCollection<InventoryItemApiDto> Items { get; } = [];
     public ObservableCollection<InventoryWarehouseApiDto> Warehouses { get; } = [];
     public ObservableCollection<StockBalanceApiRow> StockBalances { get; } = [];
+    public ObservableCollection<InventoryValuationApiRow> InventoryValuationRows { get; } = [];
     public ObservableCollection<InventoryMovementApiRow> Movements { get; } = [];
     public ObservableCollection<InventoryTransferApiRow> Transfers { get; } = [];
     public ObservableCollection<InventorySerialEventApiRow> SerialEvents { get; } = [];
@@ -70,6 +73,7 @@ public sealed class InventoryWorkspaceViewModel : INotifyPropertyChanged
     public ICommand ReceiveStockCommand { get; }
     public ICommand IssueStockCommand { get; }
     public ICommand RefreshStockCardCommand { get; }
+    public ICommand RefreshInventoryValuationCommand { get; }
     public ICommand TransferStockCommand { get; }
     public ICommand PostInventoryMovementToLedgerCommand { get; }
 
@@ -84,6 +88,7 @@ public sealed class InventoryWorkspaceViewModel : INotifyPropertyChanged
         ReceiveStockCommand = new AsyncCommand(() => RecordMovementAsync(receipt: true), CanReceiveStock, HandleUnexpectedFailure);
         IssueStockCommand = new AsyncCommand(() => RecordMovementAsync(receipt: false), CanIssueStock, HandleUnexpectedFailure);
         RefreshStockCardCommand = new AsyncCommand(RefreshStockCardAsync, () => _apiClient is not null && SelectedCompany is not null && !IsBusy, HandleUnexpectedFailure);
+        RefreshInventoryValuationCommand = new AsyncCommand(RefreshInventoryValuationAsync, CanRefreshInventoryValuation, HandleUnexpectedFailure);
         TransferStockCommand = new AsyncCommand(RecordTransferAsync, CanTransferStock, HandleUnexpectedFailure);
         PostInventoryMovementToLedgerCommand = new AsyncCommand(PostInventoryMovementToLedgerAsync, CanPostInventoryMovementToLedger, HandleUnexpectedFailure);
     }
@@ -172,6 +177,20 @@ public sealed class InventoryWorkspaceViewModel : INotifyPropertyChanged
     public string LedgerPostingSummary => SelectedLedgerMovement is null
         ? "اختر حركة استلام/صرف يدوية غير مرحلة."
         : $"{SelectedLedgerMovement.MovementNumber} · {SelectedLedgerMovement.MovementType} · القيمة {Math.Abs(SelectedLedgerMovement.InventoryValueDelta):N2} {SelectedCurrency} · التاريخ {SelectedLedgerMovement.MovementDate:yyyy-MM-dd}";
+
+    public DateTime? ValuationAsOfDate
+    {
+        get => _valuationAsOfDate;
+        set { if (_valuationAsOfDate == value) return; _valuationAsOfDate = value; OnPropertyChanged(); NotifyCommands(); }
+    }
+
+    public decimal ValuationTotalValue
+    {
+        get => _valuationTotalValue;
+        private set { if (_valuationTotalValue == value) return; _valuationTotalValue = value; OnPropertyChanged(); OnPropertyChanged(nameof(ValuationSummary)); }
+    }
+
+    public string ValuationSummary => $"قيمة المخزون حتى {ValuationAsOfDate:yyyy-MM-dd}: {ValuationTotalValue:N2} {SelectedCurrency} · الصفوف المعروضة {InventoryValuationRows.Count}";
 
     public StockBalanceApiRow? SelectedBalance
     {
@@ -511,6 +530,30 @@ public sealed class InventoryWorkspaceViewModel : INotifyPropertyChanged
         finally { IsBusy = false; NotifyCommands(); }
     }
 
+    private bool CanRefreshInventoryValuation() =>
+        _apiClient is not null && SelectedCompany is not null && ValuationAsOfDate.HasValue && !IsBusy;
+
+    private async Task RefreshInventoryValuationAsync()
+    {
+        if (!CanRefreshInventoryValuation() || _apiClient is null || SelectedCompany is null || !ValuationAsOfDate.HasValue) return;
+        IsBusy = true;
+        try
+        {
+            var report = await _apiClient.GetInventoryValuationAsync(SelectedCompany.Id,
+                DateOnly.FromDateTime(ValuationAsOfDate.Value), page: 1, pageSize: PageSize);
+            InventoryValuationRows.Clear();
+            foreach (var row in report.Rows) InventoryValuationRows.Add(row);
+            ValuationTotalValue = report.TotalInventoryValue;
+            StatusMessage = report.TotalRows > report.Rows.Count
+                ? $"تم تحميل {report.Rows.Count} صفًا من أصل {report.TotalRows}. الإجمالي يشمل جميع الصفوف المطابقة حتى التاريخ المحدد."
+                : $"تم تحديث تقييم المخزون حتى {report.AsOfDate:yyyy-MM-dd}.";
+            StatusIsError = false;
+        }
+        catch (ErpApiException ex) { StatusMessage = ex.Message; StatusIsError = true; }
+        catch (HttpRequestException) { StatusMessage = "تعذر الاتصال بالخادم أثناء حساب تقييم المخزون."; StatusIsError = true; }
+        finally { IsBusy = false; NotifyCommands(); }
+    }
+
     private async Task RefreshStockCardAsync()
     {
         if (_apiClient is null || SelectedCompany is null) return;
@@ -557,7 +600,7 @@ public sealed class InventoryWorkspaceViewModel : INotifyPropertyChanged
 
     private void ClearCompanyData()
     {
-        Items.Clear(); Warehouses.Clear(); StockBalances.Clear(); Movements.Clear(); Transfers.Clear(); SerialEvents.Clear(); SerialSummaryRows.Clear();
+        Items.Clear(); Warehouses.Clear(); StockBalances.Clear(); InventoryValuationRows.Clear(); ValuationTotalValue = 0m; Movements.Clear(); Transfers.Clear(); SerialEvents.Clear(); SerialSummaryRows.Clear();
         LedgerEligibleMovements.Clear(); Accounts.Clear(); InventoryAssetAccounts.Clear(); CounterpartAccounts.Clear(); OpenFiscalPeriods.Clear();
         SelectedItem = null; SelectedWarehouse = null; SelectedSourceWarehouse = null; SelectedDestinationWarehouse = null; SelectedBalance = null;
         SelectedLedgerMovement = null; SelectedLedgerFiscalPeriod = null; SelectedInventoryAssetAccount = null; SelectedCounterpartAccount = null;
@@ -584,6 +627,7 @@ public sealed class InventoryWorkspaceViewModel : INotifyPropertyChanged
         (ReceiveStockCommand as AsyncCommand)?.RaiseCanExecuteChanged();
         (IssueStockCommand as AsyncCommand)?.RaiseCanExecuteChanged();
         (RefreshStockCardCommand as AsyncCommand)?.RaiseCanExecuteChanged();
+        (RefreshInventoryValuationCommand as AsyncCommand)?.RaiseCanExecuteChanged();
         (TransferStockCommand as AsyncCommand)?.RaiseCanExecuteChanged();
         (PostInventoryMovementToLedgerCommand as AsyncCommand)?.RaiseCanExecuteChanged();
     }
