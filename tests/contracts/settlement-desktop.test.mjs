@@ -20,12 +20,16 @@ test('desktop CashBank workspace creates and posts receipts and supplier payment
   assert.match(client, /GetSupplierPaymentsAsync/);
   assert.match(client, /CreateSupplierPaymentAsync/);
   assert.match(client, /PostSupplierPaymentAsync/);
-  assert.match(viewModel, /SelectedSalesInvoice\.CustomerId == SelectedCustomer\.Id/);
-  assert.match(viewModel, /SelectedPurchaseInvoice\.SupplierId == SelectedSupplier\.Id/);
+  assert.match(client, /GetOutstandingSalesInvoicesAsync/);
+  assert.match(client, /GetOutstandingPurchaseInvoicesAsync/);
+  assert.match(client, /OutstandingInvoiceApiDto/);
+  assert.match(viewModel, /SelectedSalesInvoice\.PartyId == SelectedCustomer\.Id/);
+  assert.match(viewModel, /SelectedPurchaseInvoice\.PartyId == SelectedSupplier\.Id/);
   assert.match(viewModel, /SelectedPeriod\?\.Status == "OPEN"/);
   assert.match(viewModel, /CreateCustomerReceiptApiRequest/);
   assert.match(viewModel, /PostSupplierPaymentApiRequest/);
   assert.match(view, /Command="{Binding CreateReceiptCommand}"/);
+  assert.match(view, /DisplayMemberPath="DisplayLabel"/);
   assert.match(view, /Command="{Binding PostReceiptCommand}"/);
   assert.match(view, /Command="{Binding CreatePaymentCommand}"/);
   assert.match(view, /Command="{Binding PostPaymentCommand}"/);

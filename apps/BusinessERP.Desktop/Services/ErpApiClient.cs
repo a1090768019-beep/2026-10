@@ -214,6 +214,12 @@ public sealed class ErpApiClient(HttpClient httpClient, Guid tenantId)
     public Task<IReadOnlyList<CustomerReceiptApiDto>> GetCustomerReceiptsAsync(Guid companyId, CancellationToken ct = default) =>
         GetListAsync<CustomerReceiptApiDto>($"/api/v1/companies/{companyId:D}/customer-receipts", ct);
 
+    public Task<IReadOnlyList<OutstandingInvoiceApiDto>> GetOutstandingSalesInvoicesAsync(Guid companyId, CancellationToken ct = default) =>
+        GetListAsync<OutstandingInvoiceApiDto>($"/api/v1/companies/{companyId:D}/customer-receipts/outstanding-invoices", ct);
+
+    public Task<IReadOnlyList<OutstandingInvoiceApiDto>> GetOutstandingPurchaseInvoicesAsync(Guid companyId, CancellationToken ct = default) =>
+        GetListAsync<OutstandingInvoiceApiDto>($"/api/v1/companies/{companyId:D}/supplier-payments/outstanding-invoices", ct);
+
     public Task<CustomerReceiptApiDto> CreateCustomerReceiptAsync(Guid companyId, CreateCustomerReceiptApiRequest request, CancellationToken ct = default) =>
         SendJsonAsync<CustomerReceiptApiDto>(HttpMethod.Post, $"/api/v1/companies/{companyId:D}/customer-receipts", request, ct);
 
@@ -567,3 +573,9 @@ public sealed record SupplierPaymentApiDto(Guid Id, string Number, DateOnly Date
     string CurrencyCode, decimal Amount, string Status, Guid? JournalEntryId);
 public sealed record SettlementPostingApiResult(Guid SettlementId, Guid JournalEntryId, string EntryNumber,
     string JournalEntryStatus, DateOnly EntryDate, decimal Amount, bool AlreadyPosted);
+
+public sealed record OutstandingInvoiceApiDto(Guid InvoiceId, string Number, DateOnly Date, Guid PartyId,
+    string PartyName, string CurrencyCode, decimal InvoiceAmount, decimal OutstandingAmount)
+{
+    public string DisplayLabel => $"{Number} · متبقي {OutstandingAmount:N2} {CurrencyCode}";
+}
