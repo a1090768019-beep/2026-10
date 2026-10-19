@@ -74,20 +74,20 @@ public partial class ReportsWorkspaceControl : UserControl
         {
             var rows = new List<object?[]>
             {
-                ["Business ERP", "ميزان المراجعة"],
-                ["الشركة", _viewModel.SelectedCompany?.Name ?? ""],
-                ["الفترة", $"{trial.FromDate:yyyy-MM-dd} — {trial.ToDate:yyyy-MM-dd}"],
-                [],
-                ["رمز الحساب", "الحساب", "Account name", "النوع", "حركة مدين", "حركة دائن", "رصيد مدين", "رصيد دائن"]
+                new object?[] { "Business ERP", "ميزان المراجعة" },
+                new object?[] { "الشركة", _viewModel.SelectedCompany?.Name ?? "" },
+                new object?[] { "الفترة", $"{trial.FromDate:yyyy-MM-dd} — {trial.ToDate:yyyy-MM-dd}" },
+                Array.Empty<object?>(),
+                new object?[] { "رمز الحساب", "الحساب", "Account name", "النوع", "حركة مدين", "حركة دائن", "رصيد مدين", "رصيد دائن" }
             };
             rows.AddRange(trial.Rows.Select(x => new object?[]
             {
                 x.AccountCode, x.AccountNameAr, x.AccountNameEn, x.AccountType,
                 x.DebitMovement, x.CreditMovement, x.DebitBalance, x.CreditBalance
             }));
-            rows.Add([]);
-            rows.Add(["الإجمالي", "", "", "",
-                trial.TotalDebitMovement, trial.TotalCreditMovement, trial.TotalDebitBalance, trial.TotalCreditBalance]);
+            rows.Add(Array.Empty<object?>());
+            rows.Add(new object?[] { "الإجمالي", "", "", "",
+                trial.TotalDebitMovement, trial.TotalCreditMovement, trial.TotalDebitBalance, trial.TotalCreditBalance });
             return ("TrialBalance", rows);
         }
 
@@ -95,18 +95,18 @@ public partial class ReportsWorkspaceControl : UserControl
         {
             var rows = new List<object?[]>
             {
-                ["Business ERP", "قائمة الدخل"],
-                ["الشركة", _viewModel.SelectedCompany?.Name ?? ""],
-                ["الفترة", $"{income.FromDate:yyyy-MM-dd} — {income.ToDate:yyyy-MM-dd}"],
-                [],
-                ["الفئة", "رمز الحساب", "الحساب", "Account name", "المبلغ"]
+                new object?[] { "Business ERP", "قائمة الدخل" },
+                new object?[] { "الشركة", _viewModel.SelectedCompany?.Name ?? "" },
+                new object?[] { "الفترة", $"{income.FromDate:yyyy-MM-dd} — {income.ToDate:yyyy-MM-dd}" },
+                Array.Empty<object?>(),
+                new object?[] { "الفئة", "رمز الحساب", "الحساب", "Account name", "المبلغ" }
             };
             rows.AddRange(income.Revenue.Select(x => new object?[] { "إيراد", x.AccountCode, x.AccountNameAr, x.AccountNameEn, x.Amount }));
             rows.AddRange(income.Expenses.Select(x => new object?[] { "مصروف", x.AccountCode, x.AccountNameAr, x.AccountNameEn, x.Amount }));
-            rows.Add([]);
-            rows.Add(["إجمالي الإيرادات", "", "", "", income.TotalRevenue]);
-            rows.Add(["إجمالي المصروفات", "", "", "", income.TotalExpenses]);
-            rows.Add(["صافي الدخل", "", "", "", income.NetIncome]);
+            rows.Add(Array.Empty<object?>());
+            rows.Add(new object?[] { "إجمالي الإيرادات", "", "", "", income.TotalRevenue });
+            rows.Add(new object?[] { "إجمالي المصروفات", "", "", "", income.TotalExpenses });
+            rows.Add(new object?[] { "صافي الدخل", "", "", "", income.NetIncome });
             return ("IncomeStatement", rows);
         }
 
@@ -114,21 +114,21 @@ public partial class ReportsWorkspaceControl : UserControl
         {
             var rows = new List<object?[]>
             {
-                ["Business ERP", "الميزانية العمومية"],
-                ["الشركة", _viewModel.SelectedCompany?.Name ?? ""],
-                ["حتى تاريخ", balance.AsOfDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)],
-                [],
-                ["الفئة", "رمز الحساب", "الحساب", "Account name", "المبلغ"]
+                new object?[] { "Business ERP", "الميزانية العمومية" },
+                new object?[] { "الشركة", _viewModel.SelectedCompany?.Name ?? "" },
+                new object?[] { "حتى تاريخ", balance.AsOfDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) },
+                Array.Empty<object?>(),
+                new object?[] { "الفئة", "رمز الحساب", "الحساب", "Account name", "المبلغ" }
             };
             rows.AddRange(balance.Assets.Select(x => new object?[] { "أصول", x.AccountCode, x.AccountNameAr, x.AccountNameEn, x.Amount }));
             rows.AddRange(balance.Liabilities.Select(x => new object?[] { "التزامات", x.AccountCode, x.AccountNameAr, x.AccountNameEn, x.Amount }));
             rows.AddRange(balance.Equity.Select(x => new object?[] { "حقوق ملكية", x.AccountCode, x.AccountNameAr, x.AccountNameEn, x.Amount }));
-            rows.Add([]);
-            rows.Add(["إجمالي الأصول", "", "", "", balance.TotalAssets]);
-            rows.Add(["إجمالي الالتزامات", "", "", "", balance.TotalLiabilities]);
-            rows.Add(["إجمالي حقوق الملكية", "", "", "", balance.TotalEquity]);
-            rows.Add(["الأرباح غير المقفلة", "", "", "", balance.UnclosedEarnings]);
-            rows.Add(["فرق المعادلة", "", "", "", balance.Difference]);
+            rows.Add(Array.Empty<object?>());
+            rows.Add(new object?[] { "إجمالي الأصول", "", "", "", balance.TotalAssets });
+            rows.Add(new object?[] { "إجمالي الالتزامات", "", "", "", balance.TotalLiabilities });
+            rows.Add(new object?[] { "إجمالي حقوق الملكية", "", "", "", balance.TotalEquity });
+            rows.Add(new object?[] { "الأرباح غير المقفلة", "", "", "", balance.UnclosedEarnings });
+            rows.Add(new object?[] { "فرق المعادلة", "", "", "", balance.Difference });
             return ("BalanceSheet", rows);
         }
 
