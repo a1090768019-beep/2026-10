@@ -105,6 +105,15 @@ public static class SalesInvoiceDraftEndpoints
                 var input = request.Lines[index];
                 var description = (input.Description ?? "").Trim();
                 var key = $"lines[{index}]";
+                var serialNumbers = NormalizeSerialNumbersForDraft(input.SerialNumbers);
+                if (input.InventoryItemId.HasValue != input.InventoryWarehouseId.HasValue)
+                    errors[$"{key}.inventoryItemId"] = ["يجب اختيار الصنف والمستودع معًا."];
+                if (input.SerialNumbers is { Count: > 1000 })
+                    errors[$"{key}.serialNumbers"] = ["لا تقبل أكثر من 1000 رقم تسلسلي في البند."];
+                if (serialNumbers.Distinct(StringComparer.OrdinalIgnoreCase).Count() != serialNumbers.Length)
+                    errors[$"{key}.serialNumbers"] = ["الأرقام التسلسلية في البند مكررة."];
+                if (!input.InventoryItemId.HasValue && serialNumbers.Length > 0)
+                    errors[$"{key}.serialNumbers"] = ["لا يمكن إدخال أرقام تسلسلية لبند غير مرتبط بصنف مخزني."];
                 if (description.Length is < 1 or > 500)
                     errors[$"{key}.description"] = ["وصف البند مطلوب ولا يتجاوز 500 حرف."];
                 if (input.Quantity <= 0m || !HasSupportedPrecision(input.Quantity))
@@ -131,7 +140,8 @@ public static class SalesInvoiceDraftEndpoints
                 }
 
                 subtotal += lineAmount;
-                lines.Add(new NormalizedLine(description, input.Quantity, input.UnitPrice, lineAmount));
+                lines.Add(new NormalizedLine(description, input.Quantity, input.UnitPrice, lineAmount,
+                    input.InventoryItemId, input.InventoryWarehouseId, serialNumbers));
             }
         }
 
@@ -162,6 +172,60 @@ public static class SalesInvoiceDraftEndpoints
                 {
                     ["customerId"] = ["العميل غير موجود أو غير نشط في هذه الشركة."]
                 });
+
+
+            foreach (var (line, index) in lines.Select((line, index) => (line, index)))
+            {
+                if (line.InventoryItemId.HasValue != line.InventoryWarehouseId.HasValue)
+                    return Results.ValidationProblem(new Dictionary<string, string[]>
+                    {
+                        [$"lines[{index}].inventoryItemId"] = ["يجب اختيار الصنف والمستودع معًا."]
+                    });
+
+                if (!line.InventoryItemId.HasValue)
+                {
+                    if (line.SerialNumbers.Length > 0)
+                        return Results.ValidationProblem(new Dictionary<string, string[]>
+                        {
+                            [$"lines[{index}].serialNumbers"] = ["لا يمكن إدخال أرقام تسلسلية لبند غير مرتبط بصنف مخزني."]
+                        });
+                    continue;
+                }
+
+                var inventoryLookup = await db.Database.SqlQuery<InventoryLineLookup>($"""
+                    SELECT item.tracks_serials AS "TracksSerials",
+                           (item.is_active AND warehouse.is_active) AS "IsActive"
+                      FROM items AS item
+                      JOIN warehouses AS warehouse
+                        ON warehouse.tenant_id = item.tenant_id AND warehouse.company_id = item.company_id
+                     WHERE item.tenant_id = {tenant.TenantId} AND item.company_id = {companyId}
+                       AND item.id = {line.InventoryItemId.Value}
+                       AND warehouse.id = {line.InventoryWarehouseId!.Value}
+                     LIMIT 1
+                    """).SingleOrDefaultAsync(token);
+                if (inventoryLookup is null || !inventoryLookup.IsActive)
+                    return Results.ValidationProblem(new Dictionary<string, string[]>
+                    {
+                        [$"lines[{index}].inventoryItemId"] = ["الصنف أو المستودع غير موجود أو غير نشط في الشركة الحالية."]
+                    });
+
+                if (inventoryLookup.TracksSerials)
+                {
+                    if (line.Quantity != decimal.Truncate(line.Quantity) || line.Quantity > 1000m ||
+                        line.SerialNumbers.Length != (int)line.Quantity)
+                        return Results.ValidationProblem(new Dictionary<string, string[]>
+                        {
+                            [$"lines[{index}].serialNumbers"] = ["الصنف المتسلسل يحتاج رقمًا فريدًا لكل وحدة صحيحة وبحد أقصى 1000 وحدة."]
+                        });
+                }
+                else if (line.SerialNumbers.Length > 0)
+                {
+                    return Results.ValidationProblem(new Dictionary<string, string[]>
+                    {
+                        [$"lines[{index}].serialNumbers"] = ["الصنف المحدد لا يستخدم تتبع الأرقام التسلسلية."]
+                    });
+                }
+            }
 
             var invoiceLockKey = "sales-invoice-number:" + tenant.TenantId.ToString("D") + ":" +
                                  companyId.ToString("D") + ":" + invoiceNumber;
@@ -196,10 +260,11 @@ public static class SalesInvoiceDraftEndpoints
                 await db.Database.ExecuteSqlInterpolatedAsync($"""
                     INSERT INTO sales_invoice_draft_lines
                         (tenant_id, company_id, sales_invoice_draft_id, line_number,
-                         description, quantity, unit_price, line_amount)
+                         description, quantity, unit_price, line_amount, inventory_item_id, inventory_warehouse_id, serial_numbers)
                     VALUES
                         ({tenant.TenantId}, {companyId}, {draftId}, {index + 1},
-                         {line.Description}, {line.Quantity}, {line.UnitPrice}, {line.LineAmount})
+                         {line.Description}, {line.Quantity}, {line.UnitPrice}, {line.LineAmount},
+                         {line.InventoryItemId}, {line.InventoryWarehouseId}, CAST({JsonSerializer.Serialize(line.SerialNumbers)} AS jsonb))
                     """, token);
             }
 
@@ -278,12 +343,17 @@ public static class SalesInvoiceDraftEndpoints
     private static bool HasSupportedPrecision(decimal value) =>
         value >= 0m && value <= MaxAmount && decimal.Round(value, 4, MidpointRounding.ToEven) == value;
 
-    private sealed record NormalizedLine(string Description, decimal Quantity, decimal UnitPrice, decimal LineAmount);
+    private sealed record NormalizedLine(string Description, decimal Quantity, decimal UnitPrice, decimal LineAmount,
+        Guid? InventoryItemId, Guid? InventoryWarehouseId, string[] SerialNumbers);
+    private sealed record InventoryLineLookup(bool TracksSerials, bool IsActive);
+    private static string[] NormalizeSerialNumbersForDraft(IReadOnlyList<string>? input) =>
+        (input ?? Array.Empty<string>()).Select(value => (value ?? "").Trim().ToUpperInvariant()).Where(value => value.Length > 0).ToArray();
 
     public sealed record CreateDraftRequest(
         Guid CustomerId, string? InvoiceNumber, DateOnly IssueDate, DateOnly? DueDate,
         string? Notes, IReadOnlyList<CreateDraftLineRequest>? Lines);
-    public sealed record CreateDraftLineRequest(string? Description, decimal Quantity, decimal UnitPrice);
+    public sealed record CreateDraftLineRequest(string? Description, decimal Quantity, decimal UnitPrice,
+        Guid? InventoryItemId = null, Guid? InventoryWarehouseId = null, IReadOnlyList<string>? SerialNumbers = null);
     public sealed record DraftListDto(
         Guid Id, string InvoiceNumber, DateOnly IssueDate, DateOnly? DueDate, string CurrencyCode,
         Guid CustomerId, string CustomerName, decimal SubtotalAmount, string TaxCalculationStatus,
