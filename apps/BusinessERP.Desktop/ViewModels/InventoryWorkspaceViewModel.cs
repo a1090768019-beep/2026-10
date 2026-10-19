@@ -9,7 +9,7 @@ namespace BusinessERP.Desktop.ViewModels;
 
 /// <summary>
 /// Tenant-scoped item catalog, receipt/issue stock ledger and inter-warehouse transfer workspace.
-/// Serial-level tracking and purchase/sales document integration are not yet enabled.
+/// Serial number tracking is supported for inventory receipts, issues and transfers.
 /// </summary>
 public sealed class InventoryWorkspaceViewModel : INotifyPropertyChanged
 {
@@ -36,6 +36,9 @@ public sealed class InventoryWorkspaceViewModel : INotifyPropertyChanged
     private decimal? _movementUnitCost;
     private DateTime? _movementDate = DateTime.Today;
     private string _movementNotes = "";
+    private string _movementSerialNumbers = "";
+    private string _transferSerialNumbers = "";
+    private bool _newItemTracksSerials;
     private string _transferNumber = $"TRF-{DateTime.Now:yyyyMMdd-HHmmss}";
     private decimal _transferQuantity = 1m;
     private DateTime? _transferDate = DateTime.Today;
@@ -48,6 +51,8 @@ public sealed class InventoryWorkspaceViewModel : INotifyPropertyChanged
     public ObservableCollection<StockBalanceApiRow> StockBalances { get; } = [];
     public ObservableCollection<InventoryMovementApiRow> Movements { get; } = [];
     public ObservableCollection<InventoryTransferApiRow> Transfers { get; } = [];
+    public ObservableCollection<InventorySerialEventApiRow> SerialEvents { get; } = [];
+    public ObservableCollection<InventorySerialSummaryApiRow> SerialSummaryRows { get; } = [];
 
     public ICommand RefreshCommand { get; }
     public ICommand CreateItemCommand { get; }
@@ -137,6 +142,9 @@ public sealed class InventoryWorkspaceViewModel : INotifyPropertyChanged
     public decimal? MovementUnitCost { get => _movementUnitCost; set { if (_movementUnitCost == value) return; _movementUnitCost = value; OnPropertyChanged(); NotifyCommands(); } }
     public DateTime? MovementDate { get => _movementDate; set { if (_movementDate == value) return; _movementDate = value; OnPropertyChanged(); NotifyCommands(); } }
     public string MovementNotes { get => _movementNotes; set { if (_movementNotes == value) return; _movementNotes = value; OnPropertyChanged(); } }
+    public string MovementSerialNumbers { get => _movementSerialNumbers; set { if (_movementSerialNumbers == value) return; _movementSerialNumbers = value; OnPropertyChanged(); } }
+    public string TransferSerialNumbers { get => _transferSerialNumbers; set { if (_transferSerialNumbers == value) return; _transferSerialNumbers = value; OnPropertyChanged(); } }
+    public bool NewItemTracksSerials { get => _newItemTracksSerials; set { if (_newItemTracksSerials == value) return; _newItemTracksSerials = value; OnPropertyChanged(); NotifyCommands(); } }
     public string TransferNumber { get => _transferNumber; set { if (_transferNumber == value) return; _transferNumber = value; OnPropertyChanged(); NotifyCommands(); } }
     public decimal TransferQuantity { get => _transferQuantity; set { if (_transferQuantity == value) return; _transferQuantity = value; OnPropertyChanged(); NotifyCommands(); } }
     public DateTime? TransferDate { get => _transferDate; set { if (_transferDate == value) return; _transferDate = value; OnPropertyChanged(); NotifyCommands(); } }
@@ -235,7 +243,9 @@ public sealed class InventoryWorkspaceViewModel : INotifyPropertyChanged
         var balancesTask = _apiClient.GetInventoryBalancesAsync(companyId, 1, PageSize);
         var movementsTask = _apiClient.GetInventoryMovementsAsync(companyId, page: 1, pageSize: PageSize);
         var transfersTask = _apiClient.GetInventoryTransfersAsync(companyId, page: 1, pageSize: PageSize);
-        await Task.WhenAll(itemsTask, warehousesTask, balancesTask, movementsTask, transfersTask);
+        var serialEventsTask = _apiClient.GetInventorySerialEventsAsync(companyId, page: 1, pageSize: PageSize);
+        var serialSummaryTask = _apiClient.GetInventorySerialSummaryAsync(companyId, page: 1, pageSize: PageSize);
+        await Task.WhenAll(itemsTask, warehousesTask, balancesTask, movementsTask, transfersTask, serialEventsTask, serialSummaryTask);
 
         var prevItem = SelectedItem?.Id;
         var prevWarehouse = SelectedWarehouse?.Id;
@@ -254,6 +264,10 @@ public sealed class InventoryWorkspaceViewModel : INotifyPropertyChanged
         foreach (var movement in (await movementsTask).Rows) Movements.Add(movement);
         Transfers.Clear();
         foreach (var transfer in (await transfersTask).Rows) Transfers.Add(transfer);
+        SerialEvents.Clear();
+        foreach (var row in (await serialEventsTask).Rows) SerialEvents.Add(row);
+        SerialSummaryRows.Clear();
+        foreach (var row in (await serialSummaryTask).Rows) SerialSummaryRows.Add(row);
         OnPropertyChanged(nameof(WorkspaceContextSummary));
     }
 
@@ -265,7 +279,7 @@ public sealed class InventoryWorkspaceViewModel : INotifyPropertyChanged
         {
             var item = await _apiClient.CreateInventoryItemAsync(SelectedCompany.Id,
                 new CreateInventoryItemApiRequest(NewItemCode.Trim(), BlankToNull(NewBarcode),
-                    NewItemNameAr.Trim(), NewItemNameEn.Trim(), NewUnitCode.Trim()));
+                    NewItemNameAr.Trim(), NewItemNameEn.Trim(), NewUnitCode.Trim(), NewItemTracksSerials));
             await LoadCompanyDataAsync();
             SelectedItem = Items.FirstOrDefault(x => x.Id == item.Id) ?? item;
             NewItemCode = NewBarcode = NewItemNameAr = NewItemNameEn = "";
@@ -307,7 +321,7 @@ public sealed class InventoryWorkspaceViewModel : INotifyPropertyChanged
             var request = new InventoryMovementApiRequest(
                 SelectedItem.Id, SelectedWarehouse.Id, MovementNumber.Trim(),
                 DateOnly.FromDateTime(MovementDate.Value.Date), MovementQuantity,
-                receipt ? MovementUnitCost : null, BlankToNull(MovementNotes));
+                receipt ? MovementUnitCost : null, BlankToNull(MovementNotes), ParseSerialNumbers(MovementSerialNumbers));
             var result = receipt
                 ? await _apiClient.ReceiveInventoryStockAsync(SelectedCompany.Id, request)
                 : await _apiClient.IssueInventoryStockAsync(SelectedCompany.Id, request);
@@ -316,6 +330,7 @@ public sealed class InventoryWorkspaceViewModel : INotifyPropertyChanged
             MovementQuantity = 1m;
             MovementUnitCost = null;
             MovementNotes = "";
+            MovementSerialNumbers = "";
             StatusMessage = $"{(receipt ? "تم تسجيل الاستلام" : "تم تسجيل الصرف")} {result.MovementNumber}. الرصيد الحالي {result.OnHandQuantity:N4} {SelectedItem?.UnitCode}؛ القيمة {result.InventoryValue:N4} {SelectedCurrency}؛ متوسط التكلفة {result.AverageUnitCost:N8}.";
             StatusIsError = false;
         }
@@ -335,12 +350,13 @@ public sealed class InventoryWorkspaceViewModel : INotifyPropertyChanged
         {
             var request = new InventoryTransferApiRequest(SelectedItem.Id, SelectedSourceWarehouse.Id,
                 SelectedDestinationWarehouse.Id, TransferNumber.Trim(), DateOnly.FromDateTime(TransferDate.Value.Date),
-                TransferQuantity, BlankToNull(TransferNotes));
+                TransferQuantity, BlankToNull(TransferNotes), ParseSerialNumbers(TransferSerialNumbers));
             var result = await _apiClient.TransferInventoryStockAsync(SelectedCompany.Id, request);
             await LoadCompanyDataAsync();
             TransferNumber = $"TRF-{DateTime.Now:yyyyMMdd-HHmmss}";
             TransferQuantity = 1m;
             TransferNotes = "";
+            TransferSerialNumbers = "";
             StatusMessage = $"تم التحويل {result.TransferNumber}: {result.Quantity:N4} {SelectedItem.UnitCode} من {SelectedSourceWarehouse.Name} إلى {SelectedDestinationWarehouse.Name}. القيمة المنقولة {result.InventoryValue:N4} {SelectedCurrency}. رصيد المصدر {result.SourceOnHandQuantity:N4}؛ رصيد الوجهة {result.DestinationOnHandQuantity:N4}.";
             StatusIsError = false;
         }
@@ -395,12 +411,15 @@ public sealed class InventoryWorkspaceViewModel : INotifyPropertyChanged
 
     private void ClearCompanyData()
     {
-        Items.Clear(); Warehouses.Clear(); StockBalances.Clear(); Movements.Clear(); Transfers.Clear();
+        Items.Clear(); Warehouses.Clear(); StockBalances.Clear(); Movements.Clear(); Transfers.Clear(); SerialEvents.Clear(); SerialSummaryRows.Clear();
         SelectedItem = null; SelectedWarehouse = null; SelectedSourceWarehouse = null; SelectedDestinationWarehouse = null; SelectedBalance = null;
         OnPropertyChanged(nameof(WorkspaceContextSummary));
     }
 
     private static string? BlankToNull(string value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    private static string[] ParseSerialNumbers(string? text) =>
+        (text ?? "").Split(new[] { '\r', '\n', ',', ';', '\t' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(value => value.Length > 0).ToArray();
     private static bool HasPrecision(decimal value, int scale) => decimal.Round(value, scale, MidpointRounding.ToEven) == value;
 
     private void HandleUnexpectedFailure(Exception ex)
