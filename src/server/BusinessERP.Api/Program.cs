@@ -6,11 +6,39 @@ using BusinessERP.Infrastructure.Tenancy;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
 builder.Services.AddAuthentication();
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+    {
+        // JWT 'sub' is only trusted after authentication; unauthenticated traffic is partitioned by
+        // the socket peer IP, never by an untrusted X-Forwarded-For request header.
+        var subject = httpContext.User.FindFirst("sub")?.Value;
+        var partitionKey = !string.IsNullOrWhiteSpace(subject)
+            ? $"subject:{subject}"
+            : $"ip:{httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown"}";
+
+        return RateLimitPartition.GetFixedWindowLimiter(partitionKey, _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 120,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0,
+            AutoReplenishment = true
+        });
+    });
+    options.OnRejected = (context, cancellationToken) =>
+    {
+        context.HttpContext.Response.Headers["Retry-After"] = "60";
+        return new ValueTask(context.HttpContext.Response.WriteAsJsonAsync(
+            new { error = "rate_limit_exceeded", retryAfterSeconds = 60 }, cancellationToken));
+    };
+});
 
 var connectionString = builder.Configuration.GetConnectionString("Postgres");
 if (!string.IsNullOrWhiteSpace(connectionString))
@@ -49,7 +77,9 @@ else
 
 var app = builder.Build();
 app.UseExceptionHandler();
+app.UseRouting();
 app.UseAuthentication();
+app.UseRateLimiter();
 app.UseMiddleware<TenantResolutionMiddleware>();
 app.UseAuthorization();
 
