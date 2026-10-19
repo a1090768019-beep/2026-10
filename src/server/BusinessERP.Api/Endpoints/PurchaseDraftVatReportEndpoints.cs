@@ -7,7 +7,7 @@ namespace BusinessERP.Api.Endpoints;
 
 /// <summary>
 /// Read-only VAT details report based on saved VAT calculations on internal purchase drafts.
-/// It deliberately does not describe these drafts as issued tax invoices or ZATCA-cleared documents.
+/// It deliberately does not claim input VAT is recoverable or that the supplier document has been validated.
 /// </summary>
 public static class PurchaseDraftVatReportEndpoints
 {
@@ -88,7 +88,7 @@ public static class PurchaseDraftVatReportEndpoints
                   JOIN purchase_invoice_draft_lines line
                     ON line.tenant_id = invoice.tenant_id
                    AND line.company_id = invoice.company_id
-                   AND line.sales_invoice_draft_id = invoice.id
+                   AND line.purchase_invoice_draft_id = invoice.id
                  WHERE invoice.tenant_id = {tenant.TenantId}
                    AND invoice.company_id = {companyId}
                    AND invoice.issue_date >= {fromDate}
@@ -121,7 +121,7 @@ public static class PurchaseDraftVatReportEndpoints
                   JOIN purchase_invoice_draft_lines line
                     ON line.tenant_id = invoice.tenant_id
                    AND line.company_id = invoice.company_id
-                   AND line.sales_invoice_draft_id = invoice.id
+                   AND line.purchase_invoice_draft_id = invoice.id
                  WHERE invoice.tenant_id = {tenant.TenantId}
                    AND invoice.company_id = {companyId}
                    AND invoice.issue_date >= {fromDate}
