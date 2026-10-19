@@ -346,7 +346,8 @@ test('financial report Excel export builds a real XLSX workbook with numeric cel
   const vm = await read('apps/BusinessERP.Desktop/ViewModels/ReportsWorkspaceViewModel.cs');
   assert.match(shell, /x:Name="RibbonExportExcelButton"/);
   assert.match(shell, /Click="RibbonExportExcel_Click"/);
-  assert.match(main, /RibbonExportExcelButton\.IsEnabled = _erpApiClient is not null/);
+  assert.match(main, /var reportsAreActive = _erpApiClient is not null/);
+  assert.match(main, /RibbonExportExcelButton\.IsEnabled = reportsAreActive/);
   assert.match(main, /ReportsWorkspacePanel\.ExportCurrentReportToExcel\(\)/);
   assert.match(view, /x:Name="ReportsTabs"/);
   assert.match(code, /SaveFileDialog/);
