@@ -22,6 +22,7 @@ public sealed class AccountingApiIntegrationTests
 {
     private static readonly Guid TenantA = Guid.Parse("11111111-1111-4111-8111-111111111111");
     private static readonly Guid TenantB = Guid.Parse("22222222-2222-4222-8222-222222222222");
+    private static readonly Guid UserB = Guid.Parse("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
     private static readonly Guid TenantC = Guid.Parse("33333333-3333-4333-8333-333333333301");
     private static readonly Guid TenantD = Guid.Parse("66666666-6666-4666-8666-666666666601");
     private static readonly Guid UserE = Guid.Parse("eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee5");
@@ -59,6 +60,37 @@ public sealed class AccountingApiIntegrationTests
 
         using (var plansResponse = await client.GetAsync("/api/v1/subscription-plans"))
             Assert.Equal(HttpStatusCode.OK, plansResponse.StatusCode);
+    }
+
+    [RequiresApiPostgresFact]
+    public async Task Owner_can_assign_an_existing_identity_user_below_the_active_user_quota()
+    {
+        var connectionString = Environment.GetEnvironmentVariable("BUSINESS_ERP_TEST_CONNECTION");
+        Assert.False(string.IsNullOrWhiteSpace(connectionString));
+
+        using var factory = new ApiTestFactory(connectionString!);
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Test-Subject", "ci-subject-a");
+        SetTenant(client, TenantA);
+
+        using var response = await client.PostAsJsonAsync("/api/v1/memberships", new
+        {
+            userId = UserB,
+            roleCode = "VIEWER"
+        });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        using var member = await ParseJsonAsync(response);
+        Assert.Equal(UserB, member.RootElement.GetProperty("userId").GetGuid());
+        Assert.Equal("VIEWER", member.RootElement.GetProperty("roleCode").GetString());
+        Assert.Equal("ACTIVE", member.RootElement.GetProperty("status").GetString());
+
+        using var listResponse = await client.GetAsync("/api/v1/memberships");
+        Assert.Equal(HttpStatusCode.OK, listResponse.StatusCode);
+        using var list = await ParseJsonAsync(listResponse);
+        Assert.Contains(list.RootElement.EnumerateArray(),
+            row => row.GetProperty("userId").GetGuid() == UserB &&
+                   row.GetProperty("roleCode").GetString() == "VIEWER");
     }
 
     [RequiresApiPostgresFact]
