@@ -27,6 +27,7 @@ public partial class InventoryWorkspaceControl : UserControl
     public Task SetApiClientAsync(ErpApiClient? apiClient) => _viewModel.SetApiClientAsync(apiClient);
     public Task RefreshAsync() => _viewModel.RefreshAsync();
 
+    // Export only the currently loaded page; the current API request is capped at 100 rows.
     private void ExportStockBalances_Click(object sender, RoutedEventArgs e)
     {
         if (_viewModel.SelectedCompany is null || _viewModel.StockBalances.Count == 0)

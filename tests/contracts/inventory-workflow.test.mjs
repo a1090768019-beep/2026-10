@@ -91,6 +91,6 @@ test('inventory balance and movement reports export to real Excel workbooks with
   assert.match(code, /MinimalXlsxWriter\.Write/);
   assert.match(code, /InventoryBalances/);
   assert.match(code, /InventoryMovements/);
-  assert.match(code, /الصفحة المحمّلة حاليًا فقط/);
+  assert.match(code, /Export only the currently loaded page/);
   assert.match(reportWriter, /internal static class MinimalXlsxWriter/);
 });
