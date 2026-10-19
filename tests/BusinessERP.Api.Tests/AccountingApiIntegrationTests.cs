@@ -22,6 +22,7 @@ public sealed class AccountingApiIntegrationTests
 {
     private static readonly Guid TenantA = Guid.Parse("11111111-1111-4111-8111-111111111111");
     private static readonly Guid TenantB = Guid.Parse("22222222-2222-4222-8222-222222222222");
+    private static readonly Guid TenantC = Guid.Parse("33333333-3333-4333-8333-333333333301");
     private static readonly Guid CompanyA = Guid.Parse("11111111-1111-4111-8111-111111111101");
     private static readonly Guid CompanyB = Guid.Parse("22222222-2222-4222-8222-222222222201");
     private static readonly Guid PeriodA = Guid.Parse("11111111-1111-4111-8111-111111111103");
@@ -62,11 +63,11 @@ public sealed class AccountingApiIntegrationTests
 
         using var factory = new ApiTestFactory(connectionString!);
         using var client = factory.CreateClient();
-        SetTenant(client, TenantA);
+        SetTenant(client, TenantC);
 
         using var response = await client.PostAsJsonAsync("/api/v1/companies", new
         {
-            name = "شركة إضافية تتجاوز الخطة",
+            name = "شركة تتجاوز الخطة ذات الحصة صفر",
             baseCurrency = "SAR"
         });
 
@@ -75,8 +76,8 @@ public sealed class AccountingApiIntegrationTests
         using var json = JsonDocument.Parse(body);
         Assert.Equal("plan_limit_exceeded", json.RootElement.GetProperty("error").GetString());
         Assert.Equal("companies", json.RootElement.GetProperty("limitName").GetString());
-        Assert.Equal(1, json.RootElement.GetProperty("limit").GetInt32());
-        Assert.Equal(1, json.RootElement.GetProperty("current").GetInt32());
+        Assert.Equal(0, json.RootElement.GetProperty("limit").GetInt32());
+        Assert.Equal(0, json.RootElement.GetProperty("current").GetInt32());
     }
 
     [RequiresApiPostgresFact]
