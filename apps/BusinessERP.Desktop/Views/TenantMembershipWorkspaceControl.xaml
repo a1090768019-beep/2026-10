@@ -33,7 +33,7 @@
                 </StackPanel>
                 <StackPanel Grid.Column="1" Margin="0,0,12,0">
                     <TextBlock Text="الدور" FontWeight="SemiBold" Margin="0,0,0,6"/>
-                    <ComboBox ItemsSource="{Binding RoleCodes}" SelectedItem="{Binding SelectedRoleCode}" MinHeight="34" IsEnabled="{Binding CanEdit}"/>
+                    <ComboBox ItemsSource="{Binding RoleCodes}" SelectedItem="{Binding AssignRoleCode}" MinHeight="34" IsEnabled="{Binding CanEdit}"/>
                 </StackPanel>
                 <Button Grid.Column="2" Content="إسناد العضوية" Click="AssignMember_Click" MinHeight="34" Padding="14,7"
                         VerticalAlignment="Bottom" Margin="0,0,8,0" IsEnabled="{Binding CanEdit}"/>
