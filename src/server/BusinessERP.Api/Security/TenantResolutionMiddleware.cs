@@ -91,7 +91,7 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next, ILogger<Ten
         {
             // Subscription rows are protected by PostgreSQL RLS, so this lookup must use the
             // same transaction-local tenant context as all other tenant data access.
-            var isEntitled = await transactionRunner.ExecuteAsync(async (tenantDb, token) =>
+            var subscriptionState = await transactionRunner.ExecuteAsync(async (tenantDb, token) =>
             {
                 var subscription = await tenantDb.TenantSubscriptions.AsNoTracking()
                     .Where(x => x.TenantId == tenantId)
@@ -104,18 +104,19 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next, ILogger<Ten
                 var withinWindow = subscription is not null &&
                     subscription.StartsAt <= now &&
                     (!subscription.EndsAt.HasValue || subscription.EndsAt.Value > now);
-                return withinWindow && subscription is not null &&
+                var entitled = withinWindow && subscription is not null &&
                     (subscription.Status.Equals("ACTIVE", StringComparison.OrdinalIgnoreCase) ||
                      subscription.Status.Equals("TRIALING", StringComparison.OrdinalIgnoreCase));
+                return (HasSubscription: subscription is not null, IsEntitled: entitled);
             }, cancellationToken);
 
-            if (!isEntitled)
+            if (!subscriptionState.IsEntitled)
             {
                 http.Response.StatusCode = StatusCodes.Status402PaymentRequired;
                 await http.Response.WriteAsJsonAsync(new
                 {
                     error = "subscription_required_or_inactive",
-                    message = subscription is null
+                    message = !subscriptionState.HasSubscription
                         ? "لا يوجد اشتراك مخصص لهذا العميل. راجع حالة الاشتراك أو تواصل مع مشغل المنصة."
                         : "الاشتراك غير نشط أو انتهت مدته. راجع حالة الاشتراك أو تواصل مع مشغل المنصة."
                 }, cancellationToken);
