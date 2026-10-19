@@ -23,6 +23,11 @@ public sealed class AccountingApiIntegrationTests
     private static readonly Guid TenantA = Guid.Parse("11111111-1111-4111-8111-111111111111");
     private static readonly Guid TenantB = Guid.Parse("22222222-2222-4222-8222-222222222222");
     private static readonly Guid TenantC = Guid.Parse("33333333-3333-4333-8333-333333333301");
+    private static readonly Guid TenantD = Guid.Parse("66666666-6666-4666-8666-666666666601");
+    private static readonly Guid CompanyD = Guid.Parse("66666666-6666-4666-8666-666666666101");
+    private static readonly Guid PeriodD = Guid.Parse("66666666-6666-4666-8666-666666666103");
+    private static readonly Guid CashAccountD = Guid.Parse("66666666-6666-4666-8666-666666666104");
+    private static readonly Guid EquityAccountD = Guid.Parse("66666666-6666-4666-8666-666666666105");
     private static readonly Guid CompanyA = Guid.Parse("11111111-1111-4111-8111-111111111101");
     private static readonly Guid CompanyB = Guid.Parse("22222222-2222-4222-8222-222222222201");
     private static readonly Guid PeriodA = Guid.Parse("11111111-1111-4111-8111-111111111103");
@@ -79,6 +84,40 @@ public sealed class AccountingApiIntegrationTests
         Assert.Equal("companies", json.RootElement.GetProperty("limitName").GetString());
         Assert.Equal(0, json.RootElement.GetProperty("limit").GetInt32());
         Assert.Equal(0, json.RootElement.GetProperty("current").GetInt32());
+    }
+
+    [RequiresApiPostgresFact]
+    public async Task Monthly_journal_entry_quota_is_enforced_by_database_for_posting_api()
+    {
+        var connectionString = Environment.GetEnvironmentVariable("BUSINESS_ERP_TEST_CONNECTION");
+        Assert.False(string.IsNullOrWhiteSpace(connectionString));
+
+        using var factory = new ApiTestFactory(connectionString!);
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Test-Subject", "ci-subject-d");
+        SetTenant(client, TenantD);
+
+        using var response = await client.PostAsJsonAsync(
+            $"/api/v1/companies/{CompanyD}/journal-entries",
+            new
+            {
+                fiscalPeriodId = PeriodD,
+                entryNumber = "QUOTA-" + Guid.NewGuid().ToString("N")[..12].ToUpperInvariant(),
+                entryDate = new DateOnly(2026, 10, 19),
+                description = "Monthly quota test",
+                currencyCode = "SAR",
+                lines = new[]
+                {
+                    new { accountId = CashAccountD, debit = 100m, credit = 0m, description = "Cash debit" },
+                    new { accountId = EquityAccountD, debit = 0m, credit = 100m, description = "Equity credit" }
+                }
+            });
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        using var json = JsonDocument.Parse(body);
+        Assert.Equal("plan_limit_exceeded", json.RootElement.GetProperty("error").GetString());
+        Assert.Equal("entriesPerMonth", json.RootElement.GetProperty("limitName").GetString());
     }
 
     [RequiresApiPostgresFact]
