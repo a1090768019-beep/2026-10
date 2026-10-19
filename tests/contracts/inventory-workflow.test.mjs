@@ -78,3 +78,19 @@ test('WPF inventory workspace exposes barcode master data, stock receipts/issues
   assert.match(main, /string\.Equals\(key, "Inventory", StringComparison\.OrdinalIgnoreCase\)/);
   assert.match(main, /InventoryWorkspacePanel\.SetApiClientAsync/);
 });
+
+test('inventory balance and movement reports export to real Excel workbooks with current-page limits explained', async () => {
+  const view = await read('apps/BusinessERP.Desktop/Views/InventoryWorkspaceControl.xaml');
+  const code = await read('apps/BusinessERP.Desktop/Views/InventoryWorkspaceControl.xaml.cs');
+  const reportWriter = await read('apps/BusinessERP.Desktop/Views/ReportsWorkspaceControl.xaml.cs');
+
+  assert.match(view, /Click="ExportStockBalances_Click"/);
+  assert.match(view, /Click="ExportInventoryMovements_Click"/);
+  assert.match(code, /private void ExportStockBalances_Click/);
+  assert.match(code, /private void ExportInventoryMovements_Click/);
+  assert.match(code, /MinimalXlsxWriter\.Write/);
+  assert.match(code, /InventoryBalances/);
+  assert.match(code, /InventoryMovements/);
+  assert.match(code, /الصفحة المحمّلة حاليًا فقط/);
+  assert.match(reportWriter, /internal static class MinimalXlsxWriter/);
+});
