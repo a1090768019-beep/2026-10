@@ -67,6 +67,79 @@ UPDATE purchase_invoice_drafts
  WHERE id = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee2';
 COMMIT;
 
+-- Exercise the journal/link consistency trigger with an explicitly selected input VAT asset account.
+BEGIN;
+SELECT set_config('app.tenant_id', '11111111-1111-4111-8111-111111111111', true);
+
+INSERT INTO accounts (id, tenant_id, company_id, code, name_ar, name_en, account_type, normal_balance, is_active, allow_posting)
+VALUES
+ ('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee4', '11111111-1111-4111-8111-111111111111', '11111111-1111-4111-8111-111111111101', '5901', 'تكلفة مشتريات الاختبار', 'CI Purchase Expense', 'EXPENSE', 'DEBIT', true, true),
+ ('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee5', '11111111-1111-4111-8111-111111111111', '11111111-1111-4111-8111-111111111101', '2101', 'موردون الاختبار', 'CI Accounts Payable', 'LIABILITY', 'CREDIT', true, true),
+ ('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee6', '11111111-1111-4111-8111-111111111111', '11111111-1111-4111-8111-111111111101', '1411', 'ضريبة مدخلات الاختبار', 'CI Input VAT', 'ASSET', 'DEBIT', true, true);
+
+INSERT INTO journal_entries
+    (id, tenant_id, company_id, fiscal_period_id, entry_number, entry_date, description, currency_code, status, source_type, source_id)
+VALUES ('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee7',
+        '11111111-1111-4111-8111-111111111111',
+        '11111111-1111-4111-8111-111111111101',
+        '11111111-1111-4111-8111-111111111103',
+        'CI-PUR-GL-0001', '2026-04-01', 'CI purchase draft GL posting', 'SAR', 'DRAFT',
+        'PURCHASE_INVOICE_DRAFT', 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee2');
+
+INSERT INTO journal_entry_lines
+    (tenant_id, company_id, journal_entry_id, account_id, line_number, description, debit, credit)
+VALUES
+ ('11111111-1111-4111-8111-111111111111', '11111111-1111-4111-8111-111111111101', 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee7', 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee4', 1, 'Purchase cost', 100.0000, 0),
+ ('11111111-1111-4111-8111-111111111111', '11111111-1111-4111-8111-111111111101', 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee7', 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee6', 2, 'Input VAT (explicitly selected)', 15.0000, 0),
+ ('11111111-1111-4111-8111-111111111111', '11111111-1111-4111-8111-111111111101', 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee7', 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee5', 3, 'Accounts payable', 0, 115.0000);
+
+UPDATE journal_entries SET status = 'APPROVED'
+ WHERE id = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee7';
+UPDATE journal_entries SET status = 'POSTED', posted_at = now()
+ WHERE id = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee7';
+
+UPDATE purchase_invoice_drafts
+   SET status = 'ACCOUNTING_POSTED',
+       accounting_posted_journal_entry_id = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee7',
+       accounting_posted_at = now(),
+       accounting_input_vat_account_id = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee6'
+ WHERE id = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee2';
+COMMIT;
+
+BEGIN;
+SELECT set_config('app.tenant_id', '11111111-1111-4111-8111-111111111111', true);
+DO $$
+BEGIN
+    IF (SELECT status FROM purchase_invoice_drafts WHERE purchase_number = 'PUR-CI-0001') <> 'ACCOUNTING_POSTED'
+       OR (SELECT accounting_posted_journal_entry_id FROM purchase_invoice_drafts WHERE purchase_number = 'PUR-CI-0001')
+          <> 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee7'
+       OR (SELECT accounting_input_vat_account_id FROM purchase_invoice_drafts WHERE purchase_number = 'PUR-CI-0001')
+          <> 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee6'
+       OR (SELECT COALESCE(sum(debit), 0) FROM journal_entry_lines WHERE journal_entry_id = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee7')
+          <> (SELECT COALESCE(sum(credit), 0) FROM journal_entry_lines WHERE journal_entry_id = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee7') THEN
+        RAISE EXCEPTION 'Purchase ledger smoke failed: source link or debit-credit balance is incorrect';
+    END IF;
+END $$;
+
+DO $$
+BEGIN
+    BEGIN
+        UPDATE purchase_invoice_drafts SET vat_amount = 99.00
+         WHERE purchase_number = 'PUR-CI-0001';
+        RAISE EXCEPTION 'Expected posted purchase header to be immutable';
+    EXCEPTION WHEN check_violation THEN
+        NULL;
+    END;
+    BEGIN
+        UPDATE purchase_invoice_draft_lines SET vat_amount = 99.00
+         WHERE purchase_invoice_draft_id = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee2';
+        RAISE EXCEPTION 'Expected posted purchase line to be immutable';
+    EXCEPTION WHEN check_violation THEN
+        NULL;
+    END;
+END $$;
+COMMIT;
+
 BEGIN;
 SELECT set_config('app.tenant_id', '11111111-1111-4111-8111-111111111111', true);
 DO $$

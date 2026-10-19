@@ -201,7 +201,42 @@
                         </DataGrid.Columns>
                     </DataGrid>
                     <TextBlock Text="{Binding SelectedDraftStatusSummary}" FontSize="12" FontWeight="SemiBold" Margin="0,10,0,6" />
-                    <DataGrid ItemsSource="{Binding SelectedDraftLines}" Height="190" IsReadOnly="False">
+                    <Border Background="#F4F7FB" BorderBrush="#DDE5F0" BorderThickness="1" CornerRadius="9" Padding="12" Margin="0,0,0,10">
+                        <StackPanel>
+                            <TextBlock Text="ربط القيد المحاسبي" FontWeight="SemiBold" />
+                            <TextBlock Text="اختر فترة مفتوحة وحساب تكلفة الشراء وحساب الموردين. حساب ضريبة المدخلات اختياري؛ عند اختياره يفصل VAT في حساب أصل بناءً على قرارك، وعند تركه فارغًا تُحمّل VAT ضمن تكلفة الشراء."
+                                       FontSize="11" Foreground="#69758D" TextWrapping="Wrap" Margin="0,4,0,8" />
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="2*" />
+                                    <ColumnDefinition Width="2*" />
+                                    <ColumnDefinition Width="2*" />
+                                    <ColumnDefinition Width="2*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" Margin="0,0,6,0">
+                                    <TextBlock Text="الفترة المالية" FontSize="12" Foreground="#69758D" />
+                                    <ComboBox ItemsSource="{Binding OpenFiscalPeriods}" SelectedItem="{Binding SelectedFiscalPeriod, Mode=TwoWay}"
+                                              DisplayMemberPath="DisplayLabel" Margin="0,4,0,0" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Margin="6,0">
+                                    <TextBlock Text="حساب تكلفة الشراء" FontSize="12" Foreground="#69758D" />
+                                    <ComboBox ItemsSource="{Binding PurchaseDebitAccounts}" SelectedItem="{Binding SelectedPurchaseDebitAccount, Mode=TwoWay}"
+                                              DisplayMemberPath="DisplayLabel" Margin="0,4,0,0" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" Margin="6,0">
+                                    <TextBlock Text="حساب الموردين (دائن)" FontSize="12" Foreground="#69758D" />
+                                    <ComboBox ItemsSource="{Binding PayableAccounts}" SelectedItem="{Binding SelectedPayableAccount, Mode=TwoWay}"
+                                              DisplayMemberPath="DisplayLabel" Margin="0,4,0,0" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="3" Margin="6,0">
+                                    <TextBlock Text="حساب VAT (اختياري)" FontSize="12" Foreground="#69758D" />
+                                    <ComboBox ItemsSource="{Binding InputVatAccounts}" SelectedItem="{Binding SelectedInputVatAccount, Mode=TwoWay}"
+                                              DisplayMemberPath="DisplayLabel" Margin="0,4,0,0" />
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                    <DataGrid ItemsSource="{Binding SelectedDraftLines}" Height="190" IsReadOnly="{Binding IsSelectedDraftPosted}">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="#" Binding="{Binding LineNumber}" IsReadOnly="True" Width="45" />
                             <DataGridTextColumn Header="الوصف" Binding="{Binding Description}" IsReadOnly="True" Width="*" />
@@ -215,8 +250,13 @@
                             <DataGridTextColumn Header="الإجمالي" Binding="{Binding TotalAmount, StringFormat=N2}" IsReadOnly="True" Width="110" />
                         </DataGrid.Columns>
                     </DataGrid>
-                    <Button Content="حساب VAT وحفظها على المسودة" Command="{Binding CalculateSelectedDraftVatCommand}"
-                            HorizontalAlignment="Left" Margin="0,9,0,0" />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Margin="0,9,0,0">
+                        <Button Content="حساب VAT وحفظها على المسودة" Command="{Binding CalculateSelectedDraftVatCommand}" />
+                        <Button Content="ترحيل القيد إلى دفتر الأستاذ" Command="{Binding PostSelectedDraftToLedgerCommand}"
+                                Background="#146C4A" />
+                    </StackPanel>
+                    <TextBlock Text="الترحيل ينشئ قيدًا مزدوجًا داخليًا ويربطه بمسودة الشراء مرة واحدة. لا يُصدر فاتورة ضريبية ولا يثبت استرداد VAT."
+                               Foreground="#8A6A20" FontSize="11" TextWrapping="Wrap" Margin="0,7,0,0" />
                 </StackPanel>
             </Border>
 

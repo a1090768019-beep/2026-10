@@ -45,6 +45,9 @@ public static class PurchaseInvoiceDraftEndpoints
                        draft.gross_amount AS "GrossAmount", draft.discount_amount AS "DiscountAmount",
                        draft.net_amount AS "NetAmount", draft.vat_amount AS "VatAmount",
                        draft.total_amount AS "TotalAmount", draft.status AS "Status",
+                       draft.accounting_posted_journal_entry_id AS "AccountingPostedJournalEntryId",
+                       draft.accounting_posted_at AS "AccountingPostedAt",
+                       draft.accounting_input_vat_account_id AS "AccountingInputVatAccountId",
                        draft.created_at AS "CreatedAt",
                        (SELECT count(*)::integer FROM purchase_invoice_draft_lines line
                          WHERE line.tenant_id = draft.tenant_id AND line.company_id = draft.company_id
@@ -240,7 +243,11 @@ public static class PurchaseInvoiceDraftEndpoints
                    subtotal_amount AS "SubtotalAmount", notes AS "Notes", status AS "Status",
                    tax_calculation_status AS "TaxCalculationStatus", gross_amount AS "GrossAmount",
                    discount_amount AS "DiscountAmount", net_amount AS "NetAmount", vat_amount AS "VatAmount",
-                   total_amount AS "TotalAmount", created_at AS "CreatedAt"
+                   total_amount AS "TotalAmount",
+                   accounting_posted_journal_entry_id AS "AccountingPostedJournalEntryId",
+                   accounting_posted_at AS "AccountingPostedAt",
+                   accounting_input_vat_account_id AS "AccountingInputVatAccountId",
+                   created_at AS "CreatedAt"
               FROM purchase_invoice_drafts
              WHERE tenant_id = {tenantId} AND company_id = {companyId} AND id = {invoiceId}
             """).SingleOrDefaultAsync(token);
@@ -262,7 +269,8 @@ public static class PurchaseInvoiceDraftEndpoints
             header.Id, header.CompanyId, header.SupplierId, header.PurchaseNumber, header.SupplierInvoiceNumber,
             header.IssueDate, header.DueDate, header.CurrencyCode, header.SupplierName, header.SupplierTaxNumber,
             header.SubtotalAmount, header.Notes, header.Status, header.TaxCalculationStatus, header.GrossAmount,
-            header.DiscountAmount, header.NetAmount, header.VatAmount, header.TotalAmount, header.CreatedAt, lines);
+            header.DiscountAmount, header.NetAmount, header.VatAmount, header.TotalAmount, header.CreatedAt, lines,
+            header.AccountingPostedJournalEntryId, header.AccountingPostedAt, header.AccountingInputVatAccountId);
     }
 
     private static string NormalizeDocumentNumber(string? value) => (value ?? "").Trim().ToUpperInvariant();
@@ -283,7 +291,8 @@ public static class PurchaseInvoiceDraftEndpoints
         Guid Id, Guid CompanyId, Guid SupplierId, string PurchaseNumber, string SupplierInvoiceNumber,
         DateOnly IssueDate, DateOnly? DueDate, string CurrencyCode, string SupplierName, string? SupplierTaxNumber,
         decimal SubtotalAmount, string Notes, string Status, string TaxCalculationStatus,
-        decimal? GrossAmount, decimal? DiscountAmount, decimal? NetAmount, decimal? VatAmount, decimal? TotalAmount, DateTime CreatedAt);
+        decimal? GrossAmount, decimal? DiscountAmount, decimal? NetAmount, decimal? VatAmount, decimal? TotalAmount, DateTime CreatedAt,
+        Guid? AccountingPostedJournalEntryId, DateTime? AccountingPostedAt, Guid? AccountingInputVatAccountId);
     public sealed record PurchaseDraftLineDto(
         Guid Id, int LineNumber, string Description, decimal Quantity, decimal UnitPrice, decimal LineAmount,
         decimal DiscountAmount, string VatTreatment, string? VatTreatmentReason, decimal? GrossAmount,
@@ -293,10 +302,12 @@ public static class PurchaseInvoiceDraftEndpoints
         DateOnly IssueDate, DateOnly? DueDate, string CurrencyCode, string SupplierName, string? SupplierTaxNumber,
         decimal SubtotalAmount, string Notes, string Status, string TaxCalculationStatus,
         decimal? GrossAmount, decimal? DiscountAmount, decimal? NetAmount, decimal? VatAmount, decimal? TotalAmount,
-        DateTime CreatedAt, IReadOnlyList<PurchaseDraftLineDto> Lines);
+        DateTime CreatedAt, IReadOnlyList<PurchaseDraftLineDto> Lines,
+        Guid? AccountingPostedJournalEntryId, DateTime? AccountingPostedAt, Guid? AccountingInputVatAccountId);
     public sealed record PurchaseDraftListRow(
         Guid Id, string PurchaseNumber, string SupplierInvoiceNumber, DateOnly IssueDate, DateOnly? DueDate,
         string CurrencyCode, Guid SupplierId, string SupplierName, string? SupplierTaxNumber,
         decimal SubtotalAmount, string TaxCalculationStatus, decimal? GrossAmount, decimal? DiscountAmount,
-        decimal? NetAmount, decimal? VatAmount, decimal? TotalAmount, string Status, DateTime CreatedAt, int LineCount);
+        decimal? NetAmount, decimal? VatAmount, decimal? TotalAmount, string Status, DateTime CreatedAt, int LineCount,
+        Guid? AccountingPostedJournalEntryId, DateTime? AccountingPostedAt, Guid? AccountingInputVatAccountId);
 }

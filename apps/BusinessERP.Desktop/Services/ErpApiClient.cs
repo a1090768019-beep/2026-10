@@ -25,12 +25,6 @@ public sealed class ErpApiClient(HttpClient httpClient, Guid tenantId)
     public Task<ApiCompany> CreateCompanyAsync(CreateCompanyApiRequest request, CancellationToken ct = default) =>
         SendJsonAsync<ApiCompany>(HttpMethod.Post, "/api/v1/companies", request, ct);
 
-    public Task<IReadOnlyList<ApiAccount>> GetAccountsAsync(Guid companyId, CancellationToken ct = default) =>
-        GetListAsync<ApiAccount>($"/api/v1/companies/{companyId:D}/accounts", ct);
-
-    public Task<IReadOnlyList<ApiFiscalPeriod>> GetFiscalPeriodsAsync(Guid companyId, CancellationToken ct = default) =>
-        GetListAsync<ApiFiscalPeriod>($"/api/v1/companies/{companyId:D}/fiscal-periods", ct);
-
     public Task<SalesDraftLedgerPostingApiResult> PostSalesDraftToLedgerAsync(
         Guid companyId, Guid invoiceId, PostSalesDraftToLedgerApiRequest request, CancellationToken ct = default) =>
         SendJsonAsync<SalesDraftLedgerPostingApiResult>(
@@ -68,6 +62,12 @@ public sealed class ErpApiClient(HttpClient httpClient, Guid tenantId)
     public Task<ApiCustomer> CreateCustomerAsync(Guid companyId, CreateCustomerApiRequest request, CancellationToken ct = default) =>
         SendJsonAsync<ApiCustomer>(HttpMethod.Post, $"/api/v1/companies/{companyId:D}/customers", request, ct);
 
+    public Task<IReadOnlyList<ApiAccount>> GetAccountsAsync(Guid companyId, CancellationToken ct = default) =>
+        GetListAsync<ApiAccount>($"/api/v1/companies/{companyId:D}/accounts", ct);
+
+    public Task<IReadOnlyList<ApiFiscalPeriod>> GetFiscalPeriodsAsync(Guid companyId, CancellationToken ct = default) =>
+        GetListAsync<ApiFiscalPeriod>($"/api/v1/companies/{companyId:D}/fiscal-periods", ct);
+
     public Task<IReadOnlyList<ApiSupplier>> GetSuppliersAsync(Guid companyId, CancellationToken ct = default) =>
         GetListAsync<ApiSupplier>($"/api/v1/companies/{companyId:D}/suppliers", ct);
 
@@ -89,6 +89,11 @@ public sealed class ErpApiClient(HttpClient httpClient, Guid tenantId)
         Guid companyId, Guid invoiceId, ApplyPurchaseDraftVatApiRequest request, CancellationToken ct = default) =>
         SendJsonAsync<PurchaseDraftVatResult>(
             HttpMethod.Post, $"/api/v1/companies/{companyId:D}/purchase-invoice-drafts/{invoiceId:D}/calculate-vat", request, ct);
+
+    public Task<PurchaseDraftLedgerPostingResult> PostPurchaseDraftToLedgerAsync(
+        Guid companyId, Guid invoiceId, PostPurchaseDraftToLedgerApiRequest request, CancellationToken ct = default) =>
+        SendJsonAsync<PurchaseDraftLedgerPostingResult>(
+            HttpMethod.Post, $"/api/v1/companies/{companyId:D}/purchase-invoice-drafts/{invoiceId:D}/post-to-ledger", request, ct);
 
     public Task<PurchaseVatDetailsApiReport> GetPurchaseVatDetailsReportAsync(
         Guid companyId, DateOnly fromDate, DateOnly toDate, int page = 1, int pageSize = 100, CancellationToken ct = default) =>
@@ -242,10 +247,12 @@ public sealed record CreateCompanyApiRequest(string Name, string BaseCurrency = 
 public sealed record ApiAccount(Guid Id, string Code, string NameAr, string NameEn, string AccountType, string NormalBalance, Guid? ParentAccountId, bool IsActive, bool AllowPosting)
 {
     public string DisplayName => $"{Code} — {NameAr} ({NameEn})";
+    public string DisplayLabel => DisplayName;
 }
 public sealed record ApiFiscalPeriod(Guid Id, Guid FiscalYearId, int PeriodNumber, DateOnly StartDate, DateOnly EndDate, string Status)
 {
     public string DisplayName => $"الفترة {PeriodNumber}: {StartDate:yyyy-MM-dd} — {EndDate:yyyy-MM-dd} ({Status})";
+    public string DisplayLabel => DisplayName;
 }
 public sealed record PostSalesDraftToLedgerApiRequest(
     Guid FiscalPeriodId, string EntryNumber, Guid ReceivableAccountId, Guid RevenueAccountId, Guid? OutputVatAccountId = null);
@@ -260,7 +267,8 @@ public sealed record PurchaseInvoiceDraftListItem(
     Guid Id, string PurchaseNumber, string SupplierInvoiceNumber, DateOnly IssueDate, DateOnly? DueDate,
     string CurrencyCode, Guid SupplierId, string SupplierName, string? SupplierTaxNumber,
     decimal SubtotalAmount, string TaxCalculationStatus, decimal? GrossAmount, decimal? DiscountAmount,
-    decimal? NetAmount, decimal? VatAmount, decimal? TotalAmount, string Status, DateTime CreatedAt, int LineCount);
+    decimal? NetAmount, decimal? VatAmount, decimal? TotalAmount, string Status, DateTime CreatedAt, int LineCount,
+    Guid? AccountingPostedJournalEntryId, DateTime? AccountingPostedAt, Guid? AccountingInputVatAccountId);
 public sealed record CreatePurchaseInvoiceDraftApiRequest(
     Guid SupplierId, string PurchaseNumber, string SupplierInvoiceNumber, DateOnly IssueDate, DateOnly? DueDate,
     string? Notes, IReadOnlyList<CreatePurchaseInvoiceDraftLineApiRequest> Lines);
@@ -270,7 +278,8 @@ public sealed record PurchaseInvoiceDraftDetails(
     DateOnly IssueDate, DateOnly? DueDate, string CurrencyCode, string SupplierName, string? SupplierTaxNumber,
     decimal SubtotalAmount, string Notes, string Status, string TaxCalculationStatus,
     decimal? GrossAmount, decimal? DiscountAmount, decimal? NetAmount, decimal? VatAmount, decimal? TotalAmount,
-    DateTime CreatedAt, IReadOnlyList<PurchaseInvoiceDraftLine> Lines);
+    DateTime CreatedAt, IReadOnlyList<PurchaseInvoiceDraftLine> Lines,
+    Guid? AccountingPostedJournalEntryId, DateTime? AccountingPostedAt, Guid? AccountingInputVatAccountId);
 public sealed record PurchaseInvoiceDraftLine(
     Guid Id, int LineNumber, string Description, decimal Quantity, decimal UnitPrice, decimal LineAmount,
     decimal DiscountAmount, string VatTreatment, string? VatTreatmentReason, decimal? GrossAmount,
@@ -284,6 +293,12 @@ public sealed record PurchaseDraftVatResult(
 public sealed record PurchaseDraftVatLineResult(
     int LineNumber, string Description, string Treatment, decimal GrossAmount, decimal DiscountAmount,
     decimal NetAmount, decimal VatRatePercent, decimal VatAmount, decimal TotalAmount, string? TreatmentReason);
+public sealed record PostPurchaseDraftToLedgerApiRequest(
+    Guid FiscalPeriodId, string EntryNumber, Guid PurchaseDebitAccountId, Guid PayableAccountId, Guid? InputVatAccountId = null);
+public sealed record PurchaseDraftLedgerPostingResult(
+    Guid PurchaseInvoiceDraftId, Guid JournalEntryId, string EntryNumber, string JournalEntryStatus, DateOnly EntryDate,
+    decimal GrossAmount, decimal DiscountAmount, decimal NetAmount, decimal VatAmount, decimal TotalAmount,
+    bool AlreadyPosted, Guid? InputVatAccountId, string InputVatPostingMode, string Message);
 public sealed record PurchaseVatDetailsApiReport(
     Guid CompanyId, DateOnly FromDate, DateOnly ToDate, int Page, int PageSize, long TotalLines, int TotalPages,
     long InvoiceCount, decimal GrossAmount, decimal DiscountAmount, decimal NetAmount, decimal VatAmount,

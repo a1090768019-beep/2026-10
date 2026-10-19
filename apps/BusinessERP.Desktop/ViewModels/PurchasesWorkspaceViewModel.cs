@@ -19,6 +19,10 @@ public sealed class PurchasesWorkspaceViewModel : INotifyPropertyChanged
     private PurchaseInvoiceDraftListItem? _selectedPurchaseDraft;
     private PurchaseInvoiceDraftDetails? _selectedDraftDetails;
     private PurchaseVatDetailsApiReport? _currentVatReport;
+    private ApiFiscalPeriod? _selectedFiscalPeriod;
+    private ApiAccount? _selectedPurchaseDebitAccount;
+    private ApiAccount? _selectedPayableAccount;
+    private ApiAccount? _selectedInputVatAccount;
     private bool _suppressCompanyReload;
     private bool _isBusy;
     private bool _statusIsError;
@@ -42,6 +46,10 @@ public sealed class PurchasesWorkspaceViewModel : INotifyPropertyChanged
     public ObservableCollection<ApiCompany> Companies { get; } = [];
     public ObservableCollection<ApiSupplier> Suppliers { get; } = [];
     public ObservableCollection<PurchaseInvoiceDraftListItem> PurchaseDrafts { get; } = [];
+    public ObservableCollection<ApiAccount> PurchaseDebitAccounts { get; } = [];
+    public ObservableCollection<ApiAccount> PayableAccounts { get; } = [];
+    public ObservableCollection<ApiAccount> InputVatAccounts { get; } = [];
+    public ObservableCollection<ApiFiscalPeriod> OpenFiscalPeriods { get; } = [];
     public ObservableCollection<PurchaseLineEditor> NewPurchaseLines { get; } = [new PurchaseLineEditor()];
     public ObservableCollection<PurchaseLineEditor> SelectedDraftLines { get; } = [];
     public ObservableCollection<PurchaseVatDetailsApiLine> PurchaseVatRows { get; } = [];
@@ -56,6 +64,7 @@ public sealed class PurchasesWorkspaceViewModel : INotifyPropertyChanged
     public ICommand LoadVatReportCommand { get; }
     public ICommand PreviousVatPageCommand { get; }
     public ICommand NextVatPageCommand { get; }
+    public ICommand PostSelectedDraftToLedgerCommand { get; }
 
     public event PropertyChangedEventHandler? PropertyChanged;
     public event EventHandler? WorkspaceContextChanged;
@@ -90,6 +99,7 @@ public sealed class PurchasesWorkspaceViewModel : INotifyPropertyChanged
         LoadVatReportCommand = new AsyncCommand(() => LoadVatReportAsync(1), CanLoadVatReport, HandleUnexpectedCommandFailure);
         PreviousVatPageCommand = new AsyncCommand(() => LoadVatReportAsync(_reportPage - 1), CanGoToPreviousVatPage, HandleUnexpectedCommandFailure);
         NextVatPageCommand = new AsyncCommand(() => LoadVatReportAsync(_reportPage + 1), CanGoToNextVatPage, HandleUnexpectedCommandFailure);
+        PostSelectedDraftToLedgerCommand = new AsyncCommand(PostSelectedDraftToLedgerAsync, CanPostSelectedDraftToLedger, HandleUnexpectedCommandFailure);
     }
 
     public string WorkspaceContextSummary => SelectedCompany is null
@@ -117,6 +127,27 @@ public sealed class PurchasesWorkspaceViewModel : INotifyPropertyChanged
 
     public string SelectedCurrency => SelectedCompany?.BaseCurrency ?? "SAR";
 
+    public ApiFiscalPeriod? SelectedFiscalPeriod
+    {
+        get => _selectedFiscalPeriod;
+        set { if (ReferenceEquals(_selectedFiscalPeriod, value)) return; _selectedFiscalPeriod = value; OnPropertyChanged(); NotifyCommands(); }
+    }
+    public ApiAccount? SelectedPurchaseDebitAccount
+    {
+        get => _selectedPurchaseDebitAccount;
+        set { if (ReferenceEquals(_selectedPurchaseDebitAccount, value)) return; _selectedPurchaseDebitAccount = value; OnPropertyChanged(); NotifyCommands(); }
+    }
+    public ApiAccount? SelectedPayableAccount
+    {
+        get => _selectedPayableAccount;
+        set { if (ReferenceEquals(_selectedPayableAccount, value)) return; _selectedPayableAccount = value; OnPropertyChanged(); NotifyCommands(); }
+    }
+    public ApiAccount? SelectedInputVatAccount
+    {
+        get => _selectedInputVatAccount;
+        set { if (ReferenceEquals(_selectedInputVatAccount, value)) return; _selectedInputVatAccount = value; OnPropertyChanged(); NotifyCommands(); }
+    }
+
     public ApiSupplier? SelectedSupplier
     {
         get => _selectedSupplier;
@@ -132,6 +163,7 @@ public sealed class PurchasesWorkspaceViewModel : INotifyPropertyChanged
             _selectedPurchaseDraft = value;
             OnPropertyChanged();
             OnPropertyChanged(nameof(SelectedDraftStatusSummary));
+            OnPropertyChanged(nameof(IsSelectedDraftPosted));
             if (value is not null && _apiClient is not null && SelectedCompany is not null)
                 _ = LoadSelectedDraftDetailsAsync(value.Id);
             else
@@ -145,9 +177,11 @@ public sealed class PurchasesWorkspaceViewModel : INotifyPropertyChanged
     }
 
     public PurchaseInvoiceDraftDetails? SelectedDraftDetails => _selectedDraftDetails;
+    public bool IsSelectedDraftPosted => string.Equals(SelectedDraftDetails?.Status, "ACCOUNTING_POSTED", StringComparison.OrdinalIgnoreCase);
     public string SelectedDraftStatusSummary => SelectedPurchaseDraft is null
         ? "اختر مسودة محفوظة لعرض بنودها وحساب VAT."
-        : $"{SelectedPurchaseDraft.PurchaseNumber} · فاتورة المورد {SelectedPurchaseDraft.SupplierInvoiceNumber} · {SelectedPurchaseDraft.SupplierName} · {SelectedPurchaseDraft.TaxCalculationStatus}";
+        : $"{SelectedPurchaseDraft.PurchaseNumber} · فاتورة المورد {SelectedPurchaseDraft.SupplierInvoiceNumber} · {SelectedPurchaseDraft.SupplierName} · {SelectedPurchaseDraft.Status} · VAT: {SelectedPurchaseDraft.TaxCalculationStatus}" +
+          (SelectedPurchaseDraft.AccountingPostedJournalEntryId.HasValue ? $" · رقم القيد {SelectedPurchaseDraft.AccountingPostedJournalEntryId.Value:D}" : " · لم ترحّل محاسبيًا");
 
     public PurchaseVatDetailsApiReport? CurrentVatReport => _currentVatReport;
     public string VatReportSummary => CurrentVatReport is null
@@ -289,14 +323,53 @@ public sealed class PurchasesWorkspaceViewModel : INotifyPropertyChanged
         var companyId = SelectedCompany.Id;
         var suppliersTask = _apiClient.GetSuppliersAsync(companyId);
         var draftsTask = _apiClient.GetPurchaseInvoiceDraftsAsync(companyId);
+        var accountsTask = _apiClient.GetAccountsAsync(companyId);
+        var periodsTask = _apiClient.GetFiscalPeriodsAsync(companyId);
         var reportTask = _reportFromDate.HasValue && _reportToDate.HasValue && _reportFromDate.Value.Date <= _reportToDate.Value.Date
             ? _apiClient.GetPurchaseVatDetailsReportAsync(companyId, DateOnly.FromDateTime(_reportFromDate.Value.Date), DateOnly.FromDateTime(_reportToDate.Value.Date), 1, ReportPageSize)
             : Task.FromResult<PurchaseVatDetailsApiReport?>(null);
-        await Task.WhenAll(suppliersTask, draftsTask, reportTask!);
+        await Task.WhenAll(suppliersTask, draftsTask, accountsTask, periodsTask, reportTask!);
         Suppliers.Clear();
         foreach (var supplier in await suppliersTask) Suppliers.Add(supplier);
         PurchaseDrafts.Clear();
         foreach (var draft in await draftsTask) PurchaseDrafts.Add(draft);
+
+        var priorDebitId = SelectedPurchaseDebitAccount?.Id;
+        var priorPayableId = SelectedPayableAccount?.Id;
+        var priorInputVatId = SelectedInputVatAccount?.Id;
+        var priorPeriodId = SelectedFiscalPeriod?.Id;
+        var accounts = await accountsTask;
+        PurchaseDebitAccounts.Clear();
+        foreach (var account in accounts.Where(account => account.IsActive && account.AllowPosting &&
+                     account.NormalBalance == "DEBIT" && (account.AccountType == "ASSET" || account.AccountType == "EXPENSE"))
+                 .OrderBy(account => account.Code, StringComparer.OrdinalIgnoreCase))
+            PurchaseDebitAccounts.Add(account);
+        PayableAccounts.Clear();
+        foreach (var account in accounts.Where(account => account.IsActive && account.AllowPosting &&
+                     account.AccountType == "LIABILITY" && account.NormalBalance == "CREDIT")
+                 .OrderBy(account => account.Code, StringComparer.OrdinalIgnoreCase))
+            PayableAccounts.Add(account);
+        InputVatAccounts.Clear();
+        foreach (var account in accounts.Where(account => account.IsActive && account.AllowPosting &&
+                     account.AccountType == "ASSET" && account.NormalBalance == "DEBIT")
+                 .OrderBy(account => account.Code, StringComparer.OrdinalIgnoreCase))
+            InputVatAccounts.Add(account);
+        SelectedPurchaseDebitAccount = (priorDebitId.HasValue ? PurchaseDebitAccounts.FirstOrDefault(account => account.Id == priorDebitId.Value) : null)
+            ?? PurchaseDebitAccounts.FirstOrDefault();
+        SelectedPayableAccount = (priorPayableId.HasValue ? PayableAccounts.FirstOrDefault(account => account.Id == priorPayableId.Value) : null)
+            ?? PayableAccounts.FirstOrDefault();
+        SelectedInputVatAccount = priorInputVatId.HasValue
+            ? InputVatAccounts.FirstOrDefault(account => account.Id == priorInputVatId.Value)
+            : null;
+
+        var periods = (await periodsTask).Where(period => period.Status == "OPEN").OrderBy(period => period.StartDate).ToArray();
+        OpenFiscalPeriods.Clear();
+        foreach (var period in periods) OpenFiscalPeriods.Add(period);
+        var priorDate = DateOnly.FromDateTime((IssueDate ?? DateTime.Today).Date);
+        SelectedFiscalPeriod = (priorPeriodId.HasValue ? OpenFiscalPeriods.FirstOrDefault(period => period.Id == priorPeriodId.Value) : null)
+            ?? OpenFiscalPeriods.FirstOrDefault(period => priorDate >= period.StartDate && priorDate <= period.EndDate)
+            ?? OpenFiscalPeriods.LastOrDefault();
+
         var selectedId = SelectedPurchaseDraft?.Id;
         SelectedPurchaseDraft = (selectedId.HasValue ? PurchaseDrafts.FirstOrDefault(x => x.Id == selectedId.Value) : null)
             ?? PurchaseDrafts.FirstOrDefault();
@@ -305,6 +378,7 @@ public sealed class PurchasesWorkspaceViewModel : INotifyPropertyChanged
         else if (reportTask?.IsFaulted == true)
             await reportTask;
         OnPropertyChanged(nameof(WorkspaceContextSummary));
+        OnPropertyChanged(nameof(IsSelectedDraftPosted));
     }
 
     private async Task CreateSupplierAsync()
@@ -377,6 +451,7 @@ public sealed class PurchasesWorkspaceViewModel : INotifyPropertyChanged
             }
             OnPropertyChanged(nameof(SelectedDraftDetails));
             OnPropertyChanged(nameof(SelectedDraftStatusSummary));
+            OnPropertyChanged(nameof(IsSelectedDraftPosted));
             NotifyCommands();
         }
         catch (ErpApiException ex) { StatusMessage = ex.Message; StatusIsError = true; }
@@ -403,6 +478,36 @@ public sealed class PurchasesWorkspaceViewModel : INotifyPropertyChanged
         catch (ErpApiException ex) { StatusMessage = ex.Message; StatusIsError = true; }
         catch (HttpRequestException) { StatusMessage = "تعذر الاتصال بالخادم لحفظ حساب VAT لمسودة المشتريات."; StatusIsError = true; }
         finally { IsBusy = false; }
+    }
+
+    private async Task PostSelectedDraftToLedgerAsync()
+    {
+        if (!CanPostSelectedDraftToLedger() || _apiClient is null || SelectedCompany is null ||
+            SelectedDraftDetails is null || SelectedFiscalPeriod is null ||
+            SelectedPurchaseDebitAccount is null || SelectedPayableAccount is null)
+            return;
+
+        IsBusy = true;
+        StatusIsError = false;
+        try
+        {
+            var request = new PostPurchaseDraftToLedgerApiRequest(
+                SelectedFiscalPeriod.Id,
+                $"PGL-{Guid.NewGuid():N}",
+                SelectedPurchaseDebitAccount.Id,
+                SelectedPayableAccount.Id,
+                SelectedDraftDetails.VatAmount.GetValueOrDefault() > 0m ? SelectedInputVatAccount?.Id : null);
+            var result = await _apiClient.PostPurchaseDraftToLedgerAsync(
+                SelectedCompany.Id, SelectedDraftDetails.Id, request);
+            await LoadCompanyDataAsync();
+            StatusMessage = $"{result.Message} رقم القيد: {result.EntryNumber} · {result.JournalEntryId:D}";
+            StatusIsError = false;
+            OnPropertyChanged(nameof(IsSelectedDraftPosted));
+            OnPropertyChanged(nameof(SelectedDraftStatusSummary));
+        }
+        catch (ErpApiException ex) { StatusMessage = ex.Message; StatusIsError = true; }
+        catch (HttpRequestException) { StatusMessage = "تعذر الاتصال بالخادم أثناء ترحيل مسودة المشتريات إلى دفتر الأستاذ."; StatusIsError = true; }
+        finally { IsBusy = false; NotifyCommands(); }
     }
 
     private async Task LoadVatReportAsync(int page)
@@ -452,13 +557,24 @@ public sealed class PurchasesWorkspaceViewModel : INotifyPropertyChanged
 
     private bool CanCalculateSelectedDraftVat() =>
         _apiClient is not null && SelectedCompany is not null && SelectedDraftDetails is not null &&
-        SelectedDraftLines.Count > 0 && !IsBusy &&
+        SelectedDraftDetails.Status == "DRAFT" && SelectedDraftLines.Count > 0 && !IsBusy &&
         SelectedDraftLines.All(line => line.DiscountAmount >= 0m && HasPrecision(line.DiscountAmount, 2) &&
             (line.VatTreatment == "StandardRated" || !string.IsNullOrWhiteSpace(line.VatTreatmentReason)));
 
     private bool CanLoadVatReport() =>
         _apiClient is not null && SelectedCompany is not null && !IsBusy &&
         ReportFromDate.HasValue && ReportToDate.HasValue && ReportFromDate.Value.Date <= ReportToDate.Value.Date;
+
+    private bool CanPostSelectedDraftToLedger() =>
+        _apiClient is not null && SelectedCompany is not null && SelectedDraftDetails is not null &&
+        SelectedDraftDetails.Status == "DRAFT" && SelectedDraftDetails.TaxCalculationStatus == "CALCULATED" &&
+        SelectedDraftDetails.TotalAmount.GetValueOrDefault() > 0m && !IsBusy &&
+        SelectedFiscalPeriod is not null && SelectedFiscalPeriod.Status == "OPEN" &&
+        SelectedDraftDetails.IssueDate >= SelectedFiscalPeriod.StartDate && SelectedDraftDetails.IssueDate <= SelectedFiscalPeriod.EndDate &&
+        SelectedPurchaseDebitAccount is not null && SelectedPayableAccount is not null &&
+        SelectedPurchaseDebitAccount.Id != SelectedPayableAccount.Id &&
+        (SelectedInputVatAccount is null || (SelectedInputVatAccount.Id != SelectedPurchaseDebitAccount.Id &&
+                                             SelectedInputVatAccount.Id != SelectedPayableAccount.Id));
 
     private bool CanGoToPreviousVatPage() => !IsBusy && CurrentVatReport is not null && CurrentVatReport.Page > 1;
     private bool CanGoToNextVatPage() => !IsBusy && CurrentVatReport is not null && CurrentVatReport.Page < CurrentVatReport.TotalPages;
@@ -480,11 +596,14 @@ public sealed class PurchasesWorkspaceViewModel : INotifyPropertyChanged
     private void ClearCompanyRows()
     {
         Suppliers.Clear(); PurchaseDrafts.Clear(); SelectedDraftLines.Clear(); PurchaseVatRows.Clear();
+        PurchaseDebitAccounts.Clear(); PayableAccounts.Clear(); InputVatAccounts.Clear(); OpenFiscalPeriods.Clear();
         SelectedSupplier = null;
+        SelectedPurchaseDebitAccount = null; SelectedPayableAccount = null; SelectedInputVatAccount = null; SelectedFiscalPeriod = null;
         _selectedPurchaseDraft = null; _selectedDraftDetails = null; _currentVatReport = null;
         OnPropertyChanged(nameof(SelectedPurchaseDraft));
         OnPropertyChanged(nameof(SelectedDraftDetails));
         OnPropertyChanged(nameof(SelectedDraftStatusSummary));
+        OnPropertyChanged(nameof(IsSelectedDraftPosted));
         OnPropertyChanged(nameof(CurrentVatReport));
         OnPropertyChanged(nameof(VatReportSummary));
         OnPropertyChanged(nameof(VatReportPageSummary));
@@ -514,6 +633,7 @@ public sealed class PurchasesWorkspaceViewModel : INotifyPropertyChanged
         (LoadVatReportCommand as AsyncCommand)?.RaiseCanExecuteChanged();
         (PreviousVatPageCommand as AsyncCommand)?.RaiseCanExecuteChanged();
         (NextVatPageCommand as AsyncCommand)?.RaiseCanExecuteChanged();
+        (PostSelectedDraftToLedgerCommand as AsyncCommand)?.RaiseCanExecuteChanged();
     }
 
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
