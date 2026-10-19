@@ -178,7 +178,7 @@ CREATE TRIGGER trg_supplier_payment_allocation_guard
 
 -- Validate source-document allocation totals in the database, independent of API validation.
 CREATE OR REPLACE FUNCTION validate_customer_receipt_allocation_totals() RETURNS trigger
-LANGUAGE plpgsql AS $
+LANGUAGE plpgsql AS $$
 DECLARE
     source_id uuid;
     source_amount numeric(20,2);
@@ -202,14 +202,14 @@ BEGIN
         RAISE EXCEPTION 'Receipt allocations cannot exceed receipt amount' USING ERRCODE = '23514';
     END IF;
     IF TG_OP = 'DELETE' THEN RETURN OLD; ELSE RETURN NEW; END IF;
-END $;
+END $$;
 CREATE CONSTRAINT TRIGGER trg_customer_receipt_allocation_total
     AFTER INSERT OR UPDATE OR DELETE ON customer_receipt_allocations
     DEFERRABLE INITIALLY DEFERRED FOR EACH ROW
     EXECUTE FUNCTION validate_customer_receipt_allocation_totals();
 
 CREATE OR REPLACE FUNCTION validate_supplier_payment_allocation_totals() RETURNS trigger
-LANGUAGE plpgsql AS $
+LANGUAGE plpgsql AS $$
 DECLARE
     source_id uuid;
     source_amount numeric(20,2);
@@ -232,8 +232,8 @@ BEGIN
     IF allocated_total > source_amount THEN
         RAISE EXCEPTION 'Payment allocations cannot exceed payment amount' USING ERRCODE = '23514';
     END IF;
-    RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
-END $;
+    IF TG_OP = 'DELETE' THEN RETURN OLD; ELSE RETURN NEW; END IF;
+END $$;
 CREATE CONSTRAINT TRIGGER trg_supplier_payment_allocation_total
     AFTER INSERT OR UPDATE OR DELETE ON supplier_payment_allocations
     DEFERRABLE INITIALLY DEFERRED FOR EACH ROW
