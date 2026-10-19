@@ -132,6 +132,7 @@ app.MapSalesDraftVatEndpoints();
 app.MapSalesDraftVatReportEndpoints();
 app.MapSalesDraftLedgerPostingEndpoints();
 app.MapSettlementEndpoints();
+app.MapReceivablesPayablesAgingEndpoints();
 app.Run();
 
 public partial class Program { }
