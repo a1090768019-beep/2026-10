@@ -371,10 +371,12 @@ public sealed class ReportsWorkspaceViewModel : INotifyPropertyChanged
         BalanceSummary = "لم يتم تحميل الميزانية.";
     }
 
-    private void NotifyCommands() =>
+    private void NotifyCommands()
+    {
         (LoadReportsCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
         (PreviousSalesVatPageCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
         (NextSalesVatPageCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
+    }
 
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
