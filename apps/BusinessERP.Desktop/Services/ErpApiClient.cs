@@ -214,12 +214,12 @@ public sealed class ErpApiClient(HttpClient httpClient, Guid tenantId)
     public Task<InvoiceAgingApiReport> GetReceivablesAgingAsync(
         Guid companyId, DateOnly asOfDate, int page = 1, int pageSize = 100, CancellationToken ct = default) =>
         GetObjectAsync<InvoiceAgingApiReport>(
-            $"/api/v1/companies/{companyId:D}/reports/receivables-aging?asOfDate={asOfDate:yyyy-MM-dd}&page={page}&pageSize={pageSize}", ct);
+            $"/api/v1/companies/{companyId:D}/reports/receivables-aging?asOfDate={asOfDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}&page={page}&pageSize={pageSize}", ct);
 
     public Task<InvoiceAgingApiReport> GetPayablesAgingAsync(
         Guid companyId, DateOnly asOfDate, int page = 1, int pageSize = 100, CancellationToken ct = default) =>
         GetObjectAsync<InvoiceAgingApiReport>(
-            $"/api/v1/companies/{companyId:D}/reports/payables-aging?asOfDate={asOfDate:yyyy-MM-dd}&page={page}&pageSize={pageSize}", ct);
+            $"/api/v1/companies/{companyId:D}/reports/payables-aging?asOfDate={asOfDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}&page={page}&pageSize={pageSize}", ct);
 
     public Task<IReadOnlyList<CustomerReceiptApiDto>> GetCustomerReceiptsAsync(Guid companyId, CancellationToken ct = default) =>
         GetListAsync<CustomerReceiptApiDto>($"/api/v1/companies/{companyId:D}/customer-receipts", ct);
