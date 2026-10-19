@@ -27,6 +27,8 @@ public static class InventoryEndpoints
         company.MapGet("/inventory/movements", GetMovements).WithName("GetInventoryMovements");
         company.MapPost("/inventory/receipts", RecordReceipt).WithName("RecordInventoryReceipt");
         company.MapPost("/inventory/issues", RecordIssue).WithName("RecordInventoryIssue");
+        company.MapGet("/inventory/transfers", GetTransfers).WithName("GetInventoryTransfers");
+        company.MapPost("/inventory/transfers", RecordTransfer).WithName("RecordInventoryTransfer");
         return endpoints;
     }
 
@@ -163,6 +165,222 @@ public static class InventoryEndpoints
         {
             return Results.Conflict(new { error = "warehouse_code_exists", message = "رمز المستودع مستخدم بالفعل داخل الشركة." });
         }
+    }
+
+
+    private static async Task<IResult> GetTransfers(
+        Guid companyId, DateOnly? fromDate, DateOnly? toDate, Guid? itemId,
+        Guid? sourceWarehouseId, Guid? destinationWarehouseId, int page, int pageSize,
+        ITenantContext tenant, TenantTransactionRunner runner, CancellationToken ct)
+    {
+        if (!ValidPage(page, pageSize))
+            return Results.ValidationProblem(new Dictionary<string, string[]> { ["page"] = ["رقم الصفحة وحجمها غير صالحين."] });
+        if (fromDate.HasValue && toDate.HasValue && fromDate.Value > toDate.Value)
+            return Results.ValidationProblem(new Dictionary<string, string[]> { ["dateRange"] = ["تاريخ البداية لا يجوز أن يتجاوز تاريخ النهاية."] });
+
+        return await runner.ExecuteAsync<IResult>(async (db, token) =>
+        {
+            if (!await CompanyExistsAsync(db, tenant.TenantId, companyId, token)) return Results.NotFound();
+            await using var command = CreateCommand(db, """
+                SELECT transfer.id, transfer.transfer_number, transfer.transfer_date,
+                       item.id, item.item_code, item.barcode, item.name_ar, item.unit_code,
+                       source.id, source.warehouse_code, source.name,
+                       destination.id, destination.warehouse_code, destination.name,
+                       transfer.quantity, transfer.unit_cost, transfer.inventory_value,
+                       transfer.notes, transfer.created_at, count(*) OVER() AS total_rows
+                  FROM inventory_transfers AS transfer
+                  JOIN items AS item ON item.id = transfer.item_id
+                    AND item.tenant_id = @tenant_id AND item.company_id = @company_id
+                  JOIN warehouses AS source ON source.id = transfer.source_warehouse_id
+                    AND source.tenant_id = @tenant_id AND source.company_id = @company_id
+                  JOIN warehouses AS destination ON destination.id = transfer.destination_warehouse_id
+                    AND destination.tenant_id = @tenant_id AND destination.company_id = @company_id
+                 WHERE transfer.tenant_id = @tenant_id AND transfer.company_id = @company_id
+                   AND (CAST(@from_date AS date) IS NULL OR transfer.transfer_date >= @from_date)
+                   AND (CAST(@to_date AS date) IS NULL OR transfer.transfer_date <= @to_date)
+                   AND (CAST(@item_id AS uuid) IS NULL OR transfer.item_id = @item_id)
+                   AND (CAST(@source_warehouse_id AS uuid) IS NULL OR transfer.source_warehouse_id = @source_warehouse_id)
+                   AND (CAST(@destination_warehouse_id AS uuid) IS NULL OR transfer.destination_warehouse_id = @destination_warehouse_id)
+                 ORDER BY transfer.transfer_date DESC, transfer.created_at DESC, transfer.transfer_number DESC
+                 OFFSET @offset LIMIT @page_size
+                """);
+            AddParameter(command, "tenant_id", tenant.TenantId);
+            AddParameter(command, "company_id", companyId);
+            AddParameter(command, "from_date", fromDate);
+            AddParameter(command, "to_date", toDate);
+            AddParameter(command, "item_id", itemId);
+            AddParameter(command, "source_warehouse_id", sourceWarehouseId);
+            AddParameter(command, "destination_warehouse_id", destinationWarehouseId);
+            AddParameter(command, "offset", (page - 1) * pageSize);
+            AddParameter(command, "page_size", pageSize);
+
+            await using var reader = await command.ExecuteReaderAsync(token);
+            var rows = new List<InventoryTransferRow>();
+            long totalRows = 0;
+            while (await reader.ReadAsync(token))
+            {
+                totalRows = reader.GetInt64(19);
+                rows.Add(new InventoryTransferRow(
+                    reader.GetGuid(0), reader.GetString(1), DateOnly.FromDateTime(reader.GetDateTime(2)),
+                    reader.GetGuid(3), reader.GetString(4), ReadNullableString(reader, 5), reader.GetString(6), reader.GetString(7),
+                    reader.GetGuid(8), reader.GetString(9), reader.GetString(10),
+                    reader.GetGuid(11), reader.GetString(12), reader.GetString(13),
+                    reader.GetDecimal(14), reader.GetDecimal(15), reader.GetDecimal(16),
+                    reader.GetString(17), reader.GetDateTime(18)));
+            }
+
+            return Results.Ok(new InventoryTransfersReport(page, pageSize, totalRows,
+                totalRows == 0 ? 0 : (int)Math.Ceiling(totalRows / (double)pageSize), rows));
+        }, ct);
+    }
+
+    private static async Task<IResult> RecordTransfer(
+        Guid companyId, InventoryTransferRequest request, ITenantContext tenant, HttpContext http,
+        TenantTransactionRunner runner, CancellationToken ct)
+    {
+        if (!CanWrite(tenant)) return Results.Forbid();
+        var transferNumber = request.TransferNumber?.Trim().ToUpperInvariant() ?? "";
+        var notes = request.Notes?.Trim() ?? "";
+        var errors = new Dictionary<string, string[]>();
+        if (transferNumber.Length is < 1 or > 72) errors["transferNumber"] = ["رقم التحويل مطلوب ولا يتجاوز 72 حرفًا."];
+        if (request.ItemId == Guid.Empty) errors["itemId"] = ["الصنف مطلوب."];
+        if (request.SourceWarehouseId == Guid.Empty) errors["sourceWarehouseId"] = ["مستودع المصدر مطلوب."];
+        if (request.DestinationWarehouseId == Guid.Empty) errors["destinationWarehouseId"] = ["مستودع الوجهة مطلوب."];
+        if (request.SourceWarehouseId == request.DestinationWarehouseId) errors["destinationWarehouseId"] = ["يجب أن يختلف مستودع الوجهة عن مستودع المصدر."];
+        if (request.Quantity <= 0 || request.Quantity != decimal.Round(request.Quantity, 4))
+            errors["quantity"] = ["الكمية يجب أن تكون أكبر من صفر وبحد أقصى أربع منازل عشرية."];
+        if (notes.Length > 1000) errors["notes"] = ["الملاحظات لا تتجاوز 1000 حرف."];
+        if (request.TransferDate < new DateOnly(1900, 1, 1) || request.TransferDate > new DateOnly(2200, 12, 31))
+            errors["transferDate"] = ["تاريخ التحويل خارج النطاق المدعوم."];
+        if (errors.Count != 0) return Results.ValidationProblem(errors);
+
+        try
+        {
+            return await runner.ExecuteAsync<IResult>(async (db, token) =>
+            {
+                if (!await CompanyExistsAsync(db, tenant.TenantId, companyId, token)) return Results.NotFound();
+                await AcquireAdvisoryLockAsync(db, $"transfer-number:{tenant.TenantId:D}:{companyId:D}:{transferNumber}", token);
+
+                var sourceLock = $"inventory-balance:{tenant.TenantId:D}:{companyId:D}:{request.SourceWarehouseId:D}:{request.ItemId:D}";
+                var destinationLock = $"inventory-balance:{tenant.TenantId:D}:{companyId:D}:{request.DestinationWarehouseId:D}:{request.ItemId:D}";
+                foreach (var lockKey in new[] { sourceLock, destinationLock }.OrderBy(x => x, StringComparer.Ordinal))
+                    await AcquireAdvisoryLockAsync(db, lockKey, token);
+
+                if (!await IsActiveItemAndWarehouseAsync(db, tenant.TenantId, companyId, request.ItemId, request.SourceWarehouseId, token) ||
+                    !await IsActiveItemAndWarehouseAsync(db, tenant.TenantId, companyId, request.ItemId, request.DestinationWarehouseId, token))
+                    return Results.ValidationProblem(new Dictionary<string, string[]> { ["warehouseId"] = ["الصنف أو أحد المستودعين غير موجود أو غير نشط ضمن الشركة المحددة."] });
+
+                await using (var duplicate = CreateCommand(db, """
+                    SELECT EXISTS (SELECT 1 FROM inventory_transfers
+                                    WHERE tenant_id = @tenant_id AND company_id = @company_id
+                                      AND transfer_number = @transfer_number)
+                    """))
+                {
+                    AddParameter(duplicate, "tenant_id", tenant.TenantId);
+                    AddParameter(duplicate, "company_id", companyId);
+                    AddParameter(duplicate, "transfer_number", transferNumber);
+                    if (Convert.ToBoolean(await duplicate.ExecuteScalarAsync(token)))
+                        return Results.Conflict(new { error = "transfer_number_exists", message = "رقم التحويل مستخدم مسبقًا داخل الشركة." });
+                }
+
+                var (sourceOnHand, sourceValue) = await GetInventoryBalanceAsync(db, tenant.TenantId, companyId,
+                    request.SourceWarehouseId, request.ItemId, token);
+                var (destinationOnHand, destinationValue) = await GetInventoryBalanceAsync(db, tenant.TenantId, companyId,
+                    request.DestinationWarehouseId, request.ItemId, token);
+                if (request.Quantity > sourceOnHand)
+                    return Results.Conflict(new { error = "insufficient_stock", message = $"الكمية المتاحة في مستودع المصدر {sourceOnHand:N4} أقل من الكمية المطلوبة {request.Quantity:N4}." });
+
+                var transferValue = request.Quantity == sourceOnHand
+                    ? sourceValue
+                    : decimal.Round(request.Quantity * (sourceValue / sourceOnHand), 4, MidpointRounding.AwayFromZero);
+                var unitCost = decimal.Round(transferValue / request.Quantity, 8, MidpointRounding.AwayFromZero);
+
+                Guid transferId;
+                DateTime createdAt;
+                await using (var header = CreateCommand(db, """
+                    INSERT INTO inventory_transfers
+                        (tenant_id, company_id, transfer_number, item_id, source_warehouse_id,
+                         destination_warehouse_id, transfer_date, quantity, unit_cost, inventory_value, notes, created_by)
+                    VALUES
+                        (@tenant_id, @company_id, @transfer_number, @item_id, @source_warehouse_id,
+                         @destination_warehouse_id, @transfer_date, @quantity, @unit_cost, @inventory_value, @notes, @created_by)
+                    RETURNING id, created_at
+                    """))
+                {
+                    AddParameter(header, "tenant_id", tenant.TenantId);
+                    AddParameter(header, "company_id", companyId);
+                    AddParameter(header, "transfer_number", transferNumber);
+                    AddParameter(header, "item_id", request.ItemId);
+                    AddParameter(header, "source_warehouse_id", request.SourceWarehouseId);
+                    AddParameter(header, "destination_warehouse_id", request.DestinationWarehouseId);
+                    AddParameter(header, "transfer_date", request.TransferDate);
+                    AddParameter(header, "quantity", request.Quantity);
+                    AddParameter(header, "unit_cost", unitCost);
+                    AddParameter(header, "inventory_value", transferValue);
+                    AddParameter(header, "notes", notes);
+                    AddParameter(header, "created_by", tenant.UserId);
+                    await using var reader = await header.ExecuteReaderAsync(token);
+                    if (!await reader.ReadAsync(token)) throw new InvalidOperationException("The inventory transfer header was not returned.");
+                    transferId = reader.GetGuid(0);
+                    createdAt = reader.GetDateTime(1);
+                }
+
+                await InsertTransferMovementAsync(db, tenant.TenantId, companyId, transferId,
+                    transferNumber + "-OUT", request.ItemId, request.SourceWarehouseId, "ISSUE",
+                    request.TransferDate, -request.Quantity, unitCost, -transferValue, notes, tenant.UserId, token);
+                await InsertTransferMovementAsync(db, tenant.TenantId, companyId, transferId,
+                    transferNumber + "-IN", request.ItemId, request.DestinationWarehouseId, "RECEIPT",
+                    request.TransferDate, request.Quantity, unitCost, transferValue, notes, tenant.UserId, token);
+
+                await AddAuditAsync(db, tenant, http, "INVENTORY_TRANSFER_RECORDED", "InventoryTransfer",
+                    transferId.ToString("D"),
+                    new { transferNumber, request.ItemId, request.SourceWarehouseId, request.DestinationWarehouseId,
+                        request.TransferDate, request.Quantity, unitCost, transferValue }, token);
+
+                var newSourceQuantity = sourceOnHand - request.Quantity;
+                var newSourceValue = sourceValue - transferValue;
+                var newDestinationQuantity = destinationOnHand + request.Quantity;
+                var newDestinationValue = destinationValue + transferValue;
+                return Results.Created($"/api/v1/companies/{companyId:D}/inventory/transfers/{transferId:D}",
+                    new InventoryTransferResult(transferId, transferNumber, request.TransferDate, request.ItemId,
+                        request.SourceWarehouseId, request.DestinationWarehouseId, request.Quantity, unitCost,
+                        transferValue, newSourceQuantity, newSourceValue, newDestinationQuantity, newDestinationValue,
+                        newDestinationQuantity == 0 ? 0 : newDestinationValue / newDestinationQuantity, createdAt));
+            }, ct);
+        }
+        catch (DbException ex) when (IsUniqueViolation(ex))
+        {
+            return Results.Conflict(new { error = "transfer_number_exists", message = "رقم التحويل مستخدم مسبقًا داخل الشركة." });
+        }
+    }
+
+    private static async Task InsertTransferMovementAsync(
+        ErpDbContext db, Guid tenantId, Guid companyId, Guid transferId, string movementNumber,
+        Guid itemId, Guid warehouseId, string movementType, DateOnly movementDate, decimal quantityDelta,
+        decimal unitCost, decimal valueDelta, string notes, Guid createdBy, CancellationToken ct)
+    {
+        await using var command = CreateCommand(db, """
+            INSERT INTO inventory_movements
+                (tenant_id, company_id, movement_number, item_id, warehouse_id, movement_type,
+                 movement_date, quantity_delta, unit_cost, inventory_value_delta, source_type, transfer_id, notes, created_by)
+            VALUES
+                (@tenant_id, @company_id, @movement_number, @item_id, @warehouse_id, @movement_type,
+                 @movement_date, @quantity_delta, @unit_cost, @value_delta, 'TRANSFER', @transfer_id, @notes, @created_by)
+            """);
+        AddParameter(command, "tenant_id", tenantId);
+        AddParameter(command, "company_id", companyId);
+        AddParameter(command, "movement_number", movementNumber);
+        AddParameter(command, "item_id", itemId);
+        AddParameter(command, "warehouse_id", warehouseId);
+        AddParameter(command, "movement_type", movementType);
+        AddParameter(command, "movement_date", movementDate);
+        AddParameter(command, "quantity_delta", quantityDelta);
+        AddParameter(command, "unit_cost", unitCost);
+        AddParameter(command, "value_delta", valueDelta);
+        AddParameter(command, "transfer_id", transferId);
+        AddParameter(command, "notes", notes);
+        AddParameter(command, "created_by", createdBy);
+        await command.ExecuteNonQueryAsync(ct);
     }
 
     private static async Task<IResult> GetBalances(
@@ -511,4 +729,17 @@ public static class InventoryEndpoints
     private sealed record CreateWarehouseRequest(string? Code, string? Name);
     private sealed record InventoryMovementRequest(Guid ItemId, Guid WarehouseId, string? MovementNumber, DateOnly MovementDate,
         decimal Quantity, decimal? UnitCost = null, string? Notes = null);
+    private sealed record InventoryTransferRequest(Guid ItemId, Guid SourceWarehouseId, Guid DestinationWarehouseId,
+        string? TransferNumber, DateOnly TransferDate, decimal Quantity, string? Notes = null);
+    private sealed record InventoryTransferResult(Guid Id, string TransferNumber, DateOnly TransferDate, Guid ItemId,
+        Guid SourceWarehouseId, Guid DestinationWarehouseId, decimal Quantity, decimal UnitCost, decimal InventoryValue,
+        decimal SourceOnHandQuantity, decimal SourceInventoryValue, decimal DestinationOnHandQuantity,
+        decimal DestinationInventoryValue, decimal DestinationAverageUnitCost, DateTime CreatedAt);
+    private sealed record InventoryTransfersReport(int Page, int PageSize, long TotalRows, int TotalPages,
+        IReadOnlyList<InventoryTransferRow> Rows);
+    private sealed record InventoryTransferRow(Guid Id, string TransferNumber, DateOnly TransferDate,
+        Guid ItemId, string ItemCode, string? Barcode, string ItemNameAr, string UnitCode,
+        Guid SourceWarehouseId, string SourceWarehouseCode, string SourceWarehouseName,
+        Guid DestinationWarehouseId, string DestinationWarehouseCode, string DestinationWarehouseName,
+        decimal Quantity, decimal UnitCost, decimal InventoryValue, string Notes, DateTime CreatedAt);
 }

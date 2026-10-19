@@ -94,3 +94,25 @@ test('inventory balance and movement reports export to real Excel workbooks with
   assert.match(code, /Export only the currently loaded page/);
   assert.match(reportWriter, /internal static class MinimalXlsxWriter/);
 });
+
+test('warehouse transfer backend persists an atomic issue/receipt pair and validates tenant isolation', async () => {
+  const migration = await read('database/migrations/0008_inventory_transfers.sql');
+  const endpoint = await read('src/server/BusinessERP.Api/Endpoints/InventoryEndpoints.cs');
+  const program = await read('src/server/BusinessERP.Api/Program.cs');
+  const runtimeRole = await read('database/tests/prepare-runtime-role.sql');
+  const smoke = await read('database/tests/inventory-stock-smoke.sql');
+  assert.match(migration, /CREATE TABLE inventory_transfers/);
+  assert.match(migration, /DEFERRABLE INITIALLY DEFERRED/);
+  assert.match(migration, /assert_inventory_transfer_complete/);
+  assert.match(migration, /ENABLE ROW LEVEL SECURITY/);
+  assert.match(migration, /source_type = 'TRANSFER' AND transfer_id IS NOT NULL/);
+  assert.match(endpoint, /MapPost\("\/inventory\/transfers", RecordTransfer\)/);
+  assert.match(endpoint, /MapGet\("\/inventory\/transfers", GetTransfers\)/);
+  assert.match(endpoint, /transfer-number:/);
+  assert.match(endpoint, /insufficient_stock/);
+  assert.match(program, /MapInventoryEndpoints/);
+  assert.match(runtimeRole, /inventory_transfers TO erp_ci_runtime/);
+  assert.match(smoke, /CI-INV-TRF-001/);
+  assert.match(smoke, /preserve 2 units \/ value 10/);
+  assert.match(smoke, /tenant B can view tenant A inventory/);
+});

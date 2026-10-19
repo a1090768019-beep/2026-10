@@ -21,6 +21,12 @@ VALUES ('ffffffff-ffff-4fff-8fff-fffffffffff2',
         '11111111-1111-4111-8111-111111111101',
         'CI-WH-01', 'CI Inventory Warehouse');
 
+INSERT INTO warehouses (id, tenant_id, company_id, warehouse_code, name)
+VALUES ('ffffffff-ffff-4fff-8fff-fffffffffff6',
+        '11111111-1111-4111-8111-111111111111',
+        '11111111-1111-4111-8111-111111111101',
+        'CI-WH-02', 'CI Inventory Destination Warehouse');
+
 INSERT INTO inventory_movements
     (id, tenant_id, company_id, movement_number, item_id, warehouse_id, movement_type,
      movement_date, quantity_delta, unit_cost, inventory_value_delta, source_type, notes, created_by)
@@ -74,6 +80,52 @@ BEGIN
     END IF;
 END $$;
 
+
+-- A transfer has one header and exactly two matching stock ledger legs at commit.
+INSERT INTO inventory_transfers
+    (id, tenant_id, company_id, transfer_number, item_id, source_warehouse_id, destination_warehouse_id,
+     transfer_date, quantity, unit_cost, inventory_value, notes, created_by)
+VALUES
+ ('ffffffff-ffff-4fff-8fff-fffffffffff7',
+  '11111111-1111-4111-8111-111111111111', '11111111-1111-4111-8111-111111111101',
+  'CI-INV-TRF-001', 'ffffffff-ffff-4fff-8fff-fffffffffff1',
+  'ffffffff-ffff-4fff-8fff-fffffffffff2', 'ffffffff-ffff-4fff-8fff-fffffffffff6',
+  '2026-04-03', 2.0000, 5.00000000, 10.0000, 'Inventory transfer CI',
+  'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+
+INSERT INTO inventory_movements
+    (id, tenant_id, company_id, movement_number, item_id, warehouse_id, movement_type,
+     movement_date, quantity_delta, unit_cost, inventory_value_delta, source_type, transfer_id, notes, created_by)
+VALUES
+ ('ffffffff-ffff-4fff-8fff-fffffffffff8',
+  '11111111-1111-4111-8111-111111111111', '11111111-1111-4111-8111-111111111101',
+  'CI-INV-TRF-001-OUT', 'ffffffff-ffff-4fff-8fff-fffffffffff1',
+  'ffffffff-ffff-4fff-8fff-fffffffffff2', 'ISSUE', '2026-04-03', -2.0000, 5.00000000, -10.0000,
+  'TRANSFER', 'ffffffff-ffff-4fff-8fff-fffffffffff7', 'Inventory transfer CI', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'),
+ ('ffffffff-ffff-4fff-8fff-fffffffffff9',
+  '11111111-1111-4111-8111-111111111111', '11111111-1111-4111-8111-111111111101',
+  'CI-INV-TRF-001-IN', 'ffffffff-ffff-4fff-8fff-fffffffffff1',
+  'ffffffff-ffff-4fff-8fff-fffffffffff6', 'RECEIPT', '2026-04-03', 2.0000, 5.00000000, 10.0000,
+  'TRANSFER', 'ffffffff-ffff-4fff-8fff-fffffffffff7', 'Inventory transfer CI', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+
+DO $
+BEGIN
+    IF (SELECT sum(quantity_delta) FROM inventory_movements
+         WHERE item_id = 'ffffffff-ffff-4fff-8fff-fffffffffff1'
+           AND warehouse_id = 'ffffffff-ffff-4fff-8fff-fffffffffff2') <> 4.0000
+       OR (SELECT sum(inventory_value_delta) FROM inventory_movements
+         WHERE item_id = 'ffffffff-ffff-4fff-8fff-fffffffffff1'
+           AND warehouse_id = 'ffffffff-ffff-4fff-8fff-fffffffffff2') <> 20.0000
+       OR (SELECT sum(quantity_delta) FROM inventory_movements
+         WHERE item_id = 'ffffffff-ffff-4fff-8fff-fffffffffff1'
+           AND warehouse_id = 'ffffffff-ffff-4fff-8fff-fffffffffff6') <> 2.0000
+       OR (SELECT sum(inventory_value_delta) FROM inventory_movements
+         WHERE item_id = 'ffffffff-ffff-4fff-8fff-fffffffffff1'
+           AND warehouse_id = 'ffffffff-ffff-4fff-8fff-fffffffffff6') <> 10.0000 THEN
+        RAISE EXCEPTION 'Inventory transfer did not preserve 2 units / value 10 across source and destination';
+    END IF;
+END $;
+
 -- Runtime role has INSERT/SELECT but deliberately has no UPDATE or DELETE grant on the stock ledger.
 DO $$
 BEGIN
@@ -98,8 +150,9 @@ SELECT set_config('app.tenant_id', '22222222-2222-4222-8222-222222222222', true)
 DO $$
 BEGIN
     IF EXISTS (SELECT 1 FROM items WHERE item_code = 'CI-ITEM-001')
-       OR EXISTS (SELECT 1 FROM warehouses WHERE warehouse_code = 'CI-WH-01')
-       OR EXISTS (SELECT 1 FROM inventory_movements WHERE movement_number = 'CI-INV-RCPT-001') THEN
+       OR EXISTS (SELECT 1 FROM warehouses WHERE warehouse_code IN ('CI-WH-01', 'CI-WH-02'))
+       OR EXISTS (SELECT 1 FROM inventory_movements WHERE movement_number IN ('CI-INV-RCPT-001', 'CI-INV-TRF-001-OUT', 'CI-INV-TRF-001-IN'))
+       OR EXISTS (SELECT 1 FROM inventory_transfers WHERE transfer_number = 'CI-INV-TRF-001') THEN
         RAISE EXCEPTION 'Inventory RLS smoke failed: tenant B can view tenant A inventory';
     END IF;
 END $$;

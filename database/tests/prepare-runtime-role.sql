@@ -65,4 +65,4 @@ GRANT UPDATE (
 
 
 -- Inventory catalog and append-only stock movement ledger.
-GRANT SELECT, INSERT ON items, warehouses, inventory_movements TO erp_ci_runtime;
+GRANT SELECT, INSERT ON items, warehouses, inventory_movements, inventory_transfers TO erp_ci_runtime;
