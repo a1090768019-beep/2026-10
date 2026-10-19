@@ -190,6 +190,88 @@ public static class PurchaseDraftLedgerPostingEndpoints
                     });
             }
 
+
+            var sourceLines = await db.Database.SqlQuery<InventoryDocumentPostingLine>($"""
+                SELECT id AS "Id", line_number AS "LineNumber",
+                       inventory_item_id AS "InventoryItemId", inventory_warehouse_id AS "InventoryWarehouseId",
+                       quantity AS "Quantity", line_amount AS "LineAmount", net_amount AS "NetAmount",
+                       total_amount AS "TotalAmount", serial_numbers::text AS "SerialNumbersJson",
+                       inventory_cost_amount AS "InventoryCostAmount"
+                  FROM purchase_invoice_draft_lines
+                 WHERE tenant_id = {tenant.TenantId} AND company_id = {companyId}
+                   AND purchase_invoice_draft_id = {invoiceId}
+                 ORDER BY line_number
+                """).ToListAsync(token);
+            var linkedLines = sourceLines.Where(line => line.InventoryItemId.HasValue).ToList();
+            if (linkedLines.Count > 0 && linkedLines.Count != sourceLines.Count)
+                return Results.Conflict(new
+                {
+                    error = "purchase_draft_mixed_inventory_and_non_inventory_lines",
+                    message = "لضمان تطابق قيد تكلفة الشراء مع المخزون، اربط جميع بنود مسودة الشراء بالمخزون أو اتركها جميعًا غير مخزنية."
+                });
+
+            var receiptPlans = new List<(InventoryDocumentPostingLine Line, Guid ItemId, Guid WarehouseId,
+                decimal CostAmount, decimal UnitCost, string[] SerialNumbers)>();
+            if (linkedLines.Count > 0)
+            {
+                if (purchaseDebit.AccountType != "ASSET" || purchaseDebit.NormalBalance != "DEBIT" ||
+                    !purchaseDebit.IsActive || !purchaseDebit.AllowPosting)
+                    return Results.ValidationProblem(new Dictionary<string, string[]>
+                    {
+                        ["purchaseDebitAccountId"] = ["عند ربط جميع بنود الفاتورة بالمخزون، يجب أن يكون حساب مدين المشتريات أصل مخزون مدينًا ونشطًا وقابلًا للترحيل."]
+                    });
+
+                var serialValues = linkedLines.SelectMany(line => InventoryDocumentStockPostingService.ParseSerialNumbers(line.SerialNumbersJson)).ToArray();
+                if (serialValues.Distinct(StringComparer.OrdinalIgnoreCase).Count() != serialValues.Length)
+                    return Results.ValidationProblem(new Dictionary<string, string[]>
+                    {
+                        ["lines.serialNumbers"] = ["يوجد رقم تسلسلي مكرر بين بنود فاتورة الشراء."]
+                    });
+
+                foreach (var line in linkedLines)
+                {
+                    var lineValue = postVatAsAsset ? line.NetAmount : line.TotalAmount;
+                    if (!lineValue.HasValue)
+                        return Results.Conflict(new { error = "purchase_line_vat_totals_missing", lineNumber = line.LineNumber });
+                    var costAmount = decimal.Round(lineValue.Value, 4, MidpointRounding.AwayFromZero);
+                    if (costAmount < 0m)
+                        return Results.Conflict(new { error = "purchase_line_inventory_cost_invalid", lineNumber = line.LineNumber });
+                    var itemId = line.InventoryItemId!.Value;
+                    var warehouseId = line.InventoryWarehouseId!.Value;
+                    var serialNumbers = InventoryDocumentStockPostingService.ParseSerialNumbers(line.SerialNumbersJson);
+                    var tracksSerials = await InventoryEndpoints.GetTracksSerialsAsync(db, tenant.TenantId, companyId, itemId, token);
+                    var serialValidation = await InventoryEndpoints.ValidateSerialNumbersAsync(
+                        db, tenant.TenantId, companyId, itemId, warehouseId, line.Quantity, receipt, tracksSerials, serialNumbers, token);
+                    if (serialValidation is not null) return serialValidation;
+                    var unitCost = decimal.Round(costAmount / line.Quantity, 8, MidpointRounding.AwayFromZero);
+                    receiptPlans.Add((line, itemId, warehouseId, costAmount, unitCost, serialNumbers));
+                }
+
+                var plannedInventoryCost = receiptPlans.Sum(x => x.CostAmount);
+                if (plannedInventoryCost != purchaseDebitAmount)
+                    return Results.Conflict(new
+                    {
+                        error = "purchase_inventory_cost_does_not_match_posted_debit",
+                        inventoryCost = plannedInventoryCost,
+                        purchaseDebitAmount,
+                        message = "مجموع تكلفة بنود المخزون لا يطابق قيمة مدين المشتريات في القيد. راجع خصومات البنود وVAT قبل الترحيل."
+                    });
+
+                await InventoryDocumentStockPostingService.AcquireMovementLocksAsync(
+                    db, tenant.TenantId, companyId,
+                    receiptPlans.Select(x => (x.ItemId, x.WarehouseId)), token);
+
+                foreach (var plan in receiptPlans)
+                {
+                    await db.Database.ExecuteSqlInterpolatedAsync($"""
+                        UPDATE purchase_invoice_draft_lines
+                           SET inventory_cost_amount = {plan.CostAmount}
+                         WHERE tenant_id = {tenant.TenantId} AND company_id = {companyId}
+                           AND purchase_invoice_draft_id = {invoiceId} AND id = {plan.Line.Id}
+                        """, token);
+                }
+            }
+
             var entryNumberLock = $"journal-entry-number:{tenant.TenantId:D}:{companyId:D}:{entryNumber}";
             await db.Database.ExecuteSqlInterpolatedAsync(
                 $"SELECT pg_advisory_xact_lock(hashtextextended({entryNumberLock}, 0))", token);
@@ -253,6 +335,17 @@ public static class PurchaseDraftLedgerPostingEndpoints
             entry.Status = "POSTED";
             entry.PostedAt = postedAt;
             await db.SaveChangesAsync(token);
+
+            foreach (var plan in receiptPlans)
+            {
+                var movementId = await InventoryDocumentStockPostingService.InsertDocumentMovementAsync(
+                    db, tenant.TenantId, companyId, "PURCHASE", plan.Line.Id,
+                    plan.ItemId, plan.WarehouseId, draft.IssueDate, plan.Line.Quantity, plan.UnitCost,
+                    plan.CostAmount, $"Purchase draft {invoiceId:D}", tenant.UserId, token);
+                await InventoryDocumentStockPostingService.RecordSerialEventsAsync(
+                    db, tenant.TenantId, companyId, plan.ItemId, plan.WarehouseId, movementId,
+                    draft.IssueDate, plan.Line.Quantity, receipt: true, plan.SerialNumbers, tenant.UserId, token);
+            }
 
             await db.Database.ExecuteSqlInterpolatedAsync($"""
                 UPDATE purchase_invoice_drafts
