@@ -268,8 +268,14 @@ public sealed record ApiCustomer(Guid Id, string Code, string Name, string? Emai
 public sealed record ApiSupplier(Guid Id, string Code, string Name, string? Email, string? Phone, string? TaxNumber, bool IsActive, DateTime CreatedAt);
 public sealed record ApiAccount(
     Guid Id, string Code, string NameAr, string NameEn, string AccountType, string NormalBalance,
-    Guid? ParentAccountId, bool IsActive, bool AllowPosting);
-public sealed record ApiFiscalPeriod(Guid Id, Guid FiscalYearId, int PeriodNumber, DateOnly StartDate, DateOnly EndDate, string Status);
+    Guid? ParentAccountId, bool IsActive, bool AllowPosting)
+{
+    public string DisplayLabel => $"{Code} · {NameAr}";
+}
+public sealed record ApiFiscalPeriod(Guid Id, Guid FiscalYearId, int PeriodNumber, DateOnly StartDate, DateOnly EndDate, string Status)
+{
+    public string DisplayLabel => $"{StartDate:yyyy-MM-dd} — {EndDate:yyyy-MM-dd} (فترة {PeriodNumber})";
+}
 
 public sealed record CreateSupplierApiRequest(string Code, string Name, string? Email = null, string? Phone = null, string? TaxNumber = null);
 public sealed record PurchaseInvoiceDraftListItem(
