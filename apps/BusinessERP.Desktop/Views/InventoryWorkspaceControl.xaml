@@ -117,6 +117,7 @@
                             <TextBox Grid.Column="3" Text="{Binding NewItemNameEn, UpdateSourceTrigger=PropertyChanged}" ToolTip="اسم الصنف بالإنجليزية" Margin="5,0" />
                             <TextBox Grid.Column="4" Text="{Binding NewUnitCode, UpdateSourceTrigger=PropertyChanged}" ToolTip="الوحدة" Margin="5,0" />
                         </Grid>
+                        <CheckBox Content="تتبع الأرقام التسلسلية (رقم فريد لكل وحدة)" IsChecked="{Binding NewItemTracksSerials, Mode=TwoWay}" Margin="0,8,0,0" />
                         <Button Content="حفظ الصنف" Command="{Binding CreateItemCommand}" HorizontalAlignment="Left" Margin="0,8,0,0" />
                         <DataGrid ItemsSource="{Binding Items}" Height="200" Margin="0,10,0,0">
                             <DataGrid.Columns>
@@ -194,6 +195,7 @@
                             <TextBox Text="{Binding MovementUnitCost, UpdateSourceTrigger=PropertyChanged}" Margin="0,4,0,0" />
                         </StackPanel>
                     </Grid>
+                    <TextBox Text="{Binding MovementSerialNumbers, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" Height="58" VerticalScrollBarVisibility="Auto" ToolTip="للصنف المتسلسل: رقم فريد لكل وحدة، سطر أو فاصلة بين الأرقام" Margin="0,8,0,0" />
                     <TextBox Text="{Binding MovementNotes, UpdateSourceTrigger=PropertyChanged}" ToolTip="ملاحظات (اختياري)" Margin="0,8,0,0" />
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Margin="0,8,0,0">
                         <Button Content="تسجيل استلام" Command="{Binding ReceiveStockCommand}" Background="#146C4A" />
@@ -241,6 +243,7 @@
                             <TextBox Text="{Binding TransferQuantity, UpdateSourceTrigger=PropertyChanged}" Margin="0,4,0,0" />
                         </StackPanel>
                     </Grid>
+                    <TextBox Text="{Binding TransferSerialNumbers, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" Height="58" VerticalScrollBarVisibility="Auto" ToolTip="للصنف المتسلسل: رقم لكل وحدة موجودة في مستودع المصدر" Margin="0,8,0,0" />
                     <TextBox Text="{Binding TransferNotes, UpdateSourceTrigger=PropertyChanged}" ToolTip="ملاحظات التحويل (اختياري)" Margin="0,8,0,0" />
                     <Button Content="تسجيل التحويل" Command="{Binding TransferStockCommand}" HorizontalAlignment="Left" Margin="0,8,0,0" Background="#146C4A" />
                     <TextBlock Text="سجل التحويلات" FontSize="14" FontWeight="SemiBold" Margin="0,12,0,0" />
@@ -299,6 +302,43 @@
                     </DataGrid>
                     <TextBlock Text="حدود هذه المرحلة: الرصيد والقيمة محسوبان من دفتر الحركات بمتوسط تكلفة متحرك لكل صنف ومستودع. لم يكتمل بعد تتبع الأرقام التسلسلية، التحويل بين المستودعات، الجرد الدوري، وربط الاستلام آليًا بمسودات شراء الموردين أو الصرف بفواتير المبيعات."
                                Foreground="#8A6A20" FontSize="11" TextWrapping="Wrap" Margin="2,10,2,0" />
+                </StackPanel>
+            </Border>
+            <Border Background="White" BorderBrush="#E3E9F2" BorderThickness="1" CornerRadius="14" Padding="16" Margin="0,0,0,14">
+                <StackPanel>
+                    <DockPanel LastChildFill="False">
+                        <TextBlock Text="سجل الأرقام التسلسلية" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" />
+                        <Button Content="تصدير سجل الأرقام" Click="ExportInventorySerialEvents_Click" Margin="8,0,0,0" />
+                        <Button Content="تصدير ملخص الأرقام" Click="ExportInventorySerialSummary_Click" Margin="8,0,0,0" />
+                    </DockPanel>
+                    <TextBlock Text="يحتفظ النظام بحركة كل رقم تسلسلي وموقعه وقت الحركة وموقعه الحالي. تعرض الشاشة آخر 100 صف من كل تقرير."
+                               Foreground="#69758D" FontSize="11" TextWrapping="Wrap" Margin="0,5,0,8" />
+                    <DataGrid ItemsSource="{Binding SerialEvents}" Height="240">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="الرقم التسلسلي" Binding="{Binding SerialNumber}" Width="150" />
+                            <DataGridTextColumn Header="الصنف" Binding="{Binding ItemNameAr}" Width="*" />
+                            <DataGridTextColumn Header="رمز الصنف" Binding="{Binding ItemCode}" Width="100" />
+                            <DataGridTextColumn Header="الباركود" Binding="{Binding Barcode}" Width="120" />
+                            <DataGridTextColumn Header="الحدث" Binding="{Binding EventType}" Width="120" />
+                            <DataGridTextColumn Header="رقم الحركة" Binding="{Binding MovementNumber}" Width="150" />
+                            <DataGridTextColumn Header="التاريخ" Binding="{Binding MovementDate, StringFormat=yyyy-MM-dd}" Width="105" />
+                            <DataGridTextColumn Header="المستودع وقت الحركة" Binding="{Binding WarehouseName}" Width="155" />
+                            <DataGridTextColumn Header="الحالة الحالية" Binding="{Binding CurrentStatus}" Width="105" />
+                            <DataGridTextColumn Header="الموقع الحالي" Binding="{Binding CurrentWarehouseName}" Width="150" />
+                            <DataGridTextColumn Header="رقم التحويل" Binding="{Binding TransferNumber}" Width="140" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                    <TextBlock Text="ملخص الأرقام حسب الصنف والحالة والمستودع" FontSize="14" FontWeight="SemiBold" Margin="0,14,0,0" />
+                    <DataGrid ItemsSource="{Binding SerialSummaryRows}" Height="180" Margin="0,8,0,0">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="رمز الصنف" Binding="{Binding ItemCode}" Width="120" />
+                            <DataGridTextColumn Header="الباركود" Binding="{Binding Barcode}" Width="140" />
+                            <DataGridTextColumn Header="الصنف" Binding="{Binding ItemNameAr}" Width="*" />
+                            <DataGridTextColumn Header="الحالة" Binding="{Binding CurrentStatus}" Width="120" />
+                            <DataGridTextColumn Header="المستودع" Binding="{Binding WarehouseName}" Width="180" />
+                            <DataGridTextColumn Header="عدد الأرقام" Binding="{Binding SerialCount, StringFormat=N0}" Width="120" />
+                        </DataGrid.Columns>
+                    </DataGrid>
                 </StackPanel>
             </Border>
         </StackPanel>

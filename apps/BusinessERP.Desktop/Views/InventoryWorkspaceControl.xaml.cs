@@ -102,6 +102,51 @@ public partial class InventoryWorkspaceControl : UserControl
         SaveInventoryReport("BusinessERP-InventoryTransfers", "InventoryTransfers", rows);
     }
 
+    private void ExportInventorySerialEvents_Click(object sender, RoutedEventArgs e)
+    {
+        if (_viewModel.SerialEvents.Count == 0)
+        {
+            MessageBox.Show(Window.GetWindow(this), "لا توجد حركة أرقام تسلسلية محمّلة للتصدير.", "Business ERP", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        var rows = new List<object?[]>
+        {
+            new object?[] { "Business ERP", "سجل الأرقام التسلسلية" },
+            new object?[] { "ملاحظة", "الملف يعرض الصفحة المحمّلة حاليًا فقط (حتى 100 صف)." },
+            Array.Empty<object?>(),
+            new object?[] { "الرقم التسلسلي", "رمز الصنف", "الباركود", "الصنف", "نوع الحدث", "رقم الحركة", "نوع الحركة", "التاريخ", "رمز المستودع", "المستودع وقت الحركة", "الحالة الحالية", "الموقع الحالي", "رقم التحويل" }
+        };
+        rows.AddRange(_viewModel.SerialEvents.Select(row => new object?[]
+        {
+            row.SerialNumber, row.ItemCode, row.Barcode, row.ItemNameAr, row.EventType, row.MovementNumber,
+            row.MovementType, row.MovementDate, row.WarehouseCode, row.WarehouseName, row.CurrentStatus,
+            row.CurrentWarehouseName, row.TransferNumber
+        }));
+        SaveInventoryReport("BusinessERP-InventorySerialEvents", "SerialEvents", rows);
+    }
+
+    private void ExportInventorySerialSummary_Click(object sender, RoutedEventArgs e)
+    {
+        if (_viewModel.SerialSummaryRows.Count == 0)
+        {
+            MessageBox.Show(Window.GetWindow(this), "لا يوجد ملخص أرقام تسلسلية محمّل للتصدير.", "Business ERP", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        var rows = new List<object?[]>
+        {
+            new object?[] { "Business ERP", "ملخص الأرقام التسلسلية" },
+            new object?[] { "ملاحظة", "الملف يعرض الصفحة المحمّلة حاليًا فقط (حتى 100 صف)." },
+            Array.Empty<object?>(),
+            new object?[] { "رمز الصنف", "الباركود", "اسم الصنف", "الاسم الإنجليزي", "الحالة", "رمز المستودع", "المستودع", "عدد الأرقام" }
+        };
+        rows.AddRange(_viewModel.SerialSummaryRows.Select(row => new object?[]
+        {
+            row.ItemCode, row.Barcode, row.ItemNameAr, row.ItemNameEn, row.CurrentStatus,
+            row.WarehouseCode, row.WarehouseName, row.SerialCount
+        }));
+        SaveInventoryReport("BusinessERP-InventorySerialSummary", "SerialSummary", rows);
+    }
+
     private void SaveInventoryReport(string filePrefix, string sheetName, IReadOnlyList<object?[]> rows)
     {
         var dialog = new SaveFileDialog
