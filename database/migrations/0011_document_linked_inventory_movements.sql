@@ -222,7 +222,7 @@ END $$;
 -- Once a source line has a stock movement, it is an immutable accounting/inventory source.
 -- This preserves the quantity, warehouse, serial list and cost used by the deferred movement trigger.
 CREATE OR REPLACE FUNCTION prevent_posted_document_inventory_line_mutation() RETURNS trigger
-LANGUAGE plpgsql AS $
+LANGUAGE plpgsql AS $invline$
 DECLARE
     has_movement boolean := false;
 BEGIN
@@ -249,7 +249,7 @@ BEGIN
         RETURN OLD;
     END IF;
     RETURN NEW;
-END $;
+END $invline$;
 
 CREATE TRIGGER trg_purchase_draft_line_inventory_source_immutable
     BEFORE UPDATE OR DELETE ON purchase_invoice_draft_lines
