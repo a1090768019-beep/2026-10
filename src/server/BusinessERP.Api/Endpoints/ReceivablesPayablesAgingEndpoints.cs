@@ -114,12 +114,12 @@ public static class ReceivablesPayablesAgingEndpoints
                                       AND invoice_je.status='POSTED' AND invoice_je.entry_date <= {reportDate})
                 ), open_balances AS (
                     SELECT *,
-                           CASE WHEN due_date IS NULL OR due_date >= {reportDate} THEN 0
-                                ELSE {reportDate} - due_date END AS "DaysPastDue",
-                           CASE WHEN due_date IS NULL OR due_date >= {reportDate} THEN 'CURRENT'
-                                WHEN {reportDate} - due_date <= 30 THEN 'DAYS_1_30'
-                                WHEN {reportDate} - due_date <= 60 THEN 'DAYS_31_60'
-                                WHEN {reportDate} - due_date <= 90 THEN 'DAYS_61_90'
+                           CASE WHEN "DueDate" IS NULL OR "DueDate" >= {reportDate} THEN 0
+                                ELSE {reportDate} - "DueDate" END AS "DaysPastDue",
+                           CASE WHEN "DueDate" IS NULL OR "DueDate" >= {reportDate} THEN 'CURRENT'
+                                WHEN {reportDate} - "DueDate" <= 30 THEN 'DAYS_1_30'
+                                WHEN {reportDate} - "DueDate" <= 60 THEN 'DAYS_31_60'
+                                WHEN {reportDate} - "DueDate" <= 90 THEN 'DAYS_61_90'
                                 ELSE 'OVER_90' END AS "AgingBucket"
                       FROM invoice_balances
                      WHERE "OutstandingAmount" > 0
@@ -227,12 +227,12 @@ public static class ReceivablesPayablesAgingEndpoints
                                       AND invoice_je.status='POSTED' AND invoice_je.entry_date <= {reportDate})
                 ), open_balances AS (
                     SELECT *,
-                           CASE WHEN due_date IS NULL OR due_date >= {reportDate} THEN 0
-                                ELSE {reportDate} - due_date END AS "DaysPastDue",
-                           CASE WHEN due_date IS NULL OR due_date >= {reportDate} THEN 'CURRENT'
-                                WHEN {reportDate} - due_date <= 30 THEN 'DAYS_1_30'
-                                WHEN {reportDate} - due_date <= 60 THEN 'DAYS_31_60'
-                                WHEN {reportDate} - due_date <= 90 THEN 'DAYS_61_90'
+                           CASE WHEN "DueDate" IS NULL OR "DueDate" >= {reportDate} THEN 0
+                                ELSE {reportDate} - "DueDate" END AS "DaysPastDue",
+                           CASE WHEN "DueDate" IS NULL OR "DueDate" >= {reportDate} THEN 'CURRENT'
+                                WHEN {reportDate} - "DueDate" <= 30 THEN 'DAYS_1_30'
+                                WHEN {reportDate} - "DueDate" <= 60 THEN 'DAYS_31_60'
+                                WHEN {reportDate} - "DueDate" <= 90 THEN 'DAYS_61_90'
                                 ELSE 'OVER_90' END AS "AgingBucket"
                       FROM invoice_balances
                      WHERE "OutstandingAmount" > 0
