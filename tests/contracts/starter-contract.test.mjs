@@ -262,7 +262,9 @@ test('WPF Ribbon commands are wired to real sales/search/navigation workflows', 
   assert.match(shell, /Click="ToggleRibbon_Click"/);
   assert.match(shell, /Click="ToggleNavigation_Click"/);
   assert.match(shell, /KeyDown="GeneralSearchBox_KeyDown"/);
-  assert.match(shell, /IsEnabled="False" ToolTip="تصدير Excel غير منفذ/);
+  assert.match(shell, /x:Name="RibbonExportExcelButton"/);
+  assert.match(shell, /Click="RibbonExportExcel_Click"/);
+  assert.match(shell, /Content="PDF" IsEnabled="False" ToolTip="تصدير PDF غير منفذ/);
   assert.match(code, /private async Task RunGeneralSearchAsync/);
   assert.match(code, /private void UpdateRibbonContext/);
   assert.match(salesView, /SelectedItem="{Binding SelectedDraft, Mode=TwoWay}"/);
