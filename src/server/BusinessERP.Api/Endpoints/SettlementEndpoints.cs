@@ -195,6 +195,7 @@ public static class SettlementEndpoints
                 receipt.Date, receipt.CurrencyCode, "CUSTOMER_RECEIPT", receipt.Id, $"Customer receipt {receipt.Number}",
                 [(cash.Id, "Customer receipt cash/bank", receipt.Amount, 0m),
                  (receivable.Id, "Settlement of customer receivable", 0m, receipt.Amount)], token);
+            if (entry is null) return Results.Conflict(new { error = "journal_entry_number_or_source_conflict" });
             var postedAt = entry.PostedAt!.Value;
             await db.Database.ExecuteSqlInterpolatedAsync($"""
                 UPDATE customer_receipts SET status='ACCOUNTING_POSTED',
@@ -365,6 +366,7 @@ public static class SettlementEndpoints
                 payment.Date, payment.CurrencyCode, "SUPPLIER_PAYMENT", payment.Id, $"Supplier payment {payment.Number}",
                 [(payable.Id, "Settlement of supplier payable", payment.Amount, 0m),
                  (cash.Id, "Supplier payment cash/bank", 0m, payment.Amount)], token);
+            if (entry is null) return Results.Conflict(new { error = "journal_entry_number_or_source_conflict" });
             var postedAt = entry.PostedAt!.Value;
             await db.Database.ExecuteSqlInterpolatedAsync($"""
                 UPDATE supplier_payments SET status='ACCOUNTING_POSTED',
@@ -458,7 +460,7 @@ public static class SettlementEndpoints
     private static bool IsPostable(AccountRecord account, string type, string normalBalance) =>
         account.AccountType == type && account.NormalBalance == normalBalance && account.IsActive && account.AllowPosting;
 
-    private static async Task<JournalEntryRecord> CreateAndPostJournalAsync(
+    private static async Task<JournalEntryRecord?> CreateAndPostJournalAsync(
         ErpDbContext db, Guid tenantId, Guid companyId, Guid fiscalPeriodId, string entryNumber,
         DateOnly entryDate, string currencyCode, string sourceType, Guid sourceId, string description,
         (Guid AccountId, string Description, decimal Debit, decimal Credit)[] lines, CancellationToken ct)
@@ -466,11 +468,11 @@ public static class SettlementEndpoints
         var numberLock = $"journal-entry-number:{tenantId:D}:{companyId:D}:{entryNumber}";
         await LockAsync(db, numberLock, ct);
         if (await db.JournalEntries.AnyAsync(x => x.TenantId == tenantId && x.CompanyId == companyId && x.EntryNumber == entryNumber, ct))
-            throw new SettlementConflictException("journal_entry_number_conflict");
+            return null;
 
         if (await db.JournalEntries.AnyAsync(x => x.TenantId == tenantId && x.CompanyId == companyId &&
                 x.SourceType == sourceType && x.SourceId == sourceId, ct))
-            throw new SettlementConflictException("settlement_already_has_journal");
+            return null;
 
         var now = DateTime.UtcNow;
         var entry = new JournalEntryRecord
@@ -547,9 +549,4 @@ public static class SettlementEndpoints
         string CurrencyCode, decimal Amount, string Status, Guid? JournalEntryId);
     private sealed record SupplierPaymentListRow(Guid Id, string Number, DateOnly Date, Guid PartyId, string PartyName,
         string CurrencyCode, decimal Amount, string Status, Guid? JournalEntryId);
-}
-
-internal sealed class SettlementConflictException(string error) : Exception(error)
-{
-    public string Error { get; } = error;
 }
