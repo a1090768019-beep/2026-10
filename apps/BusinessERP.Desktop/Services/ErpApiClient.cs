@@ -211,6 +211,16 @@ public sealed class ErpApiClient(HttpClient httpClient, Guid tenantId)
         SendJsonAsync<SalesVatPreviewApiResult>(
             HttpMethod.Post, $"/api/v1/companies/{companyId:D}/sales-vat-preview", request, ct);
 
+    public Task<InvoiceAgingApiReport> GetReceivablesAgingAsync(
+        Guid companyId, DateOnly asOfDate, int page = 1, int pageSize = 100, CancellationToken ct = default) =>
+        GetObjectAsync<InvoiceAgingApiReport>(
+            $"/api/v1/companies/{companyId:D}/reports/receivables-aging?asOfDate={asOfDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}&page={page}&pageSize={pageSize}", ct);
+
+    public Task<InvoiceAgingApiReport> GetPayablesAgingAsync(
+        Guid companyId, DateOnly asOfDate, int page = 1, int pageSize = 100, CancellationToken ct = default) =>
+        GetObjectAsync<InvoiceAgingApiReport>(
+            $"/api/v1/companies/{companyId:D}/reports/payables-aging?asOfDate={asOfDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}&page={page}&pageSize={pageSize}", ct);
+
     public Task<IReadOnlyList<CustomerReceiptApiDto>> GetCustomerReceiptsAsync(Guid companyId, CancellationToken ct = default) =>
         GetListAsync<CustomerReceiptApiDto>($"/api/v1/companies/{companyId:D}/customer-receipts", ct);
 
@@ -574,8 +584,47 @@ public sealed record SupplierPaymentApiDto(Guid Id, string Number, DateOnly Date
 public sealed record SettlementPostingApiResult(Guid SettlementId, Guid JournalEntryId, string EntryNumber,
     string JournalEntryStatus, DateOnly EntryDate, decimal Amount, bool AlreadyPosted);
 
-public sealed record OutstandingInvoiceApiDto(Guid InvoiceId, string Number, DateOnly Date, Guid PartyId,
-    string PartyName, string CurrencyCode, decimal InvoiceAmount, decimal OutstandingAmount)
+public sealed record InvoiceAgingApiReport(
+    DateOnly AsOfDate,
+    int Page,
+    int PageSize,
+    long TotalRows,
+    int TotalPages,
+    decimal TotalOutstandingAmount,
+    decimal CurrentAmount,
+    decimal Days1To30Amount,
+    decimal Days31To60Amount,
+    decimal Days61To90Amount,
+    decimal Over90Amount,
+    IReadOnlyList<InvoiceAgingApiRow> Rows)
 {
-    public string DisplayLabel => $"{Number} · متبقي {OutstandingAmount:N2} {CurrencyCode}";
+    public string SummaryLabel =>
+        $"الرصيد المفتوح: {TotalOutstandingAmount:N2} · حالي: {CurrentAmount:N2} · 1–30 يومًا: {Days1To30Amount:N2} · 31–60: {Days31To60Amount:N2} · 61–90: {Days61To90Amount:N2} · أكثر من 90: {Over90Amount:N2} · عدد الفواتير: {TotalRows:N0}";
+
+    public string PageLabel => TotalPages == 0 ? "لا توجد فواتير مفتوحة" : $"صفحة {Page} من {TotalPages}";
+}
+
+public sealed record InvoiceAgingApiRow(
+    Guid InvoiceId,
+    string DocumentNumber,
+    DateOnly IssueDate,
+    DateOnly? DueDate,
+    Guid PartyId,
+    string PartyName,
+    string CurrencyCode,
+    decimal InvoiceAmount,
+    decimal SettledAmount,
+    decimal OutstandingAmount,
+    int DaysPastDue,
+    string AgingBucket)
+{
+    public string AgingBucketLabel => AgingBucket switch
+    {
+        "CURRENT" => "حالي / غير مستحق",
+        "DAYS_1_30" => "متأخر 1–30 يومًا",
+        "DAYS_31_60" => "متأخر 31–60 يومًا",
+        "DAYS_61_90" => "متأخر 61–90 يومًا",
+        "OVER_90" => "متأخر أكثر من 90 يومًا",
+        _ => "غير محدد"
+    };
 }
