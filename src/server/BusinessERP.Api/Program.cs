@@ -53,6 +53,25 @@ if (!string.IsNullOrWhiteSpace(connectionString))
 var authority = builder.Configuration["Authentication:Authority"];
 var audience = builder.Configuration["Authentication:Audience"];
 var hasIdentityProvider = !string.IsNullOrWhiteSpace(authority) && !string.IsNullOrWhiteSpace(audience);
+
+if (builder.Environment.IsProduction())
+{
+    var missingConfiguration = new List<string>();
+    if (string.IsNullOrWhiteSpace(connectionString))
+        missingConfiguration.Add("ConnectionStrings:Postgres");
+
+    var authorityIsHttps = Uri.TryCreate(authority, UriKind.Absolute, out var authorityUri) &&
+        string.Equals(authorityUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase);
+    if (!authorityIsHttps)
+        missingConfiguration.Add("Authentication:Authority (absolute HTTPS URL)");
+    if (string.IsNullOrWhiteSpace(audience))
+        missingConfiguration.Add("Authentication:Audience");
+
+    if (missingConfiguration.Count > 0)
+        throw new InvalidOperationException(
+            $"Production startup blocked because required secure configuration is missing or invalid: {string.Join(", ", missingConfiguration)}.");
+}
+
 if (hasIdentityProvider)
 {
     builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
