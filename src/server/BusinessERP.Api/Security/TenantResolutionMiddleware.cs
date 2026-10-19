@@ -12,8 +12,7 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next, ILogger<Ten
 {
     public async Task InvokeAsync(
         HttpContext http,
-        IConfiguration configuration,
-        TenantTransactionRunner transactionRunner)
+        IConfiguration configuration)
     {
         var cancellationToken = http.RequestAborted;
         if (!http.Request.Path.StartsWithSegments("/api"))
@@ -91,6 +90,7 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next, ILogger<Ten
         {
             // Subscription rows are protected by PostgreSQL RLS, so this lookup must use the
             // same transaction-local tenant context as all other tenant data access.
+            var transactionRunner = services.GetRequiredService<TenantTransactionRunner>();
             var subscriptionState = await transactionRunner.ExecuteAsync(async (tenantDb, token) =>
             {
                 var subscription = await tenantDb.TenantSubscriptions.AsNoTracking()
