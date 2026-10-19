@@ -1,0 +1,13 @@
+**/bin/
+**/obj/
+.git/
+.github/
+.vs/
+apps/
+database/
+docs/
+tests/
+tools/
+*.sln
+README.md
+.env*
