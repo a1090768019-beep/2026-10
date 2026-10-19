@@ -245,6 +245,17 @@ public sealed class ErpApiClient(HttpClient httpClient, Guid tenantId)
     public Task<SettlementPostingApiResult> PostSupplierPaymentAsync(Guid companyId, Guid paymentId, PostSupplierPaymentApiRequest request, CancellationToken ct = default) =>
         SendJsonAsync<SettlementPostingApiResult>(HttpMethod.Post, $"/api/v1/companies/{companyId:D}/supplier-payments/{paymentId:D}/post-to-ledger", request, ct);
 
+    public Task<IReadOnlyList<TenantMemberApiDto>> GetTenantMembersAsync(CancellationToken ct = default) =>
+        GetListAsync<TenantMemberApiDto>("/api/v1/memberships", ct);
+
+    public Task<TenantMemberApiDto> AssignTenantMemberAsync(
+        AssignTenantMemberApiRequest request, CancellationToken ct = default) =>
+        SendJsonAsync<TenantMemberApiDto>(HttpMethod.Post, "/api/v1/memberships", request, ct);
+
+    public Task<TenantMemberApiDto> UpdateTenantMemberAsync(
+        Guid userId, UpdateTenantMemberApiRequest request, CancellationToken ct = default) =>
+        SendJsonAsync<TenantMemberApiDto>(HttpMethod.Put, $"/api/v1/memberships/{userId:D}", request, ct);
+
     private async Task<IReadOnlyList<T>> GetListAsync<T>(string path, CancellationToken ct)
     {
         using var response = await SendAsync(HttpMethod.Get, path, null, ct);
@@ -368,6 +379,11 @@ public sealed class ErpApiException(HttpStatusCode statusCode, string message) :
 
 public sealed record ApiCompany(Guid Id, string Name, string BaseCurrency, string? TaxNumber, DateTime CreatedAt);
 public sealed record CreateCompanyApiRequest(string Name, string BaseCurrency = "SAR", string? TaxNumber = null);
+public sealed record TenantMemberApiDto(
+    Guid UserId, string DisplayName, string Email, string RoleCode, string Status,
+    DateTime CreatedAt, bool IdentityDisabled);
+public sealed record AssignTenantMemberApiRequest(Guid UserId, string RoleCode);
+public sealed record UpdateTenantMemberApiRequest(string RoleCode, string Status);
 public sealed record ApiAccount(Guid Id, string Code, string NameAr, string NameEn, string AccountType, string NormalBalance, Guid? ParentAccountId, bool IsActive, bool AllowPosting)
 {
     public string DisplayName => $"{Code} — {NameAr} ({NameEn})";
