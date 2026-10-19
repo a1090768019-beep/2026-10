@@ -176,6 +176,71 @@ CREATE TRIGGER trg_supplier_payment_allocation_guard
     BEFORE INSERT OR UPDATE OR DELETE ON supplier_payment_allocations
     FOR EACH ROW EXECUTE FUNCTION guard_supplier_payment_allocation();
 
+-- Validate source-document allocation totals in the database, independent of API validation.
+CREATE OR REPLACE FUNCTION validate_customer_receipt_allocation_totals() RETURNS trigger
+LANGUAGE plpgsql AS $
+DECLARE
+    source_id uuid;
+    source_amount numeric(20,2);
+    source_status varchar(20);
+    allocated_total numeric(20,2);
+BEGIN
+    source_id := CASE WHEN TG_OP = 'DELETE' THEN OLD.receipt_id ELSE NEW.receipt_id END;
+    SELECT amount, status INTO source_amount, source_status
+      FROM customer_receipts
+     WHERE tenant_id = CASE WHEN TG_OP = 'DELETE' THEN OLD.tenant_id ELSE NEW.tenant_id END
+       AND company_id = CASE WHEN TG_OP = 'DELETE' THEN OLD.company_id ELSE NEW.company_id END
+       AND id = source_id
+     FOR UPDATE;
+    IF NOT FOUND THEN RAISE EXCEPTION 'Receipt not found' USING ERRCODE = '23503'; END IF;
+    IF source_status <> 'DRAFT' THEN RAISE EXCEPTION 'Posted receipt allocations are immutable' USING ERRCODE = '23514'; END IF;
+    SELECT COALESCE(sum(allocated_amount),0) INTO allocated_total
+      FROM customer_receipt_allocations
+     WHERE tenant_id = CASE WHEN TG_OP = 'DELETE' THEN OLD.tenant_id ELSE NEW.tenant_id END
+       AND company_id = CASE WHEN TG_OP = 'DELETE' THEN OLD.company_id ELSE NEW.company_id END
+       AND receipt_id = source_id;
+    IF allocated_total > source_amount THEN
+        RAISE EXCEPTION 'Receipt allocations cannot exceed receipt amount' USING ERRCODE = '23514';
+    END IF;
+    RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
+END $;
+CREATE CONSTRAINT TRIGGER trg_customer_receipt_allocation_total
+    AFTER INSERT OR UPDATE OR DELETE ON customer_receipt_allocations
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW
+    EXECUTE FUNCTION validate_customer_receipt_allocation_totals();
+
+CREATE OR REPLACE FUNCTION validate_supplier_payment_allocation_totals() RETURNS trigger
+LANGUAGE plpgsql AS $
+DECLARE
+    source_id uuid;
+    source_amount numeric(20,2);
+    source_status varchar(20);
+    allocated_total numeric(20,2);
+BEGIN
+    source_id := CASE WHEN TG_OP = 'DELETE' THEN OLD.payment_id ELSE NEW.payment_id END;
+    SELECT amount, status INTO source_amount, source_status
+      FROM supplier_payments
+     WHERE tenant_id = CASE WHEN TG_OP = 'DELETE' THEN OLD.tenant_id ELSE NEW.tenant_id END
+       AND company_id = CASE WHEN TG_OP = 'DELETE' THEN OLD.company_id ELSE NEW.company_id END
+       AND id = source_id
+     FOR UPDATE;
+    IF NOT FOUND THEN RAISE EXCEPTION 'Supplier payment not found' USING ERRCODE = '23503'; END IF;
+    IF source_status <> 'DRAFT' THEN RAISE EXCEPTION 'Posted payment allocations are immutable' USING ERRCODE = '23514'; END IF;
+    SELECT COALESCE(sum(allocated_amount),0) INTO allocated_total
+      FROM supplier_payment_allocations
+     WHERE tenant_id = CASE WHEN TG_OP = 'DELETE' THEN OLD.tenant_id ELSE NEW.tenant_id END
+       AND company_id = CASE WHEN TG_OP = 'DELETE' THEN OLD.company_id ELSE NEW.company_id END
+       AND payment_id = source_id;
+    IF allocated_total > source_amount THEN
+        RAISE EXCEPTION 'Payment allocations cannot exceed payment amount' USING ERRCODE = '23514';
+    END IF;
+    RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
+END $;
+CREATE CONSTRAINT TRIGGER trg_supplier_payment_allocation_total
+    AFTER INSERT OR UPDATE OR DELETE ON supplier_payment_allocations
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW
+    EXECUTE FUNCTION validate_supplier_payment_allocation_totals();
+
 CREATE OR REPLACE FUNCTION guard_customer_receipt_mutation() RETURNS trigger
 LANGUAGE plpgsql AS $$
 DECLARE
