@@ -62,3 +62,9 @@ GRANT UPDATE (
 GRANT UPDATE (
     status, accounting_posted_journal_entry_id, accounting_posted_at, accounting_input_vat_account_id
 ) ON purchase_invoice_drafts TO erp_ci_runtime;
+
+
+-- Inventory catalog and append-only stock movement ledger.
+GRANT SELECT, INSERT ON items, warehouses, inventory_movements, inventory_transfers TO erp_ci_runtime;
+GRANT SELECT, INSERT, UPDATE ON inventory_serial_numbers TO erp_ci_runtime;
+GRANT SELECT, INSERT ON inventory_serial_events TO erp_ci_runtime;

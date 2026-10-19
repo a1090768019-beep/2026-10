@@ -94,6 +94,7 @@ app.MapPurchaseInvoiceDraftEndpoints();
 app.MapPurchaseDraftVatEndpoints();
 app.MapPurchaseDraftVatReportEndpoints();
 app.MapPurchaseDraftLedgerPostingEndpoints();
+app.MapInventoryEndpoints();
 app.MapSalesInvoiceDraftEndpoints();
 app.MapSalesVatPreviewEndpoints();
 app.MapSalesDraftVatEndpoints();

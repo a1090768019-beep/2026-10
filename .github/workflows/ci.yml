@@ -69,6 +69,18 @@ jobs:
         env:
           POSTGRES_ADMIN_URL: postgresql://postgres:postgres@localhost:5432/business_erp
         run: psql "$POSTGRES_ADMIN_URL" -v ON_ERROR_STOP=1 -f database/migrations/0006_purchase_draft_ledger_posting.sql
+      - name: Apply inventory stock ledger migration
+        env:
+          POSTGRES_ADMIN_URL: postgresql://postgres:postgres@localhost:5432/business_erp
+        run: psql "$POSTGRES_ADMIN_URL" -v ON_ERROR_STOP=1 -f database/migrations/0007_inventory_stock_ledger.sql
+      - name: Apply atomic inventory transfers migration
+        env:
+          POSTGRES_ADMIN_URL: postgresql://postgres:postgres@localhost:5432/business_erp
+        run: psql "$POSTGRES_ADMIN_URL" -v ON_ERROR_STOP=1 -f database/migrations/0008_inventory_transfers.sql
+      - name: Apply serial-number tracking migration
+        env:
+          POSTGRES_ADMIN_URL: postgresql://postgres:postgres@localhost:5432/business_erp
+        run: psql "$POSTGRES_ADMIN_URL" -v ON_ERROR_STOP=1 -f database/migrations/0009_inventory_serial_tracking.sql
       - name: Create least-privilege runtime role
         env:
           POSTGRES_ADMIN_URL: postgresql://postgres:postgres@localhost:5432/business_erp
@@ -86,6 +98,10 @@ jobs:
         env:
           POSTGRES_RUNTIME_URL: postgresql://erp_ci_runtime:ci-only-password@localhost:5432/business_erp
         run: psql "$POSTGRES_RUNTIME_URL" -v ON_ERROR_STOP=1 -f database/tests/purchase-draft-smoke.sql
+      - name: Verify inventory barcode stock ledger, costing and tenant isolation
+        env:
+          POSTGRES_RUNTIME_URL: postgresql://erp_ci_runtime:ci-only-password@localhost:5432/business_erp
+        run: psql "$POSTGRES_RUNTIME_URL" -v ON_ERROR_STOP=1 -f database/tests/inventory-stock-smoke.sql
       - name: Verify EF Core subscription mapping and tenant isolation
         env:
           BUSINESS_ERP_TEST_CONNECTION: Host=localhost;Port=5432;Database=business_erp;Username=erp_ci_runtime;Password=ci-only-password

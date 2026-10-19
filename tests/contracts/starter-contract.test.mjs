@@ -309,7 +309,7 @@ test('WPF financial reports tab loads real posted-ledger reports from API', asyn
   assert.match(client, /GetTrialBalanceAsync/);
   assert.match(client, /GetIncomeStatementAsync/);
   assert.match(client, /GetBalanceSheetAsync/);
-  assert.match(vm, /Task\.WhenAll\(trialTask, incomeTask, balanceTask, vatTask\)/);
+  assert.match(vm, /Task\.WhenAll\(trialTask, incomeTask, balanceTask, vatTask, purchaseVatTask\)/);
   assert.match(vm, /POSTED/);
   assert.match(view, /ItemsSource="{Binding TrialBalanceRows}"/);
   assert.match(view, /ItemsSource="{Binding IncomeRows}"/);

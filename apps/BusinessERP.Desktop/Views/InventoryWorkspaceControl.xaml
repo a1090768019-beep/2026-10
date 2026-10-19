@@ -1,0 +1,306 @@
+<UserControl x:Class="BusinessERP.Desktop.Views.InventoryWorkspaceControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             FlowDirection="RightToLeft"
+             Background="#F6F8FC">
+    <UserControl.Resources>
+        <Style TargetType="DataGrid">
+            <Setter Property="AutoGenerateColumns" Value="False" />
+            <Setter Property="CanUserAddRows" Value="False" />
+            <Setter Property="CanUserSortColumns" Value="True" />
+            <Setter Property="CanUserResizeColumns" Value="True" />
+            <Setter Property="IsReadOnly" Value="True" />
+            <Setter Property="EnableRowVirtualization" Value="True" />
+            <Setter Property="EnableColumnVirtualization" Value="True" />
+            <Setter Property="VirtualizingPanel.IsVirtualizing" Value="True" />
+            <Setter Property="VirtualizingPanel.VirtualizationMode" Value="Recycling" />
+            <Setter Property="ScrollViewer.CanContentScroll" Value="True" />
+            <Setter Property="HeadersVisibility" Value="Column" />
+            <Setter Property="GridLinesVisibility" Value="Horizontal" />
+            <Setter Property="BorderBrush" Value="#DDE5F0" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+        <Style TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#24324A" />
+        </Style>
+        <Style TargetType="TextBox">
+            <Setter Property="Padding" Value="8,6" />
+            <Setter Property="BorderBrush" Value="#D8DFEA" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style TargetType="ComboBox">
+            <Setter Property="Padding" Value="8,6" />
+            <Setter Property="BorderBrush" Value="#D8DFEA" />
+        </Style>
+        <Style TargetType="Button">
+            <Setter Property="Padding" Value="13,8" />
+            <Setter Property="Background" Value="#315CC4" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Margin" Value="0,0,6,0" />
+        </Style>
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Margin="22,18,22,28">
+            <Border Background="White" BorderBrush="#E3E9F2" BorderThickness="1" CornerRadius="14" Padding="20" Margin="0,0,0,14">
+                <StackPanel>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="المخزون والأصناف والباركود" FontSize="21" FontWeight="Bold" />
+                            <TextBlock Text="دفتر كميات وقيم مخزنية غير قابل للتعديل؛ الاستلام يزيد الرصيد والصرف يخفضه وفق متوسط التكلفة المتحرك."
+                                       Foreground="#69758D" TextWrapping="Wrap" Margin="0,5,0,0" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button Content="تحديث البيانات" Command="{Binding RefreshCommand}" />
+                            <Button Content="تصدير الأرصدة إلى Excel" Click="ExportStockBalances_Click" />
+                            <Button Content="تصدير بطاقة الحركة إلى Excel" Click="ExportInventoryMovements_Click" />
+                            <Button Content="تصدير التحويلات إلى Excel" Click="ExportInventoryTransfers_Click" />
+                        </StackPanel>
+                    </Grid>
+                    <Grid Margin="0,14,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="2*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Margin="0,0,8,0">
+                            <TextBlock Text="الشركة" FontSize="12" Foreground="#69758D" />
+                            <ComboBox ItemsSource="{Binding Companies}" SelectedItem="{Binding SelectedCompany, Mode=TwoWay}"
+                                      DisplayMemberPath="Name" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Margin="8,0">
+                            <TextBlock Text="العملة الأساسية" FontSize="12" Foreground="#69758D" />
+                            <TextBlock Text="{Binding SelectedCurrency}" Margin="0,11,0,0" FontWeight="SemiBold" />
+                        </StackPanel>
+                        <Button Grid.Column="2" Content="تحديث بطاقة الصنف المحدد" Command="{Binding RefreshStockCardCommand}" VerticalAlignment="Bottom" />
+                    </Grid>
+                    <TextBlock Text="{Binding StatusMessage}" Margin="0,10,0,0" TextWrapping="Wrap" FontSize="12">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Foreground" Value="#69758D" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding StatusIsError}" Value="True">
+                                        <Setter Property="Foreground" Value="#B42318" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </StackPanel>
+            </Border>
+
+            <Grid Margin="0,0,0,14">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="1.45*" />
+                    <ColumnDefinition Width="1*" />
+                </Grid.ColumnDefinitions>
+                <Border Grid.Column="0" Background="White" BorderBrush="#E3E9F2" BorderThickness="1" CornerRadius="14" Padding="16" Margin="0,0,7,0">
+                    <StackPanel>
+                        <TextBlock Text="تعريف صنف / باركود" FontSize="16" FontWeight="SemiBold" />
+                        <Grid Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="1.1*" />
+                                <ColumnDefinition Width="1.6*" />
+                                <ColumnDefinition Width="1.8*" />
+                                <ColumnDefinition Width="1.8*" />
+                                <ColumnDefinition Width="0.8*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox Grid.Column="0" Text="{Binding NewItemCode, UpdateSourceTrigger=PropertyChanged}" ToolTip="رمز الصنف" Margin="0,0,5,0" />
+                            <TextBox Grid.Column="1" Text="{Binding NewBarcode, UpdateSourceTrigger=PropertyChanged}" ToolTip="الباركود" Margin="5,0" />
+                            <TextBox Grid.Column="2" Text="{Binding NewItemNameAr, UpdateSourceTrigger=PropertyChanged}" ToolTip="اسم الصنف بالعربية" Margin="5,0" />
+                            <TextBox Grid.Column="3" Text="{Binding NewItemNameEn, UpdateSourceTrigger=PropertyChanged}" ToolTip="اسم الصنف بالإنجليزية" Margin="5,0" />
+                            <TextBox Grid.Column="4" Text="{Binding NewUnitCode, UpdateSourceTrigger=PropertyChanged}" ToolTip="الوحدة" Margin="5,0" />
+                        </Grid>
+                        <Button Content="حفظ الصنف" Command="{Binding CreateItemCommand}" HorizontalAlignment="Left" Margin="0,8,0,0" />
+                        <DataGrid ItemsSource="{Binding Items}" Height="200" Margin="0,10,0,0">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="الرمز" Binding="{Binding ItemCode}" Width="100" />
+                                <DataGridTextColumn Header="الباركود" Binding="{Binding Barcode}" Width="150" />
+                                <DataGridTextColumn Header="اسم الصنف" Binding="{Binding NameAr}" Width="*" />
+                                <DataGridTextColumn Header="English" Binding="{Binding NameEn}" Width="*" />
+                                <DataGridTextColumn Header="الوحدة" Binding="{Binding UnitCode}" Width="65" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Column="1" Background="White" BorderBrush="#E3E9F2" BorderThickness="1" CornerRadius="14" Padding="16" Margin="7,0,0,0">
+                    <StackPanel>
+                        <TextBlock Text="تعريف مستودع" FontSize="16" FontWeight="SemiBold" />
+                        <Grid Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="1*" />
+                                <ColumnDefinition Width="2*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox Grid.Column="0" Text="{Binding NewWarehouseCode, UpdateSourceTrigger=PropertyChanged}" ToolTip="رمز المستودع" Margin="0,0,5,0" />
+                            <TextBox Grid.Column="1" Text="{Binding NewWarehouseName, UpdateSourceTrigger=PropertyChanged}" ToolTip="اسم المستودع" Margin="5,0" />
+                        </Grid>
+                        <Button Content="حفظ المستودع" Command="{Binding CreateWarehouseCommand}" HorizontalAlignment="Left" Margin="0,8,0,0" />
+                        <DataGrid ItemsSource="{Binding Warehouses}" Height="200" Margin="0,10,0,0">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="الرمز" Binding="{Binding Code}" Width="100" />
+                                <DataGridTextColumn Header="اسم المستودع" Binding="{Binding Name}" Width="*" />
+                                <DataGridCheckBoxColumn Header="نشط" Binding="{Binding IsActive}" Width="65" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <Border Background="White" BorderBrush="#E3E9F2" BorderThickness="1" CornerRadius="14" Padding="16" Margin="0,0,0,14">
+                <StackPanel>
+                    <TextBlock Text="استلام / صرف مخزني" FontSize="16" FontWeight="SemiBold" />
+                    <TextBlock Text="الاستلام يتطلب تكلفة وحدة؛ الصرف يستخدم متوسط التكلفة المتحرك ولا يسمح بأن ينخفض الرصيد عن الصفر. لا يُحذف سجل الحركة، وتصحيحها يكون بحركة مقابلة."
+                               Foreground="#8A6A20" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,8" />
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="1.8*" />
+                            <ColumnDefinition Width="1.8*" />
+                            <ColumnDefinition Width="1.25*" />
+                            <ColumnDefinition Width="1.1*" />
+                            <ColumnDefinition Width="1.1*" />
+                            <ColumnDefinition Width="1.2*" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Margin="0,0,6,0">
+                            <TextBlock Text="الصنف" FontSize="12" Foreground="#69758D" />
+                            <ComboBox ItemsSource="{Binding Items}" SelectedItem="{Binding SelectedItem, Mode=TwoWay}"
+                                      DisplayMemberPath="DisplayLabel" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Margin="6,0">
+                            <TextBlock Text="المستودع" FontSize="12" Foreground="#69758D" />
+                            <ComboBox ItemsSource="{Binding Warehouses}" SelectedItem="{Binding SelectedWarehouse, Mode=TwoWay}"
+                                      DisplayMemberPath="DisplayLabel" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Margin="6,0">
+                            <TextBlock Text="رقم الحركة" FontSize="12" Foreground="#69758D" />
+                            <TextBox Text="{Binding MovementNumber, UpdateSourceTrigger=PropertyChanged}" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="3" Margin="6,0">
+                            <TextBlock Text="التاريخ" FontSize="12" Foreground="#69758D" />
+                            <DatePicker SelectedDate="{Binding MovementDate, Mode=TwoWay}" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="4" Margin="6,0">
+                            <TextBlock Text="الكمية" FontSize="12" Foreground="#69758D" />
+                            <TextBox Text="{Binding MovementQuantity, UpdateSourceTrigger=PropertyChanged}" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="5" Margin="6,0">
+                            <TextBlock Text="تكلفة الوحدة (للاستلام)" FontSize="12" Foreground="#69758D" />
+                            <TextBox Text="{Binding MovementUnitCost, UpdateSourceTrigger=PropertyChanged}" Margin="0,4,0,0" />
+                        </StackPanel>
+                    </Grid>
+                    <TextBox Text="{Binding MovementNotes, UpdateSourceTrigger=PropertyChanged}" ToolTip="ملاحظات (اختياري)" Margin="0,8,0,0" />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Margin="0,8,0,0">
+                        <Button Content="تسجيل استلام" Command="{Binding ReceiveStockCommand}" Background="#146C4A" />
+                        <Button Content="تسجيل صرف" Command="{Binding IssueStockCommand}" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <Border Background="White" BorderBrush="#E3E9F2" BorderThickness="1" CornerRadius="14" Padding="16" Margin="0,0,0,14">
+                <StackPanel>
+                    <TextBlock Text="تحويل مخزني بين مستودعين" FontSize="16" FontWeight="SemiBold" />
+                    <TextBlock Text="يُنشئ النظام سجل تحويل وحركتي صرف واستلام مرتبطتين ضمن معاملة واحدة، ويستخدم متوسط تكلفة المصدر. لا يمكن التحويل إلى المستودع نفسه أو تجاوز الرصيد المتاح."
+                               Foreground="#69758D" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,8" />
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="1.5*" />
+                            <ColumnDefinition Width="1.5*" />
+                            <ColumnDefinition Width="1.5*" />
+                            <ColumnDefinition Width="1.1*" />
+                            <ColumnDefinition Width="1.1*" />
+                            <ColumnDefinition Width="1*" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Margin="0,0,6,0">
+                            <TextBlock Text="الصنف" FontSize="12" Foreground="#69758D" />
+                            <ComboBox ItemsSource="{Binding Items}" SelectedItem="{Binding SelectedItem, Mode=TwoWay}" DisplayMemberPath="DisplayLabel" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Margin="6,0">
+                            <TextBlock Text="من مستودع" FontSize="12" Foreground="#69758D" />
+                            <ComboBox ItemsSource="{Binding Warehouses}" SelectedItem="{Binding SelectedSourceWarehouse, Mode=TwoWay}" DisplayMemberPath="DisplayLabel" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Margin="6,0">
+                            <TextBlock Text="إلى مستودع" FontSize="12" Foreground="#69758D" />
+                            <ComboBox ItemsSource="{Binding Warehouses}" SelectedItem="{Binding SelectedDestinationWarehouse, Mode=TwoWay}" DisplayMemberPath="DisplayLabel" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="3" Margin="6,0">
+                            <TextBlock Text="رقم التحويل" FontSize="12" Foreground="#69758D" />
+                            <TextBox Text="{Binding TransferNumber, UpdateSourceTrigger=PropertyChanged}" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="4" Margin="6,0">
+                            <TextBlock Text="التاريخ" FontSize="12" Foreground="#69758D" />
+                            <DatePicker SelectedDate="{Binding TransferDate, Mode=TwoWay}" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="5" Margin="6,0">
+                            <TextBlock Text="الكمية" FontSize="12" Foreground="#69758D" />
+                            <TextBox Text="{Binding TransferQuantity, UpdateSourceTrigger=PropertyChanged}" Margin="0,4,0,0" />
+                        </StackPanel>
+                    </Grid>
+                    <TextBox Text="{Binding TransferNotes, UpdateSourceTrigger=PropertyChanged}" ToolTip="ملاحظات التحويل (اختياري)" Margin="0,8,0,0" />
+                    <Button Content="تسجيل التحويل" Command="{Binding TransferStockCommand}" HorizontalAlignment="Left" Margin="0,8,0,0" Background="#146C4A" />
+                    <TextBlock Text="سجل التحويلات" FontSize="14" FontWeight="SemiBold" Margin="0,12,0,0" />
+                    <DataGrid ItemsSource="{Binding Transfers}" Height="220" Margin="0,8,0,0">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="رقم التحويل" Binding="{Binding TransferNumber}" Width="150" />
+                            <DataGridTextColumn Header="التاريخ" Binding="{Binding TransferDate, StringFormat=yyyy-MM-dd}" Width="105" />
+                            <DataGridTextColumn Header="الصنف" Binding="{Binding ItemNameAr}" Width="*" />
+                            <DataGridTextColumn Header="رمز الصنف" Binding="{Binding ItemCode}" Width="105" />
+                            <DataGridTextColumn Header="من مستودع" Binding="{Binding SourceWarehouseName}" Width="150" />
+                            <DataGridTextColumn Header="إلى مستودع" Binding="{Binding DestinationWarehouseName}" Width="150" />
+                            <DataGridTextColumn Header="الكمية" Binding="{Binding Quantity, StringFormat=N4}" Width="100" />
+                            <DataGridTextColumn Header="تكلفة الوحدة" Binding="{Binding UnitCost, StringFormat=N8}" Width="120" />
+                            <DataGridTextColumn Header="القيمة" Binding="{Binding InventoryValue, StringFormat=N4}" Width="120" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                    <TextBlock Text="يظهر آخر 100 تحويل في هذه الشاشة. سجل API يدعم التصفية وترقيم الصفحات، وسيتم توسيع المرشحات في الواجهة مع استكمال التقارير المخزنية."
+                               Foreground="#8A6A20" FontSize="11" TextWrapping="Wrap" Margin="2,8,2,0" />
+                </StackPanel>
+            </Border>
+            <Border Background="White" BorderBrush="#E3E9F2" BorderThickness="1" CornerRadius="14" Padding="16" Margin="0,0,0,14">
+                <StackPanel>
+                    <TextBlock Text="الأرصدة المخزنية والقيمة بالتكلفة المتوسطة" FontSize="16" FontWeight="SemiBold" />
+                    <TextBlock Text="التصدير يشمل الصفحة المحمّلة حاليًا (حتى 100 صف)؛ استخدم المرشحات والصفحات في واجهة التقرير عند توسيعها." Foreground="#69758D" FontSize="11" Margin="0,4,0,0" />
+                    <DataGrid ItemsSource="{Binding StockBalances}" SelectedItem="{Binding SelectedBalance, Mode=TwoWay}"
+                              Height="230" Margin="0,8,0,0">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="رمز الصنف" Binding="{Binding ItemCode}" Width="100" />
+                            <DataGridTextColumn Header="الباركود" Binding="{Binding Barcode}" Width="130" />
+                            <DataGridTextColumn Header="اسم الصنف" Binding="{Binding ItemNameAr}" Width="*" />
+                            <DataGridTextColumn Header="المستودع" Binding="{Binding WarehouseName}" Width="140" />
+                            <DataGridTextColumn Header="الكمية المتاحة" Binding="{Binding OnHandQuantity, StringFormat=N4}" Width="120" />
+                            <DataGridTextColumn Header="متوسط التكلفة" Binding="{Binding AverageUnitCost, StringFormat=N8}" Width="130" />
+                            <DataGridTextColumn Header="القيمة" Binding="{Binding InventoryValue, StringFormat=N4}" Width="130" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </StackPanel>
+            </Border>
+
+            <Border Background="White" BorderBrush="#E3E9F2" BorderThickness="1" CornerRadius="14" Padding="16">
+                <StackPanel>
+                    <TextBlock Text="بطاقة حركة المخزون" FontSize="16" FontWeight="SemiBold" />
+                    <DataGrid ItemsSource="{Binding Movements}" Height="280" Margin="0,8,0,0">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="رقم الحركة" Binding="{Binding MovementNumber}" Width="150" />
+                            <DataGridTextColumn Header="نوع الحركة" Binding="{Binding MovementType}" Width="100" />
+                            <DataGridTextColumn Header="التاريخ" Binding="{Binding MovementDate, StringFormat=yyyy-MM-dd}" Width="110" />
+                            <DataGridTextColumn Header="رمز الصنف" Binding="{Binding ItemCode}" Width="100" />
+                            <DataGridTextColumn Header="الباركود" Binding="{Binding Barcode}" Width="120" />
+                            <DataGridTextColumn Header="الصنف" Binding="{Binding ItemNameAr}" Width="*" />
+                            <DataGridTextColumn Header="المستودع" Binding="{Binding WarehouseName}" Width="130" />
+                            <DataGridTextColumn Header="الكمية الموقعة" Binding="{Binding QuantityDelta, StringFormat=N4}" Width="120" />
+                            <DataGridTextColumn Header="تكلفة الوحدة" Binding="{Binding UnitCost, StringFormat=N8}" Width="120" />
+                            <DataGridTextColumn Header="تغير القيمة" Binding="{Binding InventoryValueDelta, StringFormat=N4}" Width="120" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                    <TextBlock Text="حدود هذه المرحلة: الرصيد والقيمة محسوبان من دفتر الحركات بمتوسط تكلفة متحرك لكل صنف ومستودع. لم يكتمل بعد تتبع الأرقام التسلسلية، التحويل بين المستودعات، الجرد الدوري، وربط الاستلام آليًا بمسودات شراء الموردين أو الصرف بفواتير المبيعات."
+                               Foreground="#8A6A20" FontSize="11" TextWrapping="Wrap" Margin="2,10,2,0" />
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
