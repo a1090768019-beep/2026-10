@@ -108,7 +108,7 @@ COMMIT;
 
 BEGIN;
 SELECT set_config('app.tenant_id', '11111111-1111-4111-8111-111111111111', true);
-DO $
+DO $$
 BEGIN
     IF (SELECT status FROM purchase_invoice_drafts WHERE purchase_number = 'PUR-CI-0001') <> 'ACCOUNTING_POSTED'
        OR (SELECT accounting_posted_journal_entry_id FROM purchase_invoice_drafts WHERE purchase_number = 'PUR-CI-0001')
@@ -119,9 +119,9 @@ BEGIN
           <> (SELECT COALESCE(sum(credit), 0) FROM journal_entry_lines WHERE journal_entry_id = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee7') THEN
         RAISE EXCEPTION 'Purchase ledger smoke failed: source link or debit-credit balance is incorrect';
     END IF;
-END $;
+END $$;
 
-DO $
+DO $$
 BEGIN
     BEGIN
         UPDATE purchase_invoice_drafts SET vat_amount = 99.00
@@ -137,12 +137,12 @@ BEGIN
     EXCEPTION WHEN check_violation THEN
         NULL;
     END;
-END $;
+END $$;
 COMMIT;
 
 BEGIN;
 SELECT set_config('app.tenant_id', '11111111-1111-4111-8111-111111111111', true);
-DO $
+DO $$
 BEGIN
     IF (SELECT count(*) FROM suppliers WHERE supplier_code = 'CI-SUPPLIER-A') <> 1
        OR (SELECT count(*) FROM purchase_invoice_drafts WHERE purchase_number = 'PUR-CI-0001') <> 1
