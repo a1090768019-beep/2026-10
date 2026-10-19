@@ -4,7 +4,7 @@ INSERT INTO subscription_plans
     (id, code, name, billing_interval, price, currency, limits_json, is_active)
 VALUES
     ('33333333-3333-4333-8333-333333333333', 'CI-STARTER', 'CI Starter', 'MONTHLY', 0.0000, 'SAR',
-     '{"companies":1,"users":3,"entriesPerMonth":1000}'::jsonb, true),
+     '{"companies":2,"users":3,"entriesPerMonth":1000}'::jsonb, true),
     ('44444444-4444-4444-8444-444444444444', 'CI-NO-COMPANIES', 'CI No Companies', 'MONTHLY', 0.0000, 'SAR',
      '{"companies":0,"users":1,"entriesPerMonth":10}'::jsonb, true);
 
