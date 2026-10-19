@@ -144,6 +144,12 @@ jobs:
         run: dotnet build src/server/BusinessERP.Api/BusinessERP.Api.csproj --configuration Release --no-restore
       - name: Build API container image
         run: docker build --file Dockerfile.api --tag business-erp-api:ci .
+      - name: Validate production Compose configuration
+        env:
+          ERP_CONNECTION_STRING: "Host=127.0.0.1;Port=5432;Database=business_erp;Username=erp_ci_runtime;Password=ci-only"
+          ERP_OIDC_AUTHORITY: "https://identity.example.invalid/"
+          ERP_OIDC_AUDIENCE: "business-erp-api"
+        run: docker compose --file deploy/compose.production.yml config --quiet
 
   desktop:
     runs-on: windows-latest
