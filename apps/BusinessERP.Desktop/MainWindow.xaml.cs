@@ -232,7 +232,6 @@ public partial class MainWindow : Window
             await PurchasesWorkspacePanel.SetApiClientAsync(null);
             await InventoryWorkspacePanel.SetApiClientAsync(null);
             await SettlementsWorkspacePanel.SetApiClientAsync(null);
-        await MembershipWorkspacePanel.SetApiClientAsync(null);
             await MembershipWorkspacePanel.SetApiClientAsync(null);
             UpdateWorkspaceContext();
             AuthStatusText.Text = "تعذر الاتصال بـ API";
@@ -611,8 +610,6 @@ public partial class MainWindow : Window
             SettlementsWorkspacePanel.Visibility = Visibility.Visible;
             if (_erpApiClient is null)
                 await SettlementsWorkspacePanel.SetApiClientAsync(null);
-        await MembershipWorkspacePanel.SetApiClientAsync(null);
-            await MembershipWorkspacePanel.SetApiClientAsync(null);
             else
                 await SettlementsWorkspacePanel.SetApiClientAsync(_erpApiClient);
             RibbonStatusText.Text = SettlementsWorkspacePanel.WorkspaceStatusMessage;
