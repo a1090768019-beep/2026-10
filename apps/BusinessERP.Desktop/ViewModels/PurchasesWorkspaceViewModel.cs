@@ -85,11 +85,11 @@ public sealed class PurchasesWorkspaceViewModel : INotifyPropertyChanged
         CreateSupplierCommand = new AsyncCommand(CreateSupplierAsync, CanCreateSupplier, HandleUnexpectedCommandFailure);
         AddPurchaseLineCommand = new RelayCommand(AddPurchaseLine, () => !IsBusy);
         RemovePurchaseLineCommand = new RelayCommand(RemoveSelectedPurchaseLine, () => !IsBusy && SelectedNewPurchaseLine is not null);
+        CreatePurchaseDraftCommand = new AsyncCommand(CreatePurchaseDraftAsync, CanCreatePurchaseDraft, HandleUnexpectedCommandFailure);
         CalculateSelectedDraftVatCommand = new AsyncCommand(CalculateSelectedDraftVatAsync, CanCalculateSelectedDraftVat, HandleUnexpectedCommandFailure);
-        CalculateSelectedDraftVatCommand = new AsyncCommand(CalculateSelectedDraftVatAsync, CanCalculateSelectedDraftVat);
+        LoadVatReportCommand = new AsyncCommand(() => LoadVatReportAsync(1), CanLoadVatReport, HandleUnexpectedCommandFailure);
         PreviousVatPageCommand = new AsyncCommand(() => LoadVatReportAsync(_reportPage - 1), CanGoToPreviousVatPage, HandleUnexpectedCommandFailure);
-        PreviousVatPageCommand = new AsyncCommand(() => LoadVatReportAsync(_reportPage - 1), CanGoToPreviousVatPage);
-undefined
+        NextVatPageCommand = new AsyncCommand(() => LoadVatReportAsync(_reportPage + 1), CanGoToNextVatPage, HandleUnexpectedCommandFailure);
     }
 
     public string WorkspaceContextSummary => SelectedCompany is null
