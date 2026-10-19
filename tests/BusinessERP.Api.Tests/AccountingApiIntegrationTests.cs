@@ -21,6 +21,7 @@ namespace BusinessERP.Api.Tests;
 public sealed class AccountingApiIntegrationTests
 {
     private static readonly Guid TenantA = Guid.Parse("11111111-1111-4111-8111-111111111111");
+    private static readonly Guid UserA = Guid.Parse("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa");
     private static readonly Guid TenantB = Guid.Parse("22222222-2222-4222-8222-222222222222");
     private static readonly Guid UserB = Guid.Parse("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb");
     private static readonly Guid TenantC = Guid.Parse("33333333-3333-4333-8333-333333333301");
@@ -117,6 +118,28 @@ public sealed class AccountingApiIntegrationTests
         Assert.Equal("companies", json.RootElement.GetProperty("limitName").GetString());
         Assert.Equal(0, json.RootElement.GetProperty("limit").GetInt32());
         Assert.Equal(0, json.RootElement.GetProperty("current").GetInt32());
+    }
+
+    [RequiresApiPostgresFact]
+    public async Task Last_active_owner_cannot_be_demoted_or_removed()
+    {
+        var connectionString = Environment.GetEnvironmentVariable("BUSINESS_ERP_TEST_CONNECTION");
+        Assert.False(string.IsNullOrWhiteSpace(connectionString));
+
+        using var factory = new ApiTestFactory(connectionString!);
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Test-Subject", "ci-subject-a");
+        SetTenant(client, TenantA);
+
+        using var response = await client.PutAsJsonAsync($"/api/v1/memberships/{UserA:D}", new
+        {
+            roleCode = "VIEWER",
+            status = "ACTIVE"
+        });
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal("last_owner_protection", json.RootElement.GetProperty("error").GetString());
     }
 
     [RequiresApiPostgresFact]
