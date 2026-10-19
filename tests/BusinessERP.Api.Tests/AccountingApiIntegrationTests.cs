@@ -63,6 +63,7 @@ public sealed class AccountingApiIntegrationTests
 
         using var factory = new ApiTestFactory(connectionString!);
         using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Test-Subject", "ci-subject-c");
         SetTenant(client, TenantC);
 
         using var response = await client.PostAsJsonAsync("/api/v1/companies", new
