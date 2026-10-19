@@ -127,6 +127,8 @@
                                 Style="{StaticResource RibbonTabButtonStyle}" />
                         <Button x:Name="SalesWorkspaceTab" Content="▤ مبيعات العملاء" Tag="Sales" Click="RibbonNavigate_Click"
                                 Style="{StaticResource RibbonTabButtonStyle}" />
+                        <Button x:Name="PurchasesWorkspaceTab" Content="▣ مشتريات الموردين" Tag="Purchases" Click="RibbonNavigate_Click"
+                                Style="{StaticResource RibbonTabButtonStyle}" />
                         <Button x:Name="ReportsWorkspaceTab" Content="▥ التقارير المالية" Tag="Reports" Click="RibbonNavigate_Click"
                                 Style="{StaticResource RibbonTabButtonStyle}" />
                         <TextBlock Text="تبويبات مساحة العمل" Foreground="#98A1B3" FontSize="10" VerticalAlignment="Center" Margin="12,0,0,0" />
@@ -332,6 +334,7 @@
                 </ScrollViewer>
                 <views:SalesWorkspaceControl Grid.Row="1" x:Name="SalesWorkspacePanel" Visibility="Collapsed" />
                 <views:ReportsWorkspaceControl Grid.Row="1" x:Name="ReportsWorkspacePanel" Visibility="Collapsed" />
+                <views:PurchasesWorkspaceControl Grid.Row="1" x:Name="PurchasesWorkspacePanel" Visibility="Collapsed" />
             </Grid>
 
             <Border Grid.Row="3" Background="#F1F4F9" BorderBrush="#DDE5F0" BorderThickness="0,1,0,0" Padding="12,0">
