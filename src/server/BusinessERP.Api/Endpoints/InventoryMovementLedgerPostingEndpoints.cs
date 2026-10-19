@@ -1,8 +1,10 @@
+using System.Data.Common;
 using System.Text.Json;
 using BusinessERP.Application.Abstractions;
 using BusinessERP.Infrastructure.Persistence;
 using BusinessERP.Infrastructure.Tenancy;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace BusinessERP.Api.Endpoints;
 
@@ -50,8 +52,7 @@ public static class InventoryMovementLedgerPostingEndpoints
                 return Results.NotFound(new { error = "company_not_found" });
 
             var movementLock = $"inventory-movement-ledger-posting:{tenant.TenantId:D}:{companyId:D}:{movementId:D}";
-            await db.Database.ExecuteSqlInterpolatedAsync(
-                $"SELECT pg_advisory_xact_lock(hashtextextended({movementLock}, 0))", token);
+            await AcquireAdvisoryLockAsync(db, movementLock, token);
 
             var existingLink = await db.Database.SqlQuery<InventoryMovementPostingLink>($"""
                 SELECT posting.id AS "Id",
@@ -165,8 +166,7 @@ public static class InventoryMovementLedgerPostingEndpoints
             }
 
             var entryNumberLock = $"journal-entry-number:{tenant.TenantId:D}:{companyId:D}:{entryNumber}";
-            await db.Database.ExecuteSqlInterpolatedAsync(
-                $"SELECT pg_advisory_xact_lock(hashtextextended({entryNumberLock}, 0))", token);
+            await AcquireAdvisoryLockAsync(db, entryNumberLock, token);
 
             if (await db.JournalEntries.AnyAsync(
                     x => x.TenantId == tenant.TenantId && x.CompanyId == companyId && x.EntryNumber == entryNumber, token))
@@ -265,6 +265,19 @@ public static class InventoryMovementLedgerPostingEndpoints
                         ? "تم ترحيل الاستلام اليدوي بقيد مدين للمخزون ودائن للحساب المقابل. هذا المسار لا يربط الاستلام آليًا بفاتورة شراء المورد."
                         : "تم ترحيل الصرف اليدوي بقيد مدين لتكلفة الصرف ودائن للمخزون. هذا المسار لا يربط الصرف آليًا بفاتورة مبيعات."));
         }, ct);
+    }
+
+    private static async Task AcquireAdvisoryLockAsync(
+        ErpDbContext db, string lockKey, CancellationToken ct)
+    {
+        await using var command = db.Database.GetDbConnection().CreateCommand();
+        command.Transaction = db.Database.CurrentTransaction?.GetDbTransaction();
+        command.CommandText = "SELECT pg_advisory_xact_lock(hashtextextended(@lock_key, 0))";
+        var parameter = command.CreateParameter();
+        parameter.ParameterName = "lock_key";
+        parameter.Value = lockKey;
+        command.Parameters.Add(parameter);
+        await command.ExecuteScalarAsync(ct);
     }
 
     private static InventoryMovementLedgerPostingResult ToResult(

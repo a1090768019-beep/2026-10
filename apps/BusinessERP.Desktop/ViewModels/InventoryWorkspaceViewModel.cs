@@ -24,7 +24,7 @@ public sealed class InventoryWorkspaceViewModel : INotifyPropertyChanged
     private ApiFiscalPeriod? _selectedLedgerFiscalPeriod;
     private ApiAccount? _selectedInventoryAssetAccount;
     private ApiAccount? _selectedCounterpartAccount;
-    private string _ledgerEntryNumber = $"INVGL-{DateTime.Now:yyyyMMddHHmmss}";
+    private string _ledgerEntryNumber = $"INVGL-{DateTime.Now:yyyyMMddHHmmss}-{Guid.NewGuid():N}";
     private bool _suppressCompanyReload;
     private bool _isBusy;
     private bool _statusIsError;
@@ -325,7 +325,7 @@ public sealed class InventoryWorkspaceViewModel : INotifyPropertyChanged
         foreach (var movement in (await movementsTask).Rows) Movements.Add(movement);
         LedgerEligibleMovements.Clear();
         foreach (var movement in Movements.Where(m => m.SourceType == "MANUAL" && !m.TransferId.HasValue &&
-                     !m.IsAccountingPosted && m.MovementType is "RECEIPT" or "ISSUE" &&
+                     !m.IsAccountingPosted && (m.MovementType is "RECEIPT" or "ISSUE") &&
                      Math.Abs(m.InventoryValueDelta) > 0m))
             LedgerEligibleMovements.Add(movement);
         Accounts.Clear();
@@ -474,7 +474,7 @@ public sealed class InventoryWorkspaceViewModel : INotifyPropertyChanged
     private bool CanPostInventoryMovementToLedger() =>
         _apiClient is not null && SelectedCompany is not null && SelectedLedgerMovement is not null &&
         !SelectedLedgerMovement.IsAccountingPosted && SelectedLedgerMovement.SourceType == "MANUAL" &&
-        !SelectedLedgerMovement.TransferId.HasValue && SelectedLedgerMovement.MovementType is "RECEIPT" or "ISSUE" &&
+        !SelectedLedgerMovement.TransferId.HasValue && (SelectedLedgerMovement.MovementType is "RECEIPT" or "ISSUE") &&
         Math.Abs(SelectedLedgerMovement.InventoryValueDelta) > 0m &&
         SelectedLedgerFiscalPeriod is not null && SelectedLedgerFiscalPeriod.Status == "OPEN" &&
         SelectedLedgerFiscalPeriod.StartDate <= SelectedLedgerMovement.MovementDate &&
@@ -500,7 +500,7 @@ public sealed class InventoryWorkspaceViewModel : INotifyPropertyChanged
             var result = await _apiClient.PostInventoryMovementToLedgerAsync(
                 SelectedCompany.Id, SelectedLedgerMovement.Id, request);
             await LoadCompanyDataAsync();
-            LedgerEntryNumber = $"INVGL-{DateTime.Now:yyyyMMddHHmmss}";
+            LedgerEntryNumber = $"INVGL-{DateTime.Now:yyyyMMddHHmmss}-{Guid.NewGuid():N}";
             StatusMessage = result.AlreadyPosted
                 ? $"الحركة {movementNumber} مرحّلة مسبقًا بالقيد {result.EntryNumber}."
                 : $"تم ترحيل الحركة {movementNumber} إلى دفتر الأستاذ بالقيد {result.EntryNumber}. القيمة {result.Amount:N2} {SelectedCurrency}. الحالة {result.JournalEntryStatus}.";
