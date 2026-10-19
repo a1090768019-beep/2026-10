@@ -1,0 +1,93 @@
+<UserControl x:Class="BusinessERP.Desktop.Views.TenantMembershipWorkspaceControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             FlowDirection="RightToLeft">
+    <Grid Background="#F5F7FB" Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0" Background="White" CornerRadius="12" Padding="18" Margin="0,0,0,12">
+            <StackPanel>
+                <TextBlock Text="إدارة المستخدمين والصلاحيات" FontSize="22" FontWeight="Bold" Foreground="#17233B"/>
+                <TextBlock Text="عرض الأعضاء، إسناد دور، وإيقاف أو إعادة تفعيل العضوية. يتحقق الخادم من صلاحيات OWNER/ADMIN وحدود خطة الاشتراك."
+                           Foreground="#64748B" Margin="0,7,0,0" TextWrapping="Wrap"/>
+            </StackPanel>
+        </Border>
+
+        <Border Grid.Row="1" Background="White" CornerRadius="12" Padding="16" Margin="0,0,0,12">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="2.2*"/>
+                    <ColumnDefinition Width="150"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                    <TextBlock Text="معرّف المستخدم (GUID) الموجود مسبقًا في موفر الهوية" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                    <TextBox Text="{Binding UserIdText, UpdateSourceTrigger=PropertyChanged}" MinHeight="34" Padding="8,5"
+                             ToolTip="هذه الشاشة لا تنشئ حسابًا لدى موفر الهوية ولا ترسل دعوات."/>
+                </StackPanel>
+                <StackPanel Grid.Column="1" Margin="0,0,12,0">
+                    <TextBlock Text="الدور" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                    <ComboBox ItemsSource="{Binding RoleCodes}" SelectedItem="{Binding AssignRoleCode}" MinHeight="34" IsEnabled="{Binding CanEdit}"/>
+                </StackPanel>
+                <Button Grid.Column="2" Content="إسناد العضوية" Click="AssignMember_Click" MinHeight="34" Padding="14,7"
+                        VerticalAlignment="Bottom" Margin="0,0,8,0" IsEnabled="{Binding CanEdit}"/>
+                <Button Grid.Column="3" Content="تحديث القائمة" Click="Refresh_Click" MinHeight="34" Padding="14,7"
+                        VerticalAlignment="Bottom" IsEnabled="{Binding CanEdit}"/>
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="2" Background="White" CornerRadius="12" Padding="12" Margin="0,0,0,12">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Top" Margin="4,2,4,10">
+                    <TextBlock Text="أعضاء المستأجر" FontSize="17" FontWeight="SemiBold"/>
+                    <TextBlock Text="يُسمح بالإسناد للمستخدمين المجهزين مسبقًا فقط. إضافة الهوية والدعوات الذاتية تتطلب تكاملًا منفصلًا مع موفر الهوية."
+                               Foreground="#64748B" Margin="0,5,0,0" TextWrapping="Wrap"/>
+                </StackPanel>
+                <DataGrid ItemsSource="{Binding Members}" SelectedItem="{Binding SelectedMember, Mode=TwoWay}"
+                          AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False"
+                          SelectionMode="Single" HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                          CanUserSortColumns="True" EnableRowVirtualization="True" EnableColumnVirtualization="True">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="اسم المستخدم" Binding="{Binding DisplayName}" Width="1.2*"/>
+                        <DataGridTextColumn Header="البريد" Binding="{Binding Email}" Width="1.4*"/>
+                        <DataGridTextColumn Header="الدور" Binding="{Binding RoleCode}" Width="120"/>
+                        <DataGridTextColumn Header="الحالة" Binding="{Binding Status}" Width="120"/>
+                        <DataGridCheckBoxColumn Header="هوية معطلة" Binding="{Binding IdentityDisabled}" Width="100"/>
+                        <DataGridTextColumn Header="معرّف المستخدم" Binding="{Binding UserId}" Width="2*"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </DockPanel>
+        </Border>
+
+        <Border Grid.Row="3" Background="White" CornerRadius="12" Padding="14">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="150"/>
+                        <ColumnDefinition Width="150"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="{Binding SelectedMemberSummary}" VerticalAlignment="Center" Foreground="#475569"
+                               TextWrapping="Wrap" Margin="0,0,12,0"/>
+                    <ComboBox Grid.Column="1" ItemsSource="{Binding RoleCodes}" SelectedItem="{Binding SelectedRoleCode}" MinHeight="34"
+                              Margin="0,0,8,0" IsEnabled="{Binding CanEdit}"/>
+                    <ComboBox Grid.Column="2" ItemsSource="{Binding StatusCodes}" SelectedItem="{Binding SelectedStatus}" MinHeight="34"
+                              Margin="0,0,8,0" IsEnabled="{Binding CanEdit}"/>
+                    <Button Grid.Column="3" Content="حفظ تعديل العضوية" Click="UpdateMember_Click" Padding="14,7" IsEnabled="{Binding CanEdit}"/>
+                </Grid>
+                <TextBlock Grid.Row="1" Text="{Binding StatusMessage}" Foreground="#52627C" Margin="0,10,0,0" TextWrapping="Wrap"/>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>
