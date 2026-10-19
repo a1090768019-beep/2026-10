@@ -193,7 +193,6 @@ BEGIN
        AND id = source_id
      FOR UPDATE;
     IF NOT FOUND THEN RAISE EXCEPTION 'Receipt not found' USING ERRCODE = '23503'; END IF;
-    IF source_status <> 'DRAFT' THEN RAISE EXCEPTION 'Posted receipt allocations are immutable' USING ERRCODE = '23514'; END IF;
     SELECT COALESCE(sum(allocated_amount),0) INTO allocated_total
       FROM customer_receipt_allocations
      WHERE tenant_id = CASE WHEN TG_OP = 'DELETE' THEN OLD.tenant_id ELSE NEW.tenant_id END
@@ -202,7 +201,7 @@ BEGIN
     IF allocated_total > source_amount THEN
         RAISE EXCEPTION 'Receipt allocations cannot exceed receipt amount' USING ERRCODE = '23514';
     END IF;
-    RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
+    IF TG_OP = 'DELETE' THEN RETURN OLD; ELSE RETURN NEW; END IF;
 END $;
 CREATE CONSTRAINT TRIGGER trg_customer_receipt_allocation_total
     AFTER INSERT OR UPDATE OR DELETE ON customer_receipt_allocations
@@ -225,7 +224,6 @@ BEGIN
        AND id = source_id
      FOR UPDATE;
     IF NOT FOUND THEN RAISE EXCEPTION 'Supplier payment not found' USING ERRCODE = '23503'; END IF;
-    IF source_status <> 'DRAFT' THEN RAISE EXCEPTION 'Posted payment allocations are immutable' USING ERRCODE = '23514'; END IF;
     SELECT COALESCE(sum(allocated_amount),0) INTO allocated_total
       FROM supplier_payment_allocations
      WHERE tenant_id = CASE WHEN TG_OP = 'DELETE' THEN OLD.tenant_id ELSE NEW.tenant_id END
