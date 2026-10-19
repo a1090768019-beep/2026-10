@@ -136,3 +136,34 @@ test('desktop inventory workspace creates, lists and exports warehouse transfers
   assert.match(code, /ExportInventoryTransfers_Click/);
   assert.match(code, /BusinessERP-InventoryTransfers/);
 });
+
+test('serial tracking is connected to stock receipt, issue, transfer and reporting', async () => {
+  const migration = await read('database/migrations/0009_inventory_serial_tracking.sql');
+  const api = await read('src/server/BusinessERP.Api/Endpoints/InventoryEndpoints.cs');
+  const serialApi = await read('src/server/BusinessERP.Api/Endpoints/InventorySerialEndpoints.cs');
+  const client = await read('apps/BusinessERP.Desktop/Services/ErpApiClient.cs');
+  const vm = await read('apps/BusinessERP.Desktop/ViewModels/InventoryWorkspaceViewModel.cs');
+  const view = await read('apps/BusinessERP.Desktop/Views/InventoryWorkspaceControl.xaml');
+  const codeBehind = await read('apps/BusinessERP.Desktop/Views/InventoryWorkspaceControl.xaml.cs');
+  assert.match(migration, /CREATE TABLE inventory_serial_numbers/);
+  assert.match(migration, /CREATE TABLE inventory_serial_events/);
+  assert.match(migration, /trg_inventory_serial_movement_complete/);
+  assert.match(migration, /DEFERRABLE INITIALLY DEFERRED/);
+  assert.match(migration, /ENABLE ROW LEVEL SECURITY/);
+  assert.match(api, /ValidateSerialNumbersAsync/);
+  assert.match(api, /ApplySerialReceiptAsync/);
+  assert.match(api, /ApplySerialIssueAsync/);
+  assert.match(api, /ApplySerialTransferAsync/);
+  assert.match(serialApi, /GetSerialEvents/);
+  assert.match(serialApi, /GetSerialSummary/);
+  assert.match(client, /GetInventorySerialEventsAsync/);
+  assert.match(client, /GetInventorySerialSummaryAsync/);
+  assert.match(vm, /NewItemTracksSerials/);
+  assert.match(vm, /MovementSerialNumbers/);
+  assert.match(vm, /TransferSerialNumbers/);
+  assert.match(vm, /SerialSummaryRows/);
+  assert.match(view, /ItemsSource="{Binding SerialEvents}"/);
+  assert.match(view, /ItemsSource="{Binding SerialSummaryRows}"/);
+  assert.match(codeBehind, /ExportInventorySerialEvents_Click/);
+  assert.match(codeBehind, /ExportInventorySerialSummary_Click/);
+});
