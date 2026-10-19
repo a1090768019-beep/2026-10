@@ -22,7 +22,7 @@
 
 ## Migration validation
 
-The initial schema `0001_initial.sql` is a bootstrap script followed by ordered SQL migrations through `0012_settlement_posting.sql`; this is not yet a managed EF Core migration chain or a verified production upgrade mechanism. Use a new, empty, disposable PostgreSQL database for a clean install. In PowerShell, set `MIGRATIONS_DATABASE_URL` to a PostgreSQL/libpq connection URI (not a .NET semicolon-delimited connection string), then apply every `database/migrations/*.sql` file in lexical filename order with `psql -v ON_ERROR_STOP=1`, stopping immediately on the first nonzero exit code. Do not replay non-idempotent scripts against an already migrated database. Existing production databases require a separately reviewed and tested forward-upgrade plan.
+The initial schema `0001_initial.sql` is a bootstrap script followed by ordered SQL migrations through `0013_subscription_monthly_entry_quota.sql`; this is not yet a managed EF Core migration chain or a verified production upgrade mechanism. Use a new, empty, disposable PostgreSQL database for a clean install. In PowerShell, set `MIGRATIONS_DATABASE_URL` to a PostgreSQL/libpq connection URI (not a .NET semicolon-delimited connection string), then apply every `database/migrations/*.sql` file in lexical filename order with `psql -v ON_ERROR_STOP=1`, stopping immediately on the first nonzero exit code. Do not replay non-idempotent scripts against an already migrated database. Existing production databases require a separately reviewed and tested forward-upgrade plan.
 
 GitHub Actions has executed the ordered migrations and smoke checks on disposable PostgreSQL 17 during CI. This does not verify production upgrade/rollback behavior. Before production, run clean-install, forward-upgrade, rollback or restore, two-tenant isolation, concurrent idempotency, journal immutability, and runtime-role permission tests in the target PostgreSQL environment.
 
@@ -44,3 +44,8 @@ Run the same checks locally from a shell with `psql` installed and an empty disp
 
 ## ترحيل 0004 — قيد يومية لمسودة المبيعات
 يضيف `0004_sales_draft_ledger_posting.sql` حالة `ACCOUNTING_POSTED` ورابط القيد وتاريخه، وFK مركبًا داخل نفس المستأجر/الشركة، وtriggers تمنع تعديل/حذف الرأس أو تعديل البنود بعد الترحيل. لا تقبل قاعدة البيانات الانتقال إلى الحالة الجديدة إلا عند الإشارة إلى قيد POSTED مصدره المسودة نفسها. صلاحية runtime على أعمدة الحالة والرابط محدودة ومنفصلة عن بيانات المسودة.
+
+
+## Monthly subscription quota — 0013
+
+`0013_subscription_monthly_entry_quota.sql` adds a database trigger on `journal_entries`. It checks the latest tenant subscription and the configured `entriesPerMonth` value, counts entries by database insertion time in the UTC calendar month, and serializes inserts for a tenant/month with a transaction-scoped advisory lock. The API maps quota exhaustion to HTTP 409. Deploy it after 0012; on production databases with existing data, run the separately reviewed migration procedure rather than replaying the bootstrap chain.
