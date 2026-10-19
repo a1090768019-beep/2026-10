@@ -70,6 +70,7 @@ public partial class ReportsWorkspaceControl : UserControl
                 "IncomeStatement" => "قائمة الدخل",
                 "BalanceSheet" => "الميزانية العمومية",
                 "SalesVatDetails" => "تفاصيل ضريبة المبيعات",
+                "PurchaseVatDetails" => "تفاصيل ضريبة المشتريات",
                 _ => "التقرير المالي"
             };
             document.Blocks.Add(new Paragraph(new Run("Business ERP · " + title))
@@ -252,6 +253,32 @@ public partial class ReportsWorkspaceControl : UserControl
                 vat.GrossAmount, vat.DiscountAmount, vat.NetAmount, "", vat.VatAmount, vat.TotalAmount, vat.ReportKind });
             rows.Add(new object?[] { "ملاحظة", vat.Message });
             return ("SalesVatDetails", rows);
+        }
+
+        if (ReportsTabs.SelectedIndex == 4 && _viewModel.CurrentPurchaseVatDetailsReport is { } purchaseVat)
+        {
+            var rows = new List<object?[]>
+            {
+                new object?[] { "Business ERP", "تفاصيل ضريبة المشتريات - تقرير داخلي لمسودات محسوبة VAT" },
+                new object?[] { "الشركة", _viewModel.SelectedCompany?.Name ?? "" },
+                new object?[] { "الفترة", $"{purchaseVat.FromDate:yyyy-MM-dd} — {purchaseVat.ToDate:yyyy-MM-dd}" },
+                new object?[] { "عدد المسودات المحسوبة", purchaseVat.InvoiceCount, "عدد البنود", purchaseVat.TotalLines },
+                Array.Empty<object?>(),
+                new object?[] { "رقم مسودة الشراء", "رقم فاتورة المورد", "التاريخ", "المورد", "الرقم الضريبي", "رقم البند", "الوصف", "معالجة VAT", "الكمية", "قبل الخصم", "الخصم", "الصافي", "نسبة VAT", "VAT", "الإجمالي", "الحالة" }
+            };
+            rows.AddRange(purchaseVat.Rows.Select(row => new object?[]
+            {
+                row.PurchaseNumber, row.SupplierInvoiceNumber, row.IssueDate, row.SupplierName,
+                row.SupplierTaxNumber, row.LineNumber, row.Description, row.VatTreatment, row.Quantity,
+                row.GrossAmount, row.DiscountAmount, row.NetAmount, row.VatRatePercent, row.VatAmount,
+                row.TotalAmount, row.DocumentStatus
+            }));
+            rows.Add(Array.Empty<object?>());
+            rows.Add(new object?[] { "الإجماليات (كل المسودات بالفترة)", "", "", "", "", "", "", "", "",
+                purchaseVat.GrossAmount, purchaseVat.DiscountAmount, purchaseVat.NetAmount, "",
+                purchaseVat.VatAmount, purchaseVat.TotalAmount, purchaseVat.ReportKind });
+            rows.Add(new object?[] { "ملاحظة", purchaseVat.Message });
+            return ("PurchaseVatDetails", rows);
         }
 
         return null;

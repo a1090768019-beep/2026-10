@@ -153,6 +153,38 @@
                                    Foreground="#8A6A20" FontSize="11" TextWrapping="Wrap" Margin="2,10,2,0" />
                     </StackPanel>
                 </TabItem>
+                <TabItem Header="تفاصيل ضريبة المشتريات">
+                    <StackPanel Margin="12">
+                        <TextBlock Text="{Binding PurchaseVatSummary}" FontSize="13" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,8" />
+                        <DataGrid ItemsSource="{Binding PurchaseVatRows}" Height="360">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="رقم مسودة الشراء" Binding="{Binding PurchaseNumber}" Width="140" />
+                                <DataGridTextColumn Header="رقم فاتورة المورد" Binding="{Binding SupplierInvoiceNumber}" Width="145" />
+                                <DataGridTextColumn Header="التاريخ" Binding="{Binding IssueDate, StringFormat=yyyy-MM-dd}" Width="105" />
+                                <DataGridTextColumn Header="المورد" Binding="{Binding SupplierName}" Width="180" />
+                                <DataGridTextColumn Header="الرقم الضريبي" Binding="{Binding SupplierTaxNumber}" Width="125" />
+                                <DataGridTextColumn Header="البند" Binding="{Binding LineNumber}" Width="55" />
+                                <DataGridTextColumn Header="الوصف" Binding="{Binding Description}" Width="220" />
+                                <DataGridTextColumn Header="المعاملة" Binding="{Binding VatTreatment}" Width="110" />
+                                <DataGridTextColumn Header="الكمية" Binding="{Binding Quantity, StringFormat=N2}" Width="85" />
+                                <DataGridTextColumn Header="قبل الخصم" Binding="{Binding GrossAmount, StringFormat=N2}" Width="120" />
+                                <DataGridTextColumn Header="الخصم" Binding="{Binding DiscountAmount, StringFormat=N2}" Width="100" />
+                                <DataGridTextColumn Header="الصافي" Binding="{Binding NetAmount, StringFormat=N2}" Width="110" />
+                                <DataGridTextColumn Header="النسبة %" Binding="{Binding VatRatePercent, StringFormat=N2}" Width="90" />
+                                <DataGridTextColumn Header="VAT" Binding="{Binding VatAmount, StringFormat=N2}" Width="100" />
+                                <DataGridTextColumn Header="الإجمالي" Binding="{Binding TotalAmount, StringFormat=N2}" Width="120" />
+                                <DataGridTextColumn Header="حالة المستند" Binding="{Binding DocumentStatus}" Width="120" />
+                            </DataGrid.Columns>
+                        </DataGrid>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" Margin="0,10,0,0">
+                            <Button Content="السابق" Command="{Binding PreviousPurchaseVatPageCommand}" Margin="0,0,6,0" />
+                            <TextBlock Text="{Binding PurchaseVatPageSummary}" VerticalAlignment="Center" Margin="8,0" />
+                            <Button Content="التالي" Command="{Binding NextPurchaseVatPageCommand}" Margin="6,0,0,0" />
+                        </StackPanel>
+                        <TextBlock Text="هذا التقرير يعرض حساب VAT المحفوظ على مسودات المشتريات فقط؛ لا يثبت قابلية استرداد ضريبة المدخلات ولا يمثل إقرارًا ضريبيًا رسميًا."
+                                   Foreground="#8A6A20" FontSize="11" TextWrapping="Wrap" Margin="2,10,2,0" />
+                    </StackPanel>
+                </TabItem>
                 <TabItem Header="قوالب REPX القديمة">
                     <DockPanel Margin="12">
                         <TextBlock DockPanel.Dock="Top"
