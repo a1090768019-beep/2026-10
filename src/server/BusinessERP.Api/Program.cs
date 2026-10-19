@@ -101,6 +101,7 @@ app.MapSalesVatPreviewEndpoints();
 app.MapSalesDraftVatEndpoints();
 app.MapSalesDraftVatReportEndpoints();
 app.MapSalesDraftLedgerPostingEndpoints();
+app.MapSettlementEndpoints();
 app.Run();
 
 public partial class Program { }

@@ -69,3 +69,10 @@ GRANT SELECT, INSERT ON items, warehouses, inventory_movements, inventory_transf
 GRANT SELECT, INSERT, UPDATE ON inventory_serial_numbers TO erp_ci_runtime;
 GRANT SELECT, INSERT ON inventory_serial_events TO erp_ci_runtime;
 GRANT SELECT, INSERT ON inventory_movement_accounting_postings TO erp_ci_runtime;
+
+
+-- Settlement records are append-only; the API may only transition draft headers to a linked posted state.
+GRANT SELECT, INSERT ON customer_receipts, customer_receipt_allocations,
+    supplier_payments, supplier_payment_allocations TO erp_ci_runtime;
+GRANT UPDATE (status, accounting_posted_journal_entry_id, accounting_posted_at)
+    ON customer_receipts, supplier_payments TO erp_ci_runtime;
