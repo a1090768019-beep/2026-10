@@ -62,15 +62,34 @@ public sealed class PurchasesWorkspaceViewModel : INotifyPropertyChanged
 
     public PurchasesWorkspaceViewModel()
     {
-        RefreshCommand = new AsyncCommand(RefreshAsync, () => _apiClient is not null && !IsBusy);
-        CreateSupplierCommand = new AsyncCommand(CreateSupplierAsync, CanCreateSupplier);
+        NewPurchaseLines.CollectionChanged += (_, _) =>
+        {
+            foreach (var line in NewPurchaseLines)
+                line.PropertyChanged -= NewPurchaseLine_PropertyChanged;
+            foreach (var line in NewPurchaseLines)
+                line.PropertyChanged += NewPurchaseLine_PropertyChanged;
+            NotifyCommands();
+        };
+        SelectedDraftLines.CollectionChanged += (_, _) =>
+        {
+            foreach (var line in SelectedDraftLines)
+                line.PropertyChanged -= SelectedDraftLine_PropertyChanged;
+            foreach (var line in SelectedDraftLines)
+                line.PropertyChanged += SelectedDraftLine_PropertyChanged;
+            NotifyCommands();
+        };
+        foreach (var line in NewPurchaseLines)
+            line.PropertyChanged += NewPurchaseLine_PropertyChanged;
+
+        RefreshCommand = new AsyncCommand(RefreshAsync, () => _apiClient is not null && !IsBusy, HandleUnexpectedCommandFailure);
+        CreateSupplierCommand = new AsyncCommand(CreateSupplierAsync, CanCreateSupplier, HandleUnexpectedCommandFailure);
         AddPurchaseLineCommand = new RelayCommand(AddPurchaseLine, () => !IsBusy);
         RemovePurchaseLineCommand = new RelayCommand(RemoveSelectedPurchaseLine, () => !IsBusy && SelectedNewPurchaseLine is not null);
-        CreatePurchaseDraftCommand = new AsyncCommand(CreatePurchaseDraftAsync, CanCreatePurchaseDraft);
+        CalculateSelectedDraftVatCommand = new AsyncCommand(CalculateSelectedDraftVatAsync, CanCalculateSelectedDraftVat, HandleUnexpectedCommandFailure);
         CalculateSelectedDraftVatCommand = new AsyncCommand(CalculateSelectedDraftVatAsync, CanCalculateSelectedDraftVat);
-        LoadVatReportCommand = new AsyncCommand(() => LoadVatReportAsync(1), CanLoadVatReport);
+        PreviousVatPageCommand = new AsyncCommand(() => LoadVatReportAsync(_reportPage - 1), CanGoToPreviousVatPage, HandleUnexpectedCommandFailure);
         PreviousVatPageCommand = new AsyncCommand(() => LoadVatReportAsync(_reportPage - 1), CanGoToPreviousVatPage);
-        NextVatPageCommand = new AsyncCommand(() => LoadVatReportAsync(_reportPage + 1), CanGoToNextVatPage);
+undefined
     }
 
     public string WorkspaceContextSummary => SelectedCompany is null
@@ -323,9 +342,9 @@ public sealed class PurchasesWorkspaceViewModel : INotifyPropertyChanged
             var draft = await _apiClient.CreatePurchaseInvoiceDraftAsync(SelectedCompany.Id, request);
             await LoadCompanyDataAsync();
             SelectedPurchaseDraft = PurchaseDrafts.FirstOrDefault(x => x.Id == draft.Id);
+            BeginNewPurchaseDraft();
             StatusMessage = "تم حفظ مسودة المشتريات. افتح بندها المحفوظ أسفل الشاشة، راجع تصنيف VAT والخصم ثم احسب VAT لحفظ القيم.";
             StatusIsError = false;
-            BeginNewPurchaseDraft();
         }
         catch (ErpApiException ex) { StatusMessage = ex.Message; StatusIsError = true; }
         catch (HttpRequestException) { StatusMessage = "تعذر الاتصال بالخادم أثناء حفظ مسودة المشتريات."; StatusIsError = true; }
@@ -459,6 +478,7 @@ public sealed class PurchasesWorkspaceViewModel : INotifyPropertyChanged
     private void ClearCompanyRows()
     {
         Suppliers.Clear(); PurchaseDrafts.Clear(); SelectedDraftLines.Clear(); PurchaseVatRows.Clear();
+        SelectedSupplier = null;
         _selectedPurchaseDraft = null; _selectedDraftDetails = null; _currentVatReport = null;
         OnPropertyChanged(nameof(SelectedPurchaseDraft));
         OnPropertyChanged(nameof(SelectedDraftDetails));
@@ -471,6 +491,15 @@ public sealed class PurchasesWorkspaceViewModel : INotifyPropertyChanged
 
     private static string? BlankToNull(string value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     private static bool HasPrecision(decimal value, int scale) => decimal.Round(value, scale, MidpointRounding.ToEven) == value;
+
+    private void NewPurchaseLine_PropertyChanged(object? sender, PropertyChangedEventArgs e) => NotifyCommands();
+    private void SelectedDraftLine_PropertyChanged(object? sender, PropertyChangedEventArgs e) => NotifyCommands();
+
+    private void HandleUnexpectedCommandFailure(Exception ex)
+    {
+        StatusMessage = $"حدث خطأ غير متوقع في شاشة المشتريات: {ex.Message}";
+        StatusIsError = true;
+    }
 
     private void NotifyCommands()
     {
@@ -492,7 +521,7 @@ public sealed class PurchasesWorkspaceViewModel : INotifyPropertyChanged
             WorkspaceContextChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    private sealed class AsyncCommand(Func<Task> execute, Func<bool> canExecute) : ICommand
+    private sealed class AsyncCommand(Func<Task> execute, Func<bool> canExecute, Action<Exception> onFailure) : ICommand
     {
         public event EventHandler? CanExecuteChanged;
         public bool CanExecute(object? parameter) => canExecute();
@@ -500,11 +529,7 @@ public sealed class PurchasesWorkspaceViewModel : INotifyPropertyChanged
         {
             if (!CanExecute(parameter)) return;
             try { await execute(); }
-            catch (Exception ex)
-            {
-                // Surface a concise message for unexpected desktop-side failures without crashing the UI dispatcher.
-                throw new InvalidOperationException("Purchase command failed. Please inspect application diagnostics.", ex);
-            }
+            catch (Exception ex) { onFailure(ex); }
         }
         public void RaiseCanExecuteChanged() => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
     }
