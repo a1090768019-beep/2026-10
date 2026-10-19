@@ -1,4 +1,4 @@
-# SaaS subscriptions — implementation status
+# SaaS subscriptions and tenant membership — implementation status
 
 ## Read-only endpoints
 
@@ -16,10 +16,10 @@ The current-subscription response reports `HasSubscription` and an informational
 
 ## Explicit limitations
 
-- These endpoints are read-only. They do not create a tenant, change plans, or write subscription rows.
+- The two subscription endpoints are read-only. They do not create a tenant, change plans, or write subscription rows. The membership endpoints below can manage tenant memberships but only for users already provisioned in the trusted identity system.
 - The tenant-resolution middleware enforces a minimum subscription gate for business `/api` routes: the latest tenant subscription must be `ACTIVE` or `TRIALING` and within its start/end window. `GET /api/v1/subscription` and `GET /api/v1/subscription-plans` remain available to explain the status. This gate does not prove payment collection.
-- The `companies` plan limit is enforced transactionally by the API with a per-tenant advisory lock. The `entriesPerMonth` plan limit is enforced by a PostgreSQL `BEFORE INSERT` trigger on `journal_entries`, covering manual and document-linked posting flows; over-limit attempts return HTTP 409. A missing JSON limit property means no cap is configured. Limits such as `users` remain unenforced because complete user-administration/onboarding flows are not yet implemented.
-- No checkout, payment processing, provider webhook, automated renewal, grace-period policy, refund handling, or customer billing portal is implemented.
+- The `companies` plan limit is enforced transactionally by the API with a per-tenant advisory lock. The `entriesPerMonth` plan limit is enforced by a PostgreSQL `BEFORE INSERT` trigger on `journal_entries`, covering manual and document-linked posting flows; over-limit attempts return HTTP 409. The `users` limit is enforced when an OWNER/ADMIN assigns or reactivates a membership for a pre-provisioned user. Active membership creation/reactivation is serialized per tenant. A missing JSON limit property means no cap is configured.
+- No self-service identity onboarding, verified invitations, checkout, payment processing, provider webhook, automated renewal, grace-period policy, refund handling, or customer billing portal is implemented. Role/status administration is API-only; a dedicated UI and live identity-provider onboarding are still required.
 - The database does not seed commercial prices or a default paid plan. A trusted platform operator must configure `subscription_plans` and provision a `tenant_subscriptions` row through a reviewed administrative process.
 
 - Do not treat `ACTIVE` as proof that a payment was collected. Payment-provider reconciliation and audit handling must be added before commercial billing.
