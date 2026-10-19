@@ -15,12 +15,14 @@ public sealed class SubscriptionQuotaExceptionHandler(ILogger<SubscriptionQuotaE
         Exception exception,
         CancellationToken cancellationToken)
     {
-        if (httpContext.Response.HasStarted ||
-            exception is not PostgresException postgres ||
-            postgres.SqlState != "P0001")
-        {
+        if (httpContext.Response.HasStarted)
             return false;
-        }
+
+        // EF Core wraps trigger-raised PostgreSQL errors in DbUpdateException, so inspect the
+        // complete inner-exception chain rather than only the top-level exception.
+        var postgres = exception as PostgresException ?? exception.GetBaseException() as PostgresException;
+        if (postgres is null || postgres.SqlState != "P0001")
+            return false;
 
         if (string.Equals(postgres.MessageText, "subscription_quota_exceeded:entriesPerMonth", StringComparison.Ordinal))
         {
