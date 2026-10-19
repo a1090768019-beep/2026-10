@@ -302,9 +302,15 @@ public sealed record SalesDraftLedgerPostingApiResult(
 public sealed record ApiCustomer(Guid Id, string Code, string Name, string? Email, string? Phone, string? TaxNumber, bool IsActive, DateTime CreatedAt);
 public sealed record ApiSupplier(Guid Id, string Code, string Name, string? Email, string? Phone, string? TaxNumber, bool IsActive, DateTime CreatedAt);
 public sealed record CreateInventoryItemApiRequest(string ItemCode, string? Barcode, string NameAr, string NameEn, string? UnitCode = "EA");
-public sealed record InventoryItemApiDto(Guid Id, string ItemCode, string? Barcode, string NameAr, string NameEn, string UnitCode, bool IsActive, DateTime CreatedAt);
+public sealed record InventoryItemApiDto(Guid Id, string ItemCode, string? Barcode, string NameAr, string NameEn, string UnitCode, bool IsActive, DateTime CreatedAt)
+{
+    public string DisplayLabel => $"{ItemCode} · {NameAr}";
+}
 public sealed record CreateInventoryWarehouseApiRequest(string Code, string Name);
-public sealed record InventoryWarehouseApiDto(Guid Id, string Code, string Name, bool IsActive, DateTime CreatedAt);
+public sealed record InventoryWarehouseApiDto(Guid Id, string Code, string Name, bool IsActive, DateTime CreatedAt)
+{
+    public string DisplayLabel => $"{Code} · {Name}";
+}
 public sealed record InventoryMovementApiRequest(Guid ItemId, Guid WarehouseId, string MovementNumber, DateOnly MovementDate,
     decimal Quantity, decimal? UnitCost = null, string? Notes = null);
 public sealed record InventoryMovementApiResult(Guid Id, string MovementNumber, string MovementType, Guid ItemId,
