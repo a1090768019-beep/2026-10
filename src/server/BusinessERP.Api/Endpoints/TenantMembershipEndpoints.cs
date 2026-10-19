@@ -205,10 +205,15 @@ public static class TenantMembershipEndpoints
             if (membership.Status == "ACTIVE" && membership.RoleCode == "OWNER" &&
                 (status != "ACTIVE" || role != "OWNER"))
             {
-                var activeOwners = await db.TenantMemberships.CountAsync(
-                    x => x.TenantId == tenant.TenantId &&
-                         x.Status == "ACTIVE" &&
-                         x.RoleCode == "OWNER", token);
+                var activeOwners = await (
+                    from member in db.TenantMemberships.AsNoTracking()
+                    join user in db.Users.AsNoTracking() on member.UserId equals user.Id
+                    where member.TenantId == tenant.TenantId &&
+                          member.Status == "ACTIVE" &&
+                          member.RoleCode == "OWNER" &&
+                          user.DisabledAt == null
+                    select member.UserId)
+                    .CountAsync(token);
                 if (activeOwners <= 1)
                 {
                     return Results.Conflict(new
@@ -258,8 +263,14 @@ public static class TenantMembershipEndpoints
         if (limit is not int maxUsers)
             return null;
 
-        var activeUsers = await db.TenantMemberships.CountAsync(
-            x => x.TenantId == tenantId && x.Status == "ACTIVE", ct);
+        var activeUsers = await (
+            from membership in db.TenantMemberships.AsNoTracking()
+            join user in db.Users.AsNoTracking() on membership.UserId equals user.Id
+            where membership.TenantId == tenantId &&
+                  membership.Status == "ACTIVE" &&
+                  user.DisabledAt == null
+            select membership.UserId)
+            .CountAsync(ct);
         if (activeUsers < maxUsers)
             return null;
 
