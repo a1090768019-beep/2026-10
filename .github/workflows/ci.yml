@@ -85,6 +85,10 @@ jobs:
         env:
           POSTGRES_ADMIN_URL: postgresql://postgres:postgres@localhost:5432/business_erp
         run: psql "$POSTGRES_ADMIN_URL" -v ON_ERROR_STOP=1 -f database/migrations/0010_inventory_movement_ledger_posting.sql
+      - name: Apply document-linked inventory movements migration
+        env:
+          POSTGRES_ADMIN_URL: postgresql://postgres:postgres@localhost:5432/business_erp
+        run: psql "$POSTGRES_ADMIN_URL" -v ON_ERROR_STOP=1 -f database/migrations/0011_document_linked_inventory_movements.sql
       - name: Create least-privilege runtime role
         env:
           POSTGRES_ADMIN_URL: postgresql://postgres:postgres@localhost:5432/business_erp
