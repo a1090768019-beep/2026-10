@@ -44,3 +44,14 @@ GRANT UPDATE (
     discount_amount, vat_treatment, vat_treatment_reason, gross_amount, net_amount,
     vat_rate_percent, vat_amount, total_amount
 ) ON sales_invoice_draft_lines TO erp_ci_runtime;
+
+
+-- Supplier and purchase draft data. The app may create supplier/documents and only update the reviewed VAT fields.
+GRANT SELECT, INSERT ON suppliers, purchase_invoice_drafts, purchase_invoice_draft_lines TO erp_ci_runtime;
+GRANT UPDATE (
+    tax_calculation_status, gross_amount, discount_amount, net_amount, vat_amount, total_amount
+) ON purchase_invoice_drafts TO erp_ci_runtime;
+GRANT UPDATE (
+    discount_amount, vat_treatment, vat_treatment_reason, gross_amount, net_amount,
+    vat_rate_percent, vat_amount, total_amount
+) ON purchase_invoice_draft_lines TO erp_ci_runtime;

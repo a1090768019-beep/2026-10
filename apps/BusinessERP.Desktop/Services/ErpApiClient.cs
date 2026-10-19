@@ -68,6 +68,34 @@ public sealed class ErpApiClient(HttpClient httpClient, Guid tenantId)
     public Task<ApiCustomer> CreateCustomerAsync(Guid companyId, CreateCustomerApiRequest request, CancellationToken ct = default) =>
         SendJsonAsync<ApiCustomer>(HttpMethod.Post, $"/api/v1/companies/{companyId:D}/customers", request, ct);
 
+    public Task<IReadOnlyList<ApiSupplier>> GetSuppliersAsync(Guid companyId, CancellationToken ct = default) =>
+        GetListAsync<ApiSupplier>($"/api/v1/companies/{companyId:D}/suppliers", ct);
+
+    public Task<ApiSupplier> CreateSupplierAsync(Guid companyId, CreateSupplierApiRequest request, CancellationToken ct = default) =>
+        SendJsonAsync<ApiSupplier>(HttpMethod.Post, $"/api/v1/companies/{companyId:D}/suppliers", request, ct);
+
+    public Task<IReadOnlyList<PurchaseInvoiceDraftListItem>> GetPurchaseInvoiceDraftsAsync(Guid companyId, CancellationToken ct = default) =>
+        GetListAsync<PurchaseInvoiceDraftListItem>($"/api/v1/companies/{companyId:D}/purchase-invoice-drafts", ct);
+
+    public Task<PurchaseInvoiceDraftDetails> GetPurchaseInvoiceDraftAsync(Guid companyId, Guid invoiceId, CancellationToken ct = default) =>
+        GetObjectAsync<PurchaseInvoiceDraftDetails>($"/api/v1/companies/{companyId:D}/purchase-invoice-drafts/{invoiceId:D}", ct);
+
+    public Task<PurchaseInvoiceDraftDetails> CreatePurchaseInvoiceDraftAsync(
+        Guid companyId, CreatePurchaseInvoiceDraftApiRequest request, CancellationToken ct = default) =>
+        SendJsonAsync<PurchaseInvoiceDraftDetails>(
+            HttpMethod.Post, $"/api/v1/companies/{companyId:D}/purchase-invoice-drafts", request, ct);
+
+    public Task<PurchaseDraftVatResult> CalculateAndPersistPurchaseDraftVatAsync(
+        Guid companyId, Guid invoiceId, ApplyPurchaseDraftVatApiRequest request, CancellationToken ct = default) =>
+        SendJsonAsync<PurchaseDraftVatResult>(
+            HttpMethod.Post, $"/api/v1/companies/{companyId:D}/purchase-invoice-drafts/{invoiceId:D}/calculate-vat", request, ct);
+
+    public Task<PurchaseVatDetailsApiReport> GetPurchaseVatDetailsReportAsync(
+        Guid companyId, DateOnly fromDate, DateOnly toDate, int page = 1, int pageSize = 100, CancellationToken ct = default) =>
+        GetObjectAsync<PurchaseVatDetailsApiReport>(
+            $"/api/v1/companies/{companyId:D}/reports/purchase-vat-details?fromDate={fromDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}&toDate={toDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}&page={page}&pageSize={pageSize}",
+            ct);
+
     public Task<IReadOnlyList<SalesInvoiceDraftListItem>> GetSalesInvoiceDraftsAsync(Guid companyId, CancellationToken ct = default) =>
         GetListAsync<SalesInvoiceDraftListItem>($"/api/v1/companies/{companyId:D}/sales-invoice-drafts", ct);
 
@@ -226,6 +254,47 @@ public sealed record SalesDraftLedgerPostingApiResult(
     DateOnly EntryDate, decimal GrossAmount, decimal DiscountAmount, decimal NetAmount,
     decimal VatAmount, decimal TotalAmount, bool AlreadyPosted, string Message);
 public sealed record ApiCustomer(Guid Id, string Code, string Name, string? Email, string? Phone, string? TaxNumber, bool IsActive, DateTime CreatedAt);
+public sealed record ApiSupplier(Guid Id, string Code, string Name, string? Email, string? Phone, string? TaxNumber, bool IsActive, DateTime CreatedAt);
+public sealed record CreateSupplierApiRequest(string Code, string Name, string? Email = null, string? Phone = null, string? TaxNumber = null);
+public sealed record PurchaseInvoiceDraftListItem(
+    Guid Id, string PurchaseNumber, string SupplierInvoiceNumber, DateOnly IssueDate, DateOnly? DueDate,
+    string CurrencyCode, Guid SupplierId, string SupplierName, string? SupplierTaxNumber,
+    decimal SubtotalAmount, string TaxCalculationStatus, decimal? GrossAmount, decimal? DiscountAmount,
+    decimal? NetAmount, decimal? VatAmount, decimal? TotalAmount, string Status, DateTime CreatedAt, int LineCount);
+public sealed record CreatePurchaseInvoiceDraftApiRequest(
+    Guid SupplierId, string PurchaseNumber, string SupplierInvoiceNumber, DateOnly IssueDate, DateOnly? DueDate,
+    string? Notes, IReadOnlyList<CreatePurchaseInvoiceDraftLineApiRequest> Lines);
+public sealed record CreatePurchaseInvoiceDraftLineApiRequest(string Description, decimal Quantity, decimal UnitPrice);
+public sealed record PurchaseInvoiceDraftDetails(
+    Guid Id, Guid CompanyId, Guid SupplierId, string PurchaseNumber, string SupplierInvoiceNumber,
+    DateOnly IssueDate, DateOnly? DueDate, string CurrencyCode, string SupplierName, string? SupplierTaxNumber,
+    decimal SubtotalAmount, string Notes, string Status, string TaxCalculationStatus,
+    decimal? GrossAmount, decimal? DiscountAmount, decimal? NetAmount, decimal? VatAmount, decimal? TotalAmount,
+    DateTime CreatedAt, IReadOnlyList<PurchaseInvoiceDraftLine> Lines);
+public sealed record PurchaseInvoiceDraftLine(
+    Guid Id, int LineNumber, string Description, decimal Quantity, decimal UnitPrice, decimal LineAmount,
+    decimal DiscountAmount, string VatTreatment, string? VatTreatmentReason, decimal? GrossAmount,
+    decimal? NetAmount, decimal? VatRatePercent, decimal? VatAmount, decimal? TotalAmount);
+public sealed record ApplyPurchaseDraftVatApiRequest(IReadOnlyList<ApplyPurchaseDraftVatLineApiRequest> Lines);
+public sealed record ApplyPurchaseDraftVatLineApiRequest(int LineNumber, decimal DiscountAmount, string Treatment, string? TreatmentReason = null);
+public sealed record PurchaseDraftVatResult(
+    Guid InvoiceId, Guid CompanyId, string TaxCalculationStatus, string Message,
+    decimal GrossAmount, decimal DiscountAmount, decimal NetAmount, decimal VatAmount, decimal TotalAmount,
+    IReadOnlyList<PurchaseDraftVatLineResult> Lines);
+public sealed record PurchaseDraftVatLineResult(
+    int LineNumber, string Description, string Treatment, decimal GrossAmount, decimal DiscountAmount,
+    decimal NetAmount, decimal VatRatePercent, decimal VatAmount, decimal TotalAmount, string? TreatmentReason);
+public sealed record PurchaseVatDetailsApiReport(
+    Guid CompanyId, DateOnly FromDate, DateOnly ToDate, int Page, int PageSize, long TotalLines, int TotalPages,
+    long InvoiceCount, decimal GrossAmount, decimal DiscountAmount, decimal NetAmount, decimal VatAmount,
+    decimal TotalAmount, string ReportKind, string Message, IReadOnlyList<PurchaseVatDetailsApiLine> Rows);
+public sealed record PurchaseVatDetailsApiLine(
+    Guid InvoiceId, string PurchaseNumber, string SupplierInvoiceNumber, DateOnly IssueDate,
+    string SupplierName, string? SupplierTaxNumber, string CurrencyCode, string DocumentStatus,
+    int LineNumber, string Description, decimal Quantity, decimal UnitPrice, decimal GrossAmount,
+    decimal DiscountAmount, string VatTreatment, string? VatTreatmentReason, decimal NetAmount,
+    decimal VatRatePercent, decimal VatAmount, decimal TotalAmount);
+
 public sealed record CreateCustomerApiRequest(string Code, string Name, string? Email = null, string? Phone = null, string? TaxNumber = null);
 public sealed record SalesInvoiceDraftListItem(
     Guid Id, string InvoiceNumber, DateOnly IssueDate, DateOnly? DueDate, string CurrencyCode,
