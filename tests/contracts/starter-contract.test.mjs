@@ -448,6 +448,7 @@ test('WPF settings workspace is connected to tenant member administration APIs',
   assert.match(codeBehind, /AssignMemberAsync/);
   assert.match(codeBehind, /UpdateMemberAsync/);
   assert.match(vm, /GetTenantMembersAsync/);
+  assert.match(vm, /AssignRoleCode/);
   assert.match(vm, /AssignTenantMemberApiRequest/);
   assert.match(vm, /UpdateTenantMemberApiRequest/);
 });
