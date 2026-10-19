@@ -23,16 +23,28 @@ public sealed class ReportsWorkspaceViewModel : INotifyPropertyChanged
     private TrialBalanceApiReport? _currentTrialBalance;
     private IncomeStatementApiReport? _currentIncomeStatement;
     private BalanceSheetApiReport? _currentBalanceSheet;
+    private SalesVatDetailsApiReport? _currentSalesVatDetailsReport;
+    private string _salesVatSummary = "لم يتم تحميل تقرير ضريبة المبيعات.";
+    private int _salesVatPage = 1;
+    private const int SalesVatPageSize = 100;
     
     public ObservableCollection<ApiCompany> Companies { get; } = [];
     public ObservableCollection<TrialBalanceApiRow> TrialBalanceRows { get; } = [];
     public ObservableCollection<FinancialReportLine> IncomeRows { get; } = [];
     public ObservableCollection<FinancialReportLine> BalanceRows { get; } = [];
     public ObservableCollection<LegacyReportTemplate> LegacyReportTemplates { get; } = [];
+    public ObservableCollection<SalesVatDetailsApiLine> SalesVatRows { get; } = [];
 
     public TrialBalanceApiReport? CurrentTrialBalance => _currentTrialBalance;
     public IncomeStatementApiReport? CurrentIncomeStatement => _currentIncomeStatement;
     public BalanceSheetApiReport? CurrentBalanceSheet => _currentBalanceSheet;
+    public SalesVatDetailsApiReport? CurrentSalesVatDetailsReport => _currentSalesVatDetailsReport;
+    public string SalesVatSummary { get => _salesVatSummary; private set { if (_salesVatSummary == value) return; _salesVatSummary = value; OnPropertyChanged(); } }
+    public string SalesVatPageSummary => _currentSalesVatDetailsReport is null
+        ? "لا توجد بيانات صفحة."
+        : $"الصفحة {_currentSalesVatDetailsReport.Page} من {_currentSalesVatDetailsReport.TotalPages} · المعروض {_currentSalesVatDetailsReport.Rows.Count} من {_currentSalesVatDetailsReport.TotalLines} بند";
+    public ICommand PreviousSalesVatPageCommand { get; }
+    public ICommand NextSalesVatPageCommand { get; }
 
     public ApiCompany? SelectedCompany
     {
@@ -115,6 +127,8 @@ public sealed class ReportsWorkspaceViewModel : INotifyPropertyChanged
     public ReportsWorkspaceViewModel()
     {
         LoadReportsCommand = new AsyncRelayCommand(LoadReportsAsync, CanLoadReports);
+        PreviousSalesVatPageCommand = new AsyncRelayCommand(() => ChangeSalesVatPageAsync(-1), CanGoToPreviousSalesVatPage);
+        NextSalesVatPageCommand = new AsyncRelayCommand(() => ChangeSalesVatPageAsync(1), CanGoToNextSalesVatPage);
         foreach (var report in LegacyReportCatalogService.Load(
                      System.IO.Path.Combine(AppContext.BaseDirectory, "Reports", "Legacy")))
             LegacyReportTemplates.Add(report);
@@ -200,6 +214,7 @@ public sealed class ReportsWorkspaceViewModel : INotifyPropertyChanged
         IsBusy = true;
         StatusMessage = "جارٍ حساب التقارير من القيود المرحلة…";
         StatusIsError = false;
+        _salesVatPage = 1;
         try
         {
             await LoadReportsCoreAsync();
@@ -240,11 +255,13 @@ public sealed class ReportsWorkspaceViewModel : INotifyPropertyChanged
         var trialTask = _apiClient.GetTrialBalanceAsync(companyId, fromDate, toDate);
         var incomeTask = _apiClient.GetIncomeStatementAsync(companyId, fromDate, toDate);
         var balanceTask = _apiClient.GetBalanceSheetAsync(companyId, asOfDate);
-        await Task.WhenAll(trialTask, incomeTask, balanceTask);
+        var vatTask = _apiClient.GetSalesVatDetailsReportAsync(companyId, fromDate, toDate, _salesVatPage, SalesVatPageSize);
+        await Task.WhenAll(trialTask, incomeTask, balanceTask, vatTask);
 
         var trial = await trialTask;
         var income = await incomeTask;
         var balance = await balanceTask;
+        ApplySalesVatReport(await vatTask);
         _currentTrialBalance = trial;
         _currentIncomeStatement = income;
         _currentBalanceSheet = balance;
@@ -271,8 +288,69 @@ public sealed class ReportsWorkspaceViewModel : INotifyPropertyChanged
         IncomeSummary = $"الإيرادات {income.TotalRevenue:N2} · المصروفات {income.TotalExpenses:N2} · صافي الدخل {income.NetIncome:N2} {SelectedCurrency}";
         BalanceSummary = $"الأصول {balance.TotalAssets:N2} · الالتزامات {balance.TotalLiabilities:N2} · حقوق الملكية {balance.TotalEquity:N2} · الفرق {balance.Difference:N2} {SelectedCurrency}";
 
-        StatusMessage = "تم تحميل التقارير من القيود بحالة POSTED فقط. راجع سياسة الإقفال قبل اعتماد النتائج رسميًا.";
+        StatusMessage = "تم تحميل التقارير المالية وتفاصيل VAT من المسودات المحسوبة. تقرير VAT داخلي ولا يمثل فاتورة ضريبية صادرة.";
         StatusIsError = balance.Difference != 0m;
+    }
+
+    private void ApplySalesVatReport(SalesVatDetailsApiReport report)
+    {
+        _currentSalesVatDetailsReport = report;
+        SalesVatRows.Clear();
+        foreach (var row in report.Rows)
+            SalesVatRows.Add(row);
+
+        SalesVatSummary = $"المستندات {report.InvoiceCount:N0} · قبل الخصم {report.GrossAmount:N2} · الخصم {report.DiscountAmount:N2} · الصافي {report.NetAmount:N2} · VAT {report.VatAmount:N2} · الإجمالي {report.TotalAmount:N2} {SelectedCurrency}";
+        OnPropertyChanged(nameof(CurrentSalesVatDetailsReport));
+        OnPropertyChanged(nameof(SalesVatPageSummary));
+        NotifyCommands();
+    }
+
+    private bool CanGoToPreviousSalesVatPage() =>
+        _apiClient is not null && SelectedCompany is not null && _currentSalesVatDetailsReport is not null &&
+        _currentSalesVatDetailsReport.Page > 1 && !IsBusy;
+
+    private bool CanGoToNextSalesVatPage() =>
+        _apiClient is not null && SelectedCompany is not null && _currentSalesVatDetailsReport is not null &&
+        _currentSalesVatDetailsReport.Page < _currentSalesVatDetailsReport.TotalPages && !IsBusy;
+
+    private async Task ChangeSalesVatPageAsync(int delta)
+    {
+        if (_apiClient is null || SelectedCompany is null || !FromDate.HasValue || !ToDate.HasValue)
+            return;
+
+        var targetPage = _salesVatPage + delta;
+        if (targetPage < 1 || (_currentSalesVatDetailsReport is not null && targetPage > _currentSalesVatDetailsReport.TotalPages))
+            return;
+
+        IsBusy = true;
+        StatusIsError = false;
+        try
+        {
+            var report = await _apiClient.GetSalesVatDetailsReportAsync(
+                SelectedCompany.Id,
+                DateOnly.FromDateTime(FromDate.Value.Date),
+                DateOnly.FromDateTime(ToDate.Value.Date),
+                targetPage,
+                SalesVatPageSize);
+            _salesVatPage = report.Page;
+            ApplySalesVatReport(report);
+            StatusMessage = report.Message;
+        }
+        catch (ErpApiException ex)
+        {
+            StatusMessage = ex.Message;
+            StatusIsError = true;
+        }
+        catch (HttpRequestException)
+        {
+            StatusMessage = "تعذر الاتصال بالخادم أثناء تحديث صفحة تقرير VAT.";
+            StatusIsError = true;
+        }
+        finally
+        {
+            IsBusy = false;
+            NotifyCommands();
+        }
     }
 
     private void ClearRows()
@@ -283,6 +361,11 @@ public sealed class ReportsWorkspaceViewModel : INotifyPropertyChanged
         _currentTrialBalance = null;
         _currentIncomeStatement = null;
         _currentBalanceSheet = null;
+        _currentSalesVatDetailsReport = null;
+        SalesVatRows.Clear();
+        SalesVatSummary = "لم يتم تحميل تقرير ضريبة المبيعات.";
+        OnPropertyChanged(nameof(CurrentSalesVatDetailsReport));
+        OnPropertyChanged(nameof(SalesVatPageSummary));
         TrialBalanceSummary = "لم يتم تحميل ميزان المراجعة.";
         IncomeSummary = "لم يتم تحميل قائمة الدخل.";
         BalanceSummary = "لم يتم تحميل الميزانية.";
@@ -290,6 +373,8 @@ public sealed class ReportsWorkspaceViewModel : INotifyPropertyChanged
 
     private void NotifyCommands() =>
         (LoadReportsCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
+        (PreviousSalesVatPageCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
+        (NextSalesVatPageCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
 
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null) =>
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));

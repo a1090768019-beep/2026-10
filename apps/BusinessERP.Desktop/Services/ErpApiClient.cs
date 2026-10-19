@@ -50,6 +50,12 @@ public sealed class ErpApiClient(HttpClient httpClient, Guid tenantId)
             $"/api/v1/companies/{companyId:D}/reports/income-statement?fromDate={fromDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}&toDate={toDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}",
             ct);
 
+    public Task<SalesVatDetailsApiReport> GetSalesVatDetailsReportAsync(
+        Guid companyId, DateOnly fromDate, DateOnly toDate, int page = 1, int pageSize = 100, CancellationToken ct = default) =>
+        GetObjectAsync<SalesVatDetailsApiReport>(
+            $"/api/v1/companies/{companyId:D}/reports/sales-vat-details?fromDate={fromDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}&toDate={toDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}&page={page}&pageSize={pageSize}",
+            ct);
+
     public Task<BalanceSheetApiReport> GetBalanceSheetAsync(
         Guid companyId, DateOnly asOfDate, CancellationToken ct = default) =>
         GetObjectAsync<BalanceSheetApiReport>(
@@ -246,6 +252,17 @@ public sealed record IncomeStatementApiReport(
     Guid CompanyId, DateOnly FromDate, DateOnly ToDate,
     IReadOnlyList<FinancialStatementApiRow> Revenue, IReadOnlyList<FinancialStatementApiRow> Expenses,
     decimal TotalRevenue, decimal TotalExpenses, decimal NetIncome);
+public sealed record SalesVatDetailsApiReport(
+    Guid CompanyId, DateOnly FromDate, DateOnly ToDate, int Page, int PageSize,
+    long TotalLines, int TotalPages, long InvoiceCount,
+    decimal GrossAmount, decimal DiscountAmount, decimal NetAmount, decimal VatAmount, decimal TotalAmount,
+    string ReportKind, string Message, IReadOnlyList<SalesVatDetailsApiLine> Rows);
+public sealed record SalesVatDetailsApiLine(
+    Guid InvoiceId, string InvoiceNumber, DateOnly IssueDate, string CustomerName, string? CustomerTaxNumber,
+    string CurrencyCode, string DocumentStatus, int LineNumber, string Description, decimal Quantity,
+    decimal UnitPrice, decimal GrossAmount, decimal DiscountAmount, string VatTreatment,
+    string? VatTreatmentReason, decimal NetAmount, decimal VatRatePercent, decimal VatAmount, decimal TotalAmount);
+
 public sealed record BalanceSheetApiReport(
     Guid CompanyId, DateOnly AsOfDate,
     IReadOnlyList<FinancialStatementApiRow> Assets, IReadOnlyList<FinancialStatementApiRow> Liabilities,
