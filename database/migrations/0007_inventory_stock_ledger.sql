@@ -87,7 +87,7 @@ CREATE TRIGGER trg_inventory_movements_immutable
 -- Database-level guard prevents negative stock even if a caller bypasses the API's pre-check.
 -- The lock-key format matches InventoryEndpoints.RecordMovement.
 CREATE OR REPLACE FUNCTION guard_inventory_movement_balance() RETURNS trigger
-LANGUAGE plpgsql AS $
+LANGUAGE plpgsql AS $$
 DECLARE
     current_quantity numeric(20,4);
     current_value numeric(20,4);
@@ -123,7 +123,7 @@ BEGIN
     END IF;
 
     RETURN NEW;
-END $;
+END $$;
 
 CREATE TRIGGER trg_inventory_movements_balance_guard
     BEFORE INSERT ON inventory_movements
