@@ -341,6 +341,7 @@
                 <views:PurchasesWorkspaceControl Grid.Row="1" x:Name="PurchasesWorkspacePanel" Visibility="Collapsed" />
                 <views:InventoryWorkspaceControl Grid.Row="1" x:Name="InventoryWorkspacePanel" Visibility="Collapsed" />
                 <views:SettlementsWorkspaceControl Grid.Row="1" x:Name="SettlementsWorkspacePanel" Visibility="Collapsed" />
+                <views:TenantMembershipWorkspaceControl Grid.Row="1" x:Name="MembershipWorkspacePanel" Visibility="Collapsed" />
             </Grid>
 
             <Border Grid.Row="3" Background="#F1F4F9" BorderBrush="#DDE5F0" BorderThickness="0,1,0,0" Padding="12,0">
