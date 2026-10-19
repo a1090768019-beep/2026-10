@@ -82,6 +82,7 @@ public sealed class SalesWorkspaceViewModel : INotifyPropertyChanged
             ClearVatPreview("تغيرت الشركة؛ أعد حساب معاينة VAT.");
             OnPropertyChanged();
             OnPropertyChanged(nameof(SelectedCompanyCurrency));
+            OnPropertyChanged(nameof(WorkspaceContextSummary));
             NotifyCommands();
             if (!_loadingCompanies && value is not null)
                 _ = LoadCompanyDataAsync();
@@ -89,6 +90,10 @@ public sealed class SalesWorkspaceViewModel : INotifyPropertyChanged
     }
 
     public string SelectedCompanyCurrency => SelectedCompany?.BaseCurrency ?? "SAR";
+
+    public string WorkspaceContextSummary => SelectedCompany is null
+        ? "الشركة: غير محددة · الفترة المالية: غير محددة"
+        : $"الشركة: {SelectedCompany.Name} ({SelectedCompany.BaseCurrency}) · الفترة: {SelectedFiscalPeriod?.DisplayName ?? "غير محددة"}";
 
     public ApiCustomer? SelectedCustomer
     {
@@ -118,7 +123,14 @@ public sealed class SalesWorkspaceViewModel : INotifyPropertyChanged
     public ApiFiscalPeriod? SelectedFiscalPeriod
     {
         get => _selectedFiscalPeriod;
-        set { if (ReferenceEquals(_selectedFiscalPeriod, value)) return; _selectedFiscalPeriod = value; OnPropertyChanged(); NotifyCommands(); }
+        set
+        {
+            if (ReferenceEquals(_selectedFiscalPeriod, value)) return;
+            _selectedFiscalPeriod = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(WorkspaceContextSummary));
+            NotifyCommands();
+        }
     }
 
     public ApiAccount? SelectedReceivableAccount

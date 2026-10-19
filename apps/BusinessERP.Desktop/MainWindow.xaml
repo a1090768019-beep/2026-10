@@ -333,12 +333,22 @@
             </Grid>
 
             <Border Grid.Row="3" Background="#F1F4F9" BorderBrush="#DDE5F0" BorderThickness="0,1,0,0" Padding="12,0">
-                <DockPanel LastChildFill="True">
-                    <TextBlock DockPanel.Dock="Right" Text="Business ERP" Foreground="#52627C" FontSize="10" VerticalAlignment="Center" />
-                    <TextBlock x:Name="RibbonStatusText" Text="غير متصل · سجّل الدخول لتفعيل بيانات المستأجر" Foreground="#69758D"
-                               FontSize="10" VerticalAlignment="Center" Margin="16,0,0,0" />
-                    <TextBlock DockPanel.Dock="Left" Text="RTL · SAR" Foreground="#8490A4" FontSize="10" VerticalAlignment="Center" />
-                </DockPanel>
+                <Grid FlowDirection="RightToLeft">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="1.25*" />
+                        <ColumnDefinition Width="2.4*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="Business ERP" Foreground="#52627C" FontSize="10" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="1" x:Name="RibbonStatusText" Text="غير متصل · سجّل الدخول لتفعيل بيانات المستأجر"
+                               Foreground="#69758D" FontSize="10" VerticalAlignment="Center" Margin="16,0,8,0"
+                               TextTrimming="CharacterEllipsis" />
+                    <TextBlock Grid.Column="2" x:Name="WorkspaceContextText" Text="الشركة: غير محددة · الفترة المالية: غير محددة"
+                               Foreground="#52627C" FontSize="10" VerticalAlignment="Center" Margin="8,0,8,0"
+                               TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" />
+                    <TextBlock Grid.Column="3" Text="RTL · SAR" Foreground="#8490A4" FontSize="10" VerticalAlignment="Center" />
+                </Grid>
             </Border>
         </Grid>
 

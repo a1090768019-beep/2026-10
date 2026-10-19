@@ -37,6 +37,8 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        SalesWorkspacePanel.WorkspaceContextChanged += (_, _) => UpdateWorkspaceContext();
+        ReportsWorkspacePanel.WorkspaceContextChanged += (_, _) => UpdateWorkspaceContext();
         _apiBaseUrl = LoadApiBaseUrl();
         _apiHealthService = new ApiHealthService(_apiBaseUrl);
         _oidcAuthenticationService = new OidcAuthenticationService(
@@ -47,6 +49,7 @@ public partial class MainWindow : Window
         AuthStatusText.Text = _oidcAuthenticationService.IsConfigured ? "غير مسجل الدخول" : "إعداد OIDC مطلوب";
         LoginButton.ToolTip = _oidcAuthenticationService.ConfigurationError;
         ApiAddressText.Text = $"API: {_apiBaseUrl}";
+        UpdateWorkspaceContext();
     }
 
     private static string LoadApiBaseUrl()
@@ -199,6 +202,7 @@ public partial class MainWindow : Window
             _erpApiClient = null;
             await SalesWorkspacePanel.SetApiClientAsync(null);
             await ReportsWorkspacePanel.SetApiClientAsync(null);
+            UpdateWorkspaceContext();
             AuthStatusText.Text = "تم رفض المستأجر أو صلاحيات المستخدم";
             RibbonStatusText.Text = "تم رفض عضوية المستأجر أو صلاحيات المستخدم";
             if (showErrors)
@@ -209,6 +213,7 @@ public partial class MainWindow : Window
             _erpApiClient = null;
             await SalesWorkspacePanel.SetApiClientAsync(null);
             await ReportsWorkspacePanel.SetApiClientAsync(null);
+            UpdateWorkspaceContext();
             AuthStatusText.Text = "تعذر الاتصال بـ API";
             RibbonStatusText.Text = "تعذر الاتصال بـ API";
             if (showErrors)
@@ -224,6 +229,7 @@ public partial class MainWindow : Window
         _erpApiClient = null;
         await SalesWorkspacePanel.SetApiClientAsync(null);
         await ReportsWorkspacePanel.SetApiClientAsync(null);
+        UpdateWorkspaceContext();
         _authenticatedHttpClient?.Dispose();
         _authenticatedHttpClient = null;
         UpdateRibbonContext();
@@ -417,6 +423,18 @@ public partial class MainWindow : Window
         await NavigateToKeyAsync(key);
     }
 
+    private void UpdateWorkspaceContext()
+    {
+        if (SalesWorkspacePanel.Visibility == Visibility.Visible)
+            WorkspaceContextText.Text = SalesWorkspacePanel.WorkspaceContextSummary;
+        else if (ReportsWorkspacePanel.Visibility == Visibility.Visible)
+            WorkspaceContextText.Text = ReportsWorkspacePanel.WorkspaceContextSummary;
+        else if (_erpApiClient is not null)
+            WorkspaceContextText.Text = "المستأجر مفعل · لم يتم اختيار شاشة شركة/فترة";
+        else
+            WorkspaceContextText.Text = "الشركة: غير محددة · الفترة المالية: غير محددة";
+    }
+
     private void UpdateWorkspaceTabs(string key)
     {
         SetWorkspaceTabStyle(OverviewWorkspaceTab, string.Equals(key, "Overview", StringComparison.OrdinalIgnoreCase));
@@ -454,6 +472,7 @@ public partial class MainWindow : Window
             ModulePlaceholderPanel.Visibility = Visibility.Collapsed;
             SalesWorkspacePanel.Visibility = Visibility.Collapsed;
             ReportsWorkspacePanel.Visibility = Visibility.Collapsed;
+            UpdateWorkspaceContext();
             UpdateRibbonContext();
             return;
         }
@@ -468,11 +487,13 @@ public partial class MainWindow : Window
             ModulePlaceholderPanel.Visibility = Visibility.Collapsed;
             SalesWorkspacePanel.Visibility = Visibility.Collapsed;
             ReportsWorkspacePanel.Visibility = Visibility.Visible;
+            UpdateWorkspaceContext();
             if (_erpApiClient is null)
                 await ReportsWorkspacePanel.SetApiClientAsync(null);
             else
                 await ReportsWorkspacePanel.SetApiClientAsync(_erpApiClient);
             RibbonStatusText.Text = ReportsWorkspacePanel.WorkspaceStatusMessage;
+            UpdateWorkspaceContext();
             UpdateRibbonContext();
             return;
         }
@@ -487,6 +508,7 @@ public partial class MainWindow : Window
                 await SalesWorkspacePanel.SetApiClientAsync(null);
             else
                 await SalesWorkspacePanel.RefreshAsync();
+            UpdateWorkspaceContext();
             UpdateRibbonContext();
             return;
         }
@@ -499,6 +521,7 @@ public partial class MainWindow : Window
         ModuleStatusText.Text = $"الحالة الحالية: {module.Status}. لم تُفعّل عمليات الحفظ أو الترحيل من هذه الشاشة.";
         DashboardPanel.Visibility = Visibility.Collapsed;
         ModulePlaceholderPanel.Visibility = Visibility.Visible;
+        UpdateWorkspaceContext();
         UpdateRibbonContext();
     }
 }

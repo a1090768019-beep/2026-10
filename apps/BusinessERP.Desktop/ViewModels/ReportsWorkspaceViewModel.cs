@@ -35,28 +35,33 @@ public sealed class ReportsWorkspaceViewModel : INotifyPropertyChanged
             _selectedCompany = value;
             OnPropertyChanged();
             OnPropertyChanged(nameof(SelectedCurrency));
+            OnPropertyChanged(nameof(WorkspaceContextSummary));
             NotifyCommands();
         }
     }
 
     public string SelectedCurrency => SelectedCompany?.BaseCurrency ?? "SAR";
 
+    public string WorkspaceContextSummary => SelectedCompany is null
+        ? "الشركة: غير محددة · فترة التقرير: غير محددة"
+        : $"الشركة: {SelectedCompany.Name} ({SelectedCompany.BaseCurrency}) · من {FromDate:yyyy-MM-dd} إلى {ToDate:yyyy-MM-dd} · الميزانية حتى {AsOfDate:yyyy-MM-dd}";
+
     public DateTime? FromDate
     {
         get => _fromDate;
-        set { if (_fromDate == value) return; _fromDate = value; OnPropertyChanged(); NotifyCommands(); }
+        set { if (_fromDate == value) return; _fromDate = value; OnPropertyChanged(); OnPropertyChanged(nameof(WorkspaceContextSummary)); NotifyCommands(); }
     }
 
     public DateTime? ToDate
     {
         get => _toDate;
-        set { if (_toDate == value) return; _toDate = value; OnPropertyChanged(); NotifyCommands(); }
+        set { if (_toDate == value) return; _toDate = value; OnPropertyChanged(); OnPropertyChanged(nameof(WorkspaceContextSummary)); NotifyCommands(); }
     }
 
     public DateTime? AsOfDate
     {
         get => _asOfDate;
-        set { if (_asOfDate == value) return; _asOfDate = value; OnPropertyChanged(); NotifyCommands(); }
+        set { if (_asOfDate == value) return; _asOfDate = value; OnPropertyChanged(); OnPropertyChanged(nameof(WorkspaceContextSummary)); NotifyCommands(); }
     }
 
     public bool IsBusy

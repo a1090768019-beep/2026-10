@@ -315,3 +315,22 @@ test('WPF financial reports tab loads real posted-ledger reports from API', asyn
   assert.match(shell, /x:Name="ReportsWorkspacePanel"/);
   assert.match(code, /ReportsWorkspacePanel\.SetApiClientAsync/);
 });
+
+
+test('WPF status bar displays current company and fiscal/report period context', async () => {
+  const shell = await read('apps/BusinessERP.Desktop/MainWindow.xaml');
+  const mainCode = await read('apps/BusinessERP.Desktop/MainWindow.xaml.cs');
+  const salesVm = await read('apps/BusinessERP.Desktop/ViewModels/SalesWorkspaceViewModel.cs');
+  const salesControl = await read('apps/BusinessERP.Desktop/Views/SalesWorkspaceControl.xaml.cs');
+  const reportsVm = await read('apps/BusinessERP.Desktop/ViewModels/ReportsWorkspaceViewModel.cs');
+  const reportsControl = await read('apps/BusinessERP.Desktop/Views/ReportsWorkspaceControl.xaml.cs');
+  assert.match(shell, /x:Name="WorkspaceContextText"/);
+  assert.match(mainCode, /private void UpdateWorkspaceContext/);
+  assert.match(mainCode, /SalesWorkspacePanel\.WorkspaceContextChanged/);
+  assert.match(mainCode, /ReportsWorkspacePanel\.WorkspaceContextChanged/);
+  assert.match(salesVm, /SelectedFiscalPeriod\?\.DisplayName/);
+  assert.match(salesControl, /WorkspaceContextChanged/);
+  assert.match(reportsVm, /FromDate:yyyy-MM-dd/);
+  assert.match(reportsVm, /AsOfDate:yyyy-MM-dd/);
+  assert.match(reportsControl, /WorkspaceContextChanged/);
+});
