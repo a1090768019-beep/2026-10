@@ -10,6 +10,7 @@ using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<SubscriptionQuotaExceptionHandler>();
 builder.Services.AddOpenApi();
 builder.Services.AddAuthentication();
 builder.Services.AddRateLimiter(options =>

@@ -93,6 +93,10 @@ jobs:
         env:
           POSTGRES_ADMIN_URL: postgresql://postgres:postgres@localhost:5432/business_erp
         run: psql "$POSTGRES_ADMIN_URL" -v ON_ERROR_STOP=1 -f database/migrations/0012_settlement_posting.sql
+      - name: Apply monthly journal entry subscription quota migration
+        env:
+          POSTGRES_ADMIN_URL: postgresql://postgres:postgres@localhost:5432/business_erp
+        run: psql "$POSTGRES_ADMIN_URL" -v ON_ERROR_STOP=1 -f database/migrations/0013_subscription_monthly_entry_quota.sql
       - name: Create least-privilege runtime role
         env:
           POSTGRES_ADMIN_URL: postgresql://postgres:postgres@localhost:5432/business_erp

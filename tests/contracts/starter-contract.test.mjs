@@ -375,3 +375,27 @@ test('WPF report printing uses a paginated RTL FlowDocument and is enabled only 
   assert.match(view, /FlowDirection = FlowDirection.RightToLeft/);
   assert.match(view, /PrintDocument/);
 });
+
+
+test('monthly journal-entry quota is enforced by PostgreSQL and mapped to a stable API response', async () => {
+  const migration = await read('database/migrations/0013_subscription_monthly_entry_quota.sql');
+  const handler = await read('src/server/BusinessERP.Api/Security/SubscriptionQuotaExceptionHandler.cs');
+  const program = await read('src/server/BusinessERP.Api/Program.cs');
+  const ci = await read('.github/workflows/ci.yml');
+  const fixture = await read('database/tests/postgres-fixture.sql');
+  const apiTests = await read('tests/BusinessERP.Api.Tests/AccountingApiIntegrationTests.cs');
+  const docs = await read('docs/subscriptions.md');
+
+  assert.match(migration, /CREATE TRIGGER trg_journal_entries_monthly_subscription_quota/);
+  assert.match(migration, /BEFORE INSERT ON journal_entries/);
+  assert.match(migration, /entriesPerMonth/);
+  assert.match(migration, /pg_advisory_xact_lock/);
+  assert.match(migration, /subscription_quota_exceeded:entriesPerMonth/);
+  assert.match(handler, /plan_limit_exceeded/);
+  assert.match(handler, /StatusCodes\.Status409Conflict/);
+  assert.match(program, /AddExceptionHandler<SubscriptionQuotaExceptionHandler>/);
+  assert.match(ci, /database\/migrations\/0013_subscription_monthly_entry_quota\.sql/);
+  assert.match(fixture, /CI-NO-ENTRIES/);
+  assert.match(apiTests, /Monthly_journal_entry_quota_is_enforced_by_database_for_posting_api/);
+  assert.match(docs, /entriesPerMonth/);
+});
