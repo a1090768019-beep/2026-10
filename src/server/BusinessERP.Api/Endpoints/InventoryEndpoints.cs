@@ -12,7 +12,7 @@ namespace BusinessERP.Api.Endpoints;
 /// Tenant-scoped item/warehouse endpoints and an immutable receipt/issue inventory ledger.
 /// Every command runs inside TenantTransactionRunner's transaction-local RLS context.
 /// </summary>
-public static class InventoryEndpoints
+public static partial class InventoryEndpoints
 {
     private static readonly string[] WriteRoles = ["OWNER", "ADMIN", "ACCOUNTANT"];
 
@@ -29,6 +29,8 @@ public static class InventoryEndpoints
         company.MapPost("/inventory/issues", RecordIssue).WithName("RecordInventoryIssue");
         company.MapGet("/inventory/transfers", GetTransfers).WithName("GetInventoryTransfers");
         company.MapPost("/inventory/transfers", RecordTransfer).WithName("RecordInventoryTransfer");
+        company.MapGet("/inventory/serial-numbers", GetSerialEvents).WithName("GetInventorySerialEvents");
+        company.MapGet("/inventory/serial-numbers/summary", GetSerialSummary).WithName("GetInventorySerialSummary");
         return endpoints;
     }
 
@@ -38,7 +40,7 @@ public static class InventoryEndpoints
         {
             if (!await CompanyExistsAsync(db, tenant.TenantId, companyId, token)) return Results.NotFound();
             await using var command = CreateCommand(db, """
-                SELECT id, item_code, barcode, name_ar, name_en, unit_code, is_active, created_at
+                SELECT id, item_code, barcode, name_ar, name_en, unit_code, tracks_serials, is_active, created_at
                   FROM items
                  WHERE tenant_id = @tenant_id AND company_id = @company_id
                  ORDER BY item_code
@@ -62,6 +64,7 @@ public static class InventoryEndpoints
         var nameAr = request.NameAr?.Trim() ?? "";
         var nameEn = request.NameEn?.Trim() ?? "";
         var unitCode = (request.UnitCode ?? "EA").Trim().ToUpperInvariant();
+        var tracksSerials = request.TracksSerials;
         var errors = new Dictionary<string, string[]>();
         if (itemCode.Length is < 1 or > 64) errors["itemCode"] = ["رمز الصنف مطلوب ولا يتجاوز 64 حرفًا."];
         if (barcode?.Length > 100) errors["barcode"] = ["الباركود لا يتجاوز 100 حرف."];
@@ -77,9 +80,9 @@ public static class InventoryEndpoints
                 if (!await CompanyExistsAsync(db, tenant.TenantId, companyId, token)) return Results.NotFound();
                 InventoryItemDto item;
                 await using (var command = CreateCommand(db, """
-                    INSERT INTO items (tenant_id, company_id, item_code, barcode, name_ar, name_en, unit_code)
-                    VALUES (@tenant_id, @company_id, @item_code, @barcode, @name_ar, @name_en, @unit_code)
-                    RETURNING id, item_code, barcode, name_ar, name_en, unit_code, is_active, created_at
+                    INSERT INTO items (tenant_id, company_id, item_code, barcode, name_ar, name_en, unit_code, tracks_serials)
+                    VALUES (@tenant_id, @company_id, @item_code, @barcode, @name_ar, @name_en, @unit_code, @tracks_serials)
+                    RETURNING id, item_code, barcode, name_ar, name_en, unit_code, tracks_serials, is_active, created_at
                     """))
                 {
                     AddParameter(command, "tenant_id", tenant.TenantId);
@@ -89,12 +92,13 @@ public static class InventoryEndpoints
                     AddParameter(command, "name_ar", nameAr);
                     AddParameter(command, "name_en", nameEn);
                     AddParameter(command, "unit_code", unitCode);
+                    AddParameter(command, "tracks_serials", tracksSerials);
                     await using var reader = await command.ExecuteReaderAsync(token);
                     if (!await reader.ReadAsync(token)) throw new InvalidOperationException("The new inventory item was not returned.");
                     item = ReadItem(reader);
                 }
                 await AddAuditAsync(db, tenant, http, "INVENTORY_ITEM_CREATED", "Item", item.Id.ToString("D"),
-                    new { item.ItemCode, item.Barcode, item.NameAr, item.UnitCode }, token);
+                    new { item.ItemCode, item.Barcode, item.NameAr, item.UnitCode, item.TracksSerials }, token);
                 return Results.Created($"/api/v1/companies/{companyId:D}/items/{item.Id:D}", item);
             }, ct);
         }
@@ -283,6 +287,12 @@ public static class InventoryEndpoints
                         return Results.Conflict(new { error = "transfer_number_exists", message = "رقم التحويل مستخدم مسبقًا داخل الشركة." });
                 }
 
+                var tracksSerials = await GetTracksSerialsAsync(db, tenant.TenantId, companyId, request.ItemId, token);
+                var serialNumbers = NormalizeSerialNumbers(request.SerialNumbers);
+                var serialValidation = await ValidateSerialNumbersAsync(db, tenant.TenantId, companyId, request.ItemId,
+                    request.SourceWarehouseId, request.Quantity, false, tracksSerials, serialNumbers, token);
+                if (serialValidation is not null) return serialValidation;
+
                 var (sourceOnHand, sourceValue) = await GetInventoryBalanceAsync(db, tenant.TenantId, companyId,
                     request.SourceWarehouseId, request.ItemId, token);
                 var (destinationOnHand, destinationValue) = await GetInventoryBalanceAsync(db, tenant.TenantId, companyId,
@@ -325,12 +335,16 @@ public static class InventoryEndpoints
                     createdAt = reader.GetDateTime(1);
                 }
 
-                await InsertTransferMovementAsync(db, tenant.TenantId, companyId, transferId,
+                var sourceMovementId = await InsertTransferMovementAsync(db, tenant.TenantId, companyId, transferId,
                     transferNumber + "-OUT", request.ItemId, request.SourceWarehouseId, "ISSUE",
                     request.TransferDate, -request.Quantity, unitCost, -transferValue, notes, tenant.UserId, token);
-                await InsertTransferMovementAsync(db, tenant.TenantId, companyId, transferId,
+                var destinationMovementId = await InsertTransferMovementAsync(db, tenant.TenantId, companyId, transferId,
                     transferNumber + "-IN", request.ItemId, request.DestinationWarehouseId, "RECEIPT",
                     request.TransferDate, request.Quantity, unitCost, transferValue, notes, tenant.UserId, token);
+                if (tracksSerials)
+                    await ApplySerialTransferAsync(db, tenant.TenantId, companyId, request.ItemId, request.SourceWarehouseId,
+                        request.DestinationWarehouseId, transferId, sourceMovementId, destinationMovementId,
+                        request.TransferDate, serialNumbers, tenant.UserId, token);
 
                 await AddAuditAsync(db, tenant, http, "INVENTORY_TRANSFER_RECORDED", "InventoryTransfer",
                     transferId.ToString("D"),
@@ -354,7 +368,7 @@ public static class InventoryEndpoints
         }
     }
 
-    private static async Task InsertTransferMovementAsync(
+    private static async Task<Guid> InsertTransferMovementAsync(
         ErpDbContext db, Guid tenantId, Guid companyId, Guid transferId, string movementNumber,
         Guid itemId, Guid warehouseId, string movementType, DateOnly movementDate, decimal quantityDelta,
         decimal unitCost, decimal valueDelta, string notes, Guid createdBy, CancellationToken ct)
@@ -366,6 +380,7 @@ public static class InventoryEndpoints
             VALUES
                 (@tenant_id, @company_id, @movement_number, @item_id, @warehouse_id, @movement_type,
                  @movement_date, @quantity_delta, @unit_cost, @value_delta, 'TRANSFER', @transfer_id, @notes, @created_by)
+            RETURNING id
             """);
         AddParameter(command, "tenant_id", tenantId);
         AddParameter(command, "company_id", companyId);
@@ -380,7 +395,8 @@ public static class InventoryEndpoints
         AddParameter(command, "transfer_id", transferId);
         AddParameter(command, "notes", notes);
         AddParameter(command, "created_by", createdBy);
-        await command.ExecuteNonQueryAsync(ct);
+        var insertedId = await command.ExecuteScalarAsync(ct);
+        return insertedId is Guid movementId ? movementId : throw new InvalidOperationException("Transfer movement ID was not returned.");
     }
 
     private static async Task<IResult> GetBalances(
@@ -530,6 +546,12 @@ public static class InventoryEndpoints
                 if (!await IsActiveItemAndWarehouseAsync(db, tenant.TenantId, companyId, request.ItemId, request.WarehouseId, token))
                     return Results.ValidationProblem(new Dictionary<string, string[]> { ["itemId"] = ["الصنف أو المستودع غير موجود أو غير نشط ضمن الشركة المحددة."] });
 
+                var tracksSerials = await GetTracksSerialsAsync(db, tenant.TenantId, companyId, request.ItemId, token);
+                var serialNumbers = NormalizeSerialNumbers(request.SerialNumbers);
+                var serialValidation = await ValidateSerialNumbersAsync(db, tenant.TenantId, companyId, request.ItemId, request.WarehouseId,
+                    request.Quantity, receipt, tracksSerials, serialNumbers, token);
+                if (serialValidation is not null) return serialValidation;
+
                 await using (var duplicate = CreateCommand(db, """
                     SELECT EXISTS (SELECT 1 FROM inventory_movements
                                     WHERE tenant_id = @tenant_id AND company_id = @company_id AND movement_number = @movement_number)
@@ -592,6 +614,16 @@ public static class InventoryEndpoints
                     if (!await reader.ReadAsync(token)) throw new InvalidOperationException("The new inventory movement was not returned.");
                     movementId = reader.GetGuid(0);
                     createdAt = reader.GetDateTime(1);
+                }
+
+                if (tracksSerials)
+                {
+                    if (receipt)
+                        await ApplySerialReceiptAsync(db, tenant.TenantId, companyId, request.ItemId, request.WarehouseId, movementId,
+                            request.MovementDate, serialNumbers, tenant.UserId, token);
+                    else
+                        await ApplySerialIssueAsync(db, tenant.TenantId, companyId, request.ItemId, request.WarehouseId, movementId,
+                            request.MovementDate, serialNumbers, tenant.UserId, token);
                 }
 
                 await AddAuditAsync(db, tenant, http, receipt ? "INVENTORY_RECEIPT_RECORDED" : "INVENTORY_ISSUE_RECORDED",
@@ -703,7 +735,7 @@ public static class InventoryEndpoints
 
     private static InventoryItemDto ReadItem(DbDataReader reader) =>
         new(reader.GetGuid(0), reader.GetString(1), ReadNullableString(reader, 2), reader.GetString(3),
-            reader.GetString(4), reader.GetString(5), reader.GetBoolean(6), reader.GetDateTime(7));
+            reader.GetString(4), reader.GetString(5), reader.GetBoolean(6), reader.GetBoolean(7), reader.GetDateTime(8));
 
     private static InventoryWarehouseDto ReadWarehouse(DbDataReader reader) =>
         new(reader.GetGuid(0), reader.GetString(1), reader.GetString(2), reader.GetBoolean(3), reader.GetDateTime(4));
@@ -712,7 +744,7 @@ public static class InventoryEndpoints
         reader.IsDBNull(ordinal) ? null : reader.GetString(ordinal);
 
     private sealed record InventoryItemDto(Guid Id, string ItemCode, string? Barcode, string NameAr, string NameEn,
-        string UnitCode, bool IsActive, DateTime CreatedAt);
+        string UnitCode, bool TracksSerials, bool IsActive, DateTime CreatedAt);
     private sealed record InventoryWarehouseDto(Guid Id, string Code, string Name, bool IsActive, DateTime CreatedAt);
     private sealed record InventoryMovementResult(Guid Id, string MovementNumber, string MovementType, Guid ItemId,
         Guid WarehouseId, DateOnly MovementDate, decimal QuantityDelta, decimal UnitCost, decimal InventoryValueDelta,
@@ -725,12 +757,12 @@ public static class InventoryEndpoints
     private sealed record InventoryMovementRow(Guid Id, string MovementNumber, string MovementType, DateOnly MovementDate,
         Guid ItemId, string ItemCode, string? Barcode, string ItemNameAr, Guid WarehouseId, string WarehouseCode,
         string WarehouseName, decimal QuantityDelta, decimal UnitCost, decimal InventoryValueDelta, string Notes, DateTime CreatedAt);
-    private sealed record CreateInventoryItemRequest(string? ItemCode, string? Barcode, string? NameAr, string? NameEn, string? UnitCode = "EA");
+    private sealed record CreateInventoryItemRequest(string? ItemCode, string? Barcode, string? NameAr, string? NameEn, string? UnitCode = "EA", bool TracksSerials = false);
     private sealed record CreateWarehouseRequest(string? Code, string? Name);
     private sealed record InventoryMovementRequest(Guid ItemId, Guid WarehouseId, string? MovementNumber, DateOnly MovementDate,
-        decimal Quantity, decimal? UnitCost = null, string? Notes = null);
+        decimal Quantity, decimal? UnitCost = null, string? Notes = null, IReadOnlyList<string>? SerialNumbers = null);
     private sealed record InventoryTransferRequest(Guid ItemId, Guid SourceWarehouseId, Guid DestinationWarehouseId,
-        string? TransferNumber, DateOnly TransferDate, decimal Quantity, string? Notes = null);
+        string? TransferNumber, DateOnly TransferDate, decimal Quantity, string? Notes = null, IReadOnlyList<string>? SerialNumbers = null);
     private sealed record InventoryTransferResult(Guid Id, string TransferNumber, DateOnly TransferDate, Guid ItemId,
         Guid SourceWarehouseId, Guid DestinationWarehouseId, decimal Quantity, decimal UnitCost, decimal InventoryValue,
         decimal SourceOnHandQuantity, decimal SourceInventoryValue, decimal DestinationOnHandQuantity,
