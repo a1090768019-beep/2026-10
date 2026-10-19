@@ -24,6 +24,7 @@ public static partial class InventoryEndpoints
         company.MapGet("/warehouses", GetWarehouses).WithName("GetInventoryWarehouses");
         company.MapPost("/warehouses", CreateWarehouse).WithName("CreateInventoryWarehouse");
         company.MapGet("/inventory/balances", GetBalances).WithName("GetInventoryBalances");
+        company.MapGet("/inventory/valuation", GetInventoryValuation).WithName("GetInventoryValuation");
         company.MapGet("/inventory/movements", GetMovements).WithName("GetInventoryMovements");
         company.MapPost("/inventory/receipts", RecordReceipt).WithName("RecordInventoryReceipt");
         company.MapPost("/inventory/issues", RecordIssue).WithName("RecordInventoryIssue");
@@ -453,6 +454,66 @@ public static partial class InventoryEndpoints
         }, ct);
     }
 
+    private static async Task<IResult> GetInventoryValuation(
+        Guid companyId, DateOnly asOfDate, int page, int pageSize, Guid? itemId, Guid? warehouseId,
+        ITenantContext tenant, TenantTransactionRunner runner, CancellationToken ct)
+    {
+        if (!ValidPage(page, pageSize))
+            return Results.ValidationProblem(new Dictionary<string, string[]> { ["page"] = ["رقم الصفحة وحجمها غير صالحين."] });
+        return await runner.ExecuteAsync<IResult>(async (db, token) =>
+        {
+            if (!await CompanyExistsAsync(db, tenant.TenantId, companyId, token)) return Results.NotFound();
+            await using var command = CreateCommand(db, """
+                WITH balances AS (
+                    SELECT movement.item_id, movement.warehouse_id,
+                           COALESCE(sum(movement.quantity_delta), 0)::numeric(20,4) AS on_hand_quantity,
+                           COALESCE(sum(movement.inventory_value_delta), 0)::numeric(20,4) AS inventory_value
+                      FROM inventory_movements AS movement
+                     WHERE movement.tenant_id = @tenant_id AND movement.company_id = @company_id
+                       AND movement.movement_date <= @as_of_date
+                       AND (CAST(@item_id AS uuid) IS NULL OR movement.item_id = @item_id)
+                       AND (CAST(@warehouse_id AS uuid) IS NULL OR movement.warehouse_id = @warehouse_id)
+                     GROUP BY movement.item_id, movement.warehouse_id
+                    HAVING COALESCE(sum(movement.quantity_delta), 0) <> 0
+                        OR COALESCE(sum(movement.inventory_value_delta), 0) <> 0
+                ), counted AS (
+                    SELECT balances.*, count(*) OVER() AS total_rows,
+                           COALESCE(sum(inventory_value) OVER(), 0)::numeric(20,4) AS total_inventory_value
+                      FROM balances
+                )
+                SELECT i.id, i.item_code, i.barcode, i.name_ar, i.name_en, i.unit_code,
+                       w.id, w.warehouse_code, w.name, counted.on_hand_quantity, counted.inventory_value,
+                       CASE WHEN counted.on_hand_quantity = 0 THEN 0 ELSE counted.inventory_value / counted.on_hand_quantity END AS average_unit_cost,
+                       counted.total_rows, counted.total_inventory_value
+                  FROM counted
+                  JOIN items AS i ON i.id = counted.item_id AND i.tenant_id = @tenant_id AND i.company_id = @company_id
+                  JOIN warehouses AS w ON w.id = counted.warehouse_id AND w.tenant_id = @tenant_id AND w.company_id = @company_id
+                 ORDER BY i.item_code, w.warehouse_code OFFSET @offset LIMIT @page_size
+                """);
+            AddParameter(command, "tenant_id", tenant.TenantId);
+            AddParameter(command, "company_id", companyId);
+            AddParameter(command, "as_of_date", asOfDate);
+            AddParameter(command, "item_id", itemId);
+            AddParameter(command, "warehouse_id", warehouseId);
+            AddParameter(command, "offset", (page - 1) * pageSize);
+            AddParameter(command, "page_size", pageSize);
+            await using var reader = await command.ExecuteReaderAsync(token);
+            var rows = new List<InventoryValuationRow>();
+            long totalRows = 0;
+            decimal totalInventoryValue = 0m;
+            while (await reader.ReadAsync(token))
+            {
+                totalRows = reader.GetInt64(12);
+                totalInventoryValue = reader.GetDecimal(13);
+                rows.Add(new InventoryValuationRow(reader.GetGuid(0), reader.GetString(1), ReadNullableString(reader, 2),
+                    reader.GetString(3), reader.GetString(4), reader.GetString(5), reader.GetGuid(6),
+                    reader.GetString(7), reader.GetString(8), reader.GetDecimal(9), reader.GetDecimal(10), reader.GetDecimal(11)));
+            }
+            return Results.Ok(new InventoryValuationReport(asOfDate, page, pageSize, totalRows,
+                totalRows == 0 ? 0 : (int)Math.Ceiling(totalRows / (double)pageSize), totalInventoryValue, rows));
+        }, ct);
+    }
+
     private static async Task<IResult> GetMovements(
         Guid companyId, DateOnly? fromDate, DateOnly? toDate, Guid? itemId, Guid? warehouseId,
         int page, int pageSize, ITenantContext tenant, TenantTransactionRunner runner, CancellationToken ct)
@@ -757,6 +818,11 @@ public static partial class InventoryEndpoints
         decimal OnHandQuantity, decimal InventoryValue, decimal AverageUnitCost);
     private sealed record InventoryBalancesReport(int Page, int PageSize, long TotalRows, int TotalPages, IReadOnlyList<InventoryBalanceRow> Rows);
     private sealed record InventoryBalanceRow(Guid ItemId, string ItemCode, string? Barcode, string ItemNameAr, string ItemNameEn,
+        string UnitCode, Guid WarehouseId, string WarehouseCode, string WarehouseName, decimal OnHandQuantity,
+        decimal InventoryValue, decimal AverageUnitCost);
+    private sealed record InventoryValuationReport(DateOnly AsOfDate, int Page, int PageSize, long TotalRows, int TotalPages,
+        decimal TotalInventoryValue, IReadOnlyList<InventoryValuationRow> Rows);
+    private sealed record InventoryValuationRow(Guid ItemId, string ItemCode, string? Barcode, string ItemNameAr, string ItemNameEn,
         string UnitCode, Guid WarehouseId, string WarehouseCode, string WarehouseName, decimal OnHandQuantity,
         decimal InventoryValue, decimal AverageUnitCost);
     private sealed record InventoryMovementsReport(int Page, int PageSize, long TotalRows, int TotalPages, IReadOnlyList<InventoryMovementRow> Rows);
