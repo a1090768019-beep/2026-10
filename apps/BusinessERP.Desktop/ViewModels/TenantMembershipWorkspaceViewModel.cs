@@ -11,6 +11,7 @@ public sealed class TenantMembershipWorkspaceViewModel : INotifyPropertyChanged
     private ErpApiClient? _apiClient;
     private TenantMemberApiDto? _selectedMember;
     private string _userIdText = "";
+    private string _assignRoleCode = "VIEWER";
     private string _selectedRoleCode = "VIEWER";
     private string _selectedStatus = "ACTIVE";
     private string _statusMessage = "سجّل الدخول وفعّل المستأجر لإدارة العضويات.";
@@ -46,6 +47,12 @@ public sealed class TenantMembershipWorkspaceViewModel : INotifyPropertyChanged
     {
         get => _userIdText;
         set { if (_userIdText == value) return; _userIdText = value; OnPropertyChanged(); }
+    }
+
+    public string AssignRoleCode
+    {
+        get => _assignRoleCode;
+        set { if (_assignRoleCode == value) return; _assignRoleCode = value; OnPropertyChanged(); }
     }
 
     public string SelectedRoleCode
@@ -167,7 +174,7 @@ public sealed class TenantMembershipWorkspaceViewModel : INotifyPropertyChanged
             return;
         }
 
-        if (!RoleCodes.Contains(SelectedRoleCode, StringComparer.Ordinal))
+        if (!RoleCodes.Contains(AssignRoleCode, StringComparer.Ordinal))
         {
             StatusMessage = "اختر دورًا صالحًا للمستخدم.";
             return;
@@ -177,7 +184,7 @@ public sealed class TenantMembershipWorkspaceViewModel : INotifyPropertyChanged
         try
         {
             var added = await _apiClient.AssignTenantMemberAsync(
-                new AssignTenantMemberApiRequest(userId, SelectedRoleCode));
+                new AssignTenantMemberApiRequest(userId, AssignRoleCode));
             UserIdText = "";
             await RefreshAfterMutationAsync(added.UserId);
             StatusMessage = $"تم إسناد {added.DisplayName} بدور {added.RoleCode}.";
