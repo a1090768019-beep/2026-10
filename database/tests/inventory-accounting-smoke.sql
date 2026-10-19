@@ -23,7 +23,12 @@ VALUES
   '11111111-1111-4111-8111-111111111111','11111111-1111-4111-8111-111111111101',
   'CI-INV-GL-MOV-RCPT','eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee5','eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee6',
   'RECEIPT','2026-04-01',5.0000,10.00000000,50.0000,'MANUAL',NULL,'inventory accounting smoke receipt',
-  'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'),
+  'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+
+INSERT INTO inventory_movements
+ (id, tenant_id, company_id, movement_number, item_id, warehouse_id, movement_type, movement_date,
+  quantity_delta, unit_cost, inventory_value_delta, source_type, transfer_id, notes, created_by)
+VALUES
  ('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee8',
   '11111111-1111-4111-8111-111111111111','11111111-1111-4111-8111-111111111101',
   'CI-INV-GL-MOV-ISSUE','eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee5','eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee6',
