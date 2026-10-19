@@ -118,6 +118,10 @@ jobs:
         env:
           POSTGRES_RUNTIME_URL: postgresql://erp_ci_runtime:ci-only-password@localhost:5432/business_erp
         run: psql "$POSTGRES_RUNTIME_URL" -v ON_ERROR_STOP=1 -f database/tests/inventory-serial-smoke.sql
+      - name: Verify purchase and sales invoice stock links, costing and serial consistency
+        env:
+          POSTGRES_RUNTIME_URL: postgresql://erp_ci_runtime:ci-only-password@localhost:5432/business_erp
+        run: psql "$POSTGRES_RUNTIME_URL" -v ON_ERROR_STOP=1 -f database/tests/document-inventory-posting-smoke.sql
       - name: Verify EF Core subscription mapping and tenant isolation
         env:
           BUSINESS_ERP_TEST_CONNECTION: Host=localhost;Port=5432;Database=business_erp;Username=erp_ci_runtime;Password=ci-only-password
