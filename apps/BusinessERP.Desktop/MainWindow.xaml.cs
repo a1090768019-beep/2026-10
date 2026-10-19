@@ -192,7 +192,8 @@ public partial class MainWindow : Window
             await candidateClient.GetCompaniesAsync();
             _erpApiClient = candidateClient;
             await SalesWorkspacePanel.SetApiClientAsync(candidateClient);
-            await PurchasesWorkspacePanel.SetApiClientAsync(candidateClient);
+            if (PurchasesWorkspacePanel.Visibility == Visibility.Visible)
+                await PurchasesWorkspacePanel.SetApiClientAsync(candidateClient);
             if (ReportsWorkspacePanel.Visibility == Visibility.Visible)
                 await ReportsWorkspacePanel.SetApiClientAsync(candidateClient);
             AuthStatusText.Text = $"تم تفعيل المستأجر · {tenantId.ToString("D")[..8]}";
