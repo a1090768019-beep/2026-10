@@ -23,8 +23,8 @@ test('desktop CashBank workspace creates and posts receipts and supplier payment
   assert.match(client, /GetOutstandingSalesInvoicesAsync/);
   assert.match(client, /GetOutstandingPurchaseInvoicesAsync/);
   assert.match(client, /OutstandingInvoiceApiDto/);
-  assert.match(viewModel, /SelectedSalesInvoice\.CustomerId == SelectedCustomer\.Id/);
-  assert.match(viewModel, /SelectedPurchaseInvoice\.SupplierId == SelectedSupplier\.Id/);
+  assert.match(viewModel, /SelectedSalesInvoice\.PartyId == SelectedCustomer\.Id/);
+  assert.match(viewModel, /SelectedPurchaseInvoice\.PartyId == SelectedSupplier\.Id/);
   assert.match(viewModel, /SelectedPeriod\?\.Status == "OPEN"/);
   assert.match(viewModel, /CreateCustomerReceiptApiRequest/);
   assert.match(viewModel, /PostSupplierPaymentApiRequest/);
