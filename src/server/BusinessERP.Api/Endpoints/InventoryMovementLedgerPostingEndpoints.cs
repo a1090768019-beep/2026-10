@@ -294,7 +294,7 @@ public static class InventoryMovementLedgerPostingEndpoints
         DateOnly EntryDate, string MovementType, decimal QuantityDelta, decimal Amount,
         Guid InventoryAssetAccountId, Guid CounterpartAccountId, bool AlreadyPosted, string Message);
 
-    private sealed class InventoryMovementSource
+    private sealed class InventoryMovementPostingSource
     {
         public Guid Id { get; init; }
         public string MovementNumber { get; init; } = "";
