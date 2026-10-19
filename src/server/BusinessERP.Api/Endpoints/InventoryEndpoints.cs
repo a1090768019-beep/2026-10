@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore.Storage;
 namespace BusinessERP.Api.Endpoints;
 
 /// <summary>
-/// Tenant-scoped item/warehouse endpoints and an immutable receipt/issue inventory ledger.
+/// Tenant-scoped item/warehouse endpoints, immutable stock movements, warehouse transfers and serial tracking.
 /// Every command runs inside TenantTransactionRunner's transaction-local RLS context.
 /// </summary>
 public static partial class InventoryEndpoints
