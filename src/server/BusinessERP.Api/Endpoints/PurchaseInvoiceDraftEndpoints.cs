@@ -319,17 +319,26 @@ public static class PurchaseInvoiceDraftEndpoints
             """).SingleOrDefaultAsync(token);
         if (header is null) return null;
 
-        var lines = await db.Database.SqlQuery<PurchaseDraftLineDto>($"""
+        var lineRows = await db.Database.SqlQuery<PurchaseDraftLineRow>($"""
             SELECT id AS "Id", line_number AS "LineNumber", description AS "Description",
                    quantity AS "Quantity", unit_price AS "UnitPrice", line_amount AS "LineAmount",
                    discount_amount AS "DiscountAmount", vat_treatment AS "VatTreatment",
                    vat_treatment_reason AS "VatTreatmentReason", gross_amount AS "GrossAmount",
                    net_amount AS "NetAmount", vat_rate_percent AS "VatRatePercent",
-                   vat_amount AS "VatAmount", total_amount AS "TotalAmount"
+                   vat_amount AS "VatAmount", total_amount AS "TotalAmount",
+                   inventory_item_id AS "InventoryItemId", inventory_warehouse_id AS "InventoryWarehouseId",
+                   serial_numbers::text AS "SerialNumbersJson", inventory_cost_amount AS "InventoryCostAmount"
               FROM purchase_invoice_draft_lines
              WHERE tenant_id = {tenantId} AND company_id = {companyId} AND purchase_invoice_draft_id = {invoiceId}
              ORDER BY line_number
             """).ToListAsync(token);
+        var lines = lineRows.Select(row => new PurchaseDraftLineDto(
+            row.Id, row.LineNumber, row.Description, row.Quantity, row.UnitPrice, row.LineAmount,
+            row.DiscountAmount, row.VatTreatment, row.VatTreatmentReason, row.GrossAmount,
+            row.NetAmount, row.VatRatePercent, row.VatAmount, row.TotalAmount,
+            row.InventoryItemId, row.InventoryWarehouseId,
+            JsonSerializer.Deserialize<string[]>(row.SerialNumbersJson) ?? Array.Empty<string>(),
+            row.InventoryCostAmount)).ToList();
 
         return new PurchaseDraftDetails(
             header.Id, header.CompanyId, header.SupplierId, header.PurchaseNumber, header.SupplierInvoiceNumber,
@@ -364,10 +373,16 @@ public static class PurchaseInvoiceDraftEndpoints
         decimal SubtotalAmount, string Notes, string Status, string TaxCalculationStatus,
         decimal? GrossAmount, decimal? DiscountAmount, decimal? NetAmount, decimal? VatAmount, decimal? TotalAmount, DateTime CreatedAt,
         Guid? AccountingPostedJournalEntryId, DateTime? AccountingPostedAt, Guid? AccountingInputVatAccountId);
+    private sealed record PurchaseDraftLineRow(
+        Guid Id, int LineNumber, string Description, decimal Quantity, decimal UnitPrice, decimal LineAmount,
+        decimal DiscountAmount, string VatTreatment, string? VatTreatmentReason, decimal? GrossAmount,
+        decimal? NetAmount, decimal? VatRatePercent, decimal? VatAmount, decimal? TotalAmount,
+        Guid? InventoryItemId, Guid? InventoryWarehouseId, string SerialNumbersJson, decimal? InventoryCostAmount);
     public sealed record PurchaseDraftLineDto(
         Guid Id, int LineNumber, string Description, decimal Quantity, decimal UnitPrice, decimal LineAmount,
         decimal DiscountAmount, string VatTreatment, string? VatTreatmentReason, decimal? GrossAmount,
-        decimal? NetAmount, decimal? VatRatePercent, decimal? VatAmount, decimal? TotalAmount);
+        decimal? NetAmount, decimal? VatRatePercent, decimal? VatAmount, decimal? TotalAmount,
+        Guid? InventoryItemId, Guid? InventoryWarehouseId, IReadOnlyList<string> SerialNumbers, decimal? InventoryCostAmount);
     public sealed record PurchaseDraftDetails(
         Guid Id, Guid CompanyId, Guid SupplierId, string PurchaseNumber, string SupplierInvoiceNumber,
         DateOnly IssueDate, DateOnly? DueDate, string CurrencyCode, string SupplierName, string? SupplierTaxNumber,

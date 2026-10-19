@@ -313,13 +313,17 @@ public static class SalesInvoiceDraftEndpoints
             """).SingleOrDefaultAsync(token);
         if (header is null) return null;
 
-        var lines = await db.Database.SqlQuery<DraftLineRow>($"""
+        var lineRows = await db.Database.SqlQuery<DraftLineRow>($"""
             SELECT id AS "Id",
                    line_number AS "LineNumber",
                    description AS "Description",
                    quantity AS "Quantity",
                    unit_price AS "UnitPrice",
-                   line_amount AS "LineAmount"
+                   line_amount AS "LineAmount",
+                   inventory_item_id AS "InventoryItemId",
+                   inventory_warehouse_id AS "InventoryWarehouseId",
+                   serial_numbers::text AS "SerialNumbersJson",
+                   inventory_cost_amount AS "InventoryCostAmount"
               FROM sales_invoice_draft_lines
              WHERE tenant_id = {tenantId}
                AND company_id = {companyId}
@@ -332,7 +336,9 @@ public static class SalesInvoiceDraftEndpoints
             header.IssueDate, header.DueDate, header.CurrencyCode.Trim(),
             header.CustomerName, header.CustomerTaxNumber, header.SubtotalAmount,
             header.Notes, header.Status, header.CreatedAt,
-            lines.Select(x => new DraftLineDto(x.Id, x.LineNumber, x.Description, x.Quantity, x.UnitPrice, x.LineAmount)).ToList());
+            lineRows.Select(x => new DraftLineDto(x.Id, x.LineNumber, x.Description, x.Quantity, x.UnitPrice, x.LineAmount,
+                x.InventoryItemId, x.InventoryWarehouseId, JsonSerializer.Deserialize<string[]>(x.SerialNumbersJson) ?? Array.Empty<string>(),
+                x.InventoryCostAmount)).ToList());
     }
 
     private static DraftListDto ToListDto(DraftListRow row) => new(
@@ -362,7 +368,8 @@ public static class SalesInvoiceDraftEndpoints
         Guid Id, Guid CompanyId, Guid CustomerId, string InvoiceNumber, DateOnly IssueDate,
         DateOnly? DueDate, string CurrencyCode, string CustomerName, string? CustomerTaxNumber,
         decimal SubtotalAmount, string Notes, string Status, DateTime CreatedAt, IReadOnlyList<DraftLineDto> Lines);
-    public sealed record DraftLineDto(Guid Id, int LineNumber, string Description, decimal Quantity, decimal UnitPrice, decimal LineAmount);
+    public sealed record DraftLineDto(Guid Id, int LineNumber, string Description, decimal Quantity, decimal UnitPrice, decimal LineAmount,
+        Guid? InventoryItemId, Guid? InventoryWarehouseId, IReadOnlyList<string> SerialNumbers, decimal? InventoryCostAmount);
 
     public sealed class CustomerSnapshot
     {
@@ -412,5 +419,9 @@ public static class SalesInvoiceDraftEndpoints
         public decimal Quantity { get; init; }
         public decimal UnitPrice { get; init; }
         public decimal LineAmount { get; init; }
+        public Guid? InventoryItemId { get; init; }
+        public Guid? InventoryWarehouseId { get; init; }
+        public string SerialNumbersJson { get; init; } = "[]";
+        public decimal? InventoryCostAmount { get; init; }
     }
 }

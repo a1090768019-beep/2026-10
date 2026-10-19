@@ -100,7 +100,7 @@ public static partial class InventoryEndpoints
         },ct);
     }
 
-    private static async Task<bool> GetTracksSerialsAsync(ErpDbContext db,Guid tenantId,Guid companyId,Guid itemId,CancellationToken ct)
+    internal static async Task<bool> GetTracksSerialsAsync(ErpDbContext db,Guid tenantId,Guid companyId,Guid itemId,CancellationToken ct)
     {
         await using var command=CreateCommand(db,"SELECT tracks_serials FROM items WHERE tenant_id=@tenant_id AND company_id=@company_id AND id=@item_id");
         AddParameter(command,"tenant_id",tenantId); AddParameter(command,"company_id",companyId); AddParameter(command,"item_id",itemId);
@@ -108,10 +108,10 @@ public static partial class InventoryEndpoints
         return value is not null && value != DBNull.Value && Convert.ToBoolean(value);
     }
 
-    private static string[] NormalizeSerialNumbers(IReadOnlyList<string>? input)=>(input??Array.Empty<string>())
+    internal static string[] NormalizeSerialNumbers(IReadOnlyList<string>? input)=>(input??Array.Empty<string>())
         .Select(value=>(value??"").Trim().ToUpperInvariant()).Where(value=>value.Length>0).ToArray();
 
-    private static async Task<IResult?> ValidateSerialNumbersAsync(ErpDbContext db,Guid tenantId,Guid companyId,Guid itemId,Guid warehouseId,
+    internal static async Task<IResult?> ValidateSerialNumbersAsync(ErpDbContext db,Guid tenantId,Guid companyId,Guid itemId,Guid warehouseId,
         decimal quantity,bool receipt,bool tracksSerials,string[] serialNumbers,CancellationToken ct)
     {
         if(!tracksSerials) return serialNumbers.Length==0?null:Results.ValidationProblem(new Dictionary<string,string[]> { ["serialNumbers"]=["الصنف لا يستخدم تتبع الأرقام التسلسلية."] });
@@ -138,7 +138,7 @@ public static partial class InventoryEndpoints
         return null;
     }
 
-    private static async Task ApplySerialReceiptAsync(ErpDbContext db,Guid tenantId,Guid companyId,Guid itemId,Guid warehouseId,
+    internal static async Task ApplySerialReceiptAsync(ErpDbContext db,Guid tenantId,Guid companyId,Guid itemId,Guid warehouseId,
         Guid movementId,DateOnly movementDate,string[] serials,Guid userId,CancellationToken ct)
     {
         foreach(var serial in serials)
@@ -162,7 +162,7 @@ public static partial class InventoryEndpoints
         }
     }
 
-    private static async Task ApplySerialIssueAsync(ErpDbContext db,Guid tenantId,Guid companyId,Guid itemId,Guid warehouseId,
+    internal static async Task ApplySerialIssueAsync(ErpDbContext db,Guid tenantId,Guid companyId,Guid itemId,Guid warehouseId,
         Guid movementId,DateOnly movementDate,string[] serials,Guid userId,CancellationToken ct)
     {
         foreach(var serial in serials)
