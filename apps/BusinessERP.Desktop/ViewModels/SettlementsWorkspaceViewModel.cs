@@ -14,8 +14,8 @@ public sealed class SettlementsWorkspaceViewModel : INotifyPropertyChanged
     private ApiCompany? _selectedCompany;
     private ApiCustomer? _selectedCustomer;
     private ApiSupplier? _selectedSupplier;
-    private SalesInvoiceDraftListItem? _selectedSalesInvoice;
-    private PurchaseInvoiceDraftListItem? _selectedPurchaseInvoice;
+    private OutstandingInvoiceApiDto? _selectedSalesInvoice;
+    private OutstandingInvoiceApiDto? _selectedPurchaseInvoice;
     private CustomerReceiptApiDto? _selectedReceipt;
     private SupplierPaymentApiDto? _selectedPayment;
     private ApiFiscalPeriod? _selectedPeriod;
@@ -39,8 +39,8 @@ public sealed class SettlementsWorkspaceViewModel : INotifyPropertyChanged
     public ObservableCollection<ApiCompany> Companies { get; } = [];
     public ObservableCollection<ApiCustomer> Customers { get; } = [];
     public ObservableCollection<ApiSupplier> Suppliers { get; } = [];
-    public ObservableCollection<SalesInvoiceDraftListItem> SalesInvoices { get; } = [];
-    public ObservableCollection<PurchaseInvoiceDraftListItem> PurchaseInvoices { get; } = [];
+    public ObservableCollection<OutstandingInvoiceApiDto> SalesInvoices { get; } = [];
+    public ObservableCollection<OutstandingInvoiceApiDto> PurchaseInvoices { get; } = [];
     public ObservableCollection<CustomerReceiptApiDto> Receipts { get; } = [];
     public ObservableCollection<SupplierPaymentApiDto> Payments { get; } = [];
     public ObservableCollection<ApiFiscalPeriod> FiscalPeriods { get; } = [];
@@ -51,8 +51,8 @@ public sealed class SettlementsWorkspaceViewModel : INotifyPropertyChanged
     public ApiCompany? SelectedCompany { get => _selectedCompany; set { if (Set(ref _selectedCompany, value)) RaiseCommands(); } }
     public ApiCustomer? SelectedCustomer { get => _selectedCustomer; set { if (Set(ref _selectedCustomer, value)) RaiseCommands(); } }
     public ApiSupplier? SelectedSupplier { get => _selectedSupplier; set { if (Set(ref _selectedSupplier, value)) RaiseCommands(); } }
-    public SalesInvoiceDraftListItem? SelectedSalesInvoice { get => _selectedSalesInvoice; set { if (Set(ref _selectedSalesInvoice, value)) RaiseCommands(); } }
-    public PurchaseInvoiceDraftListItem? SelectedPurchaseInvoice { get => _selectedPurchaseInvoice; set { if (Set(ref _selectedPurchaseInvoice, value)) RaiseCommands(); } }
+    public OutstandingInvoiceApiDto? SelectedSalesInvoice { get => _selectedSalesInvoice; set { if (Set(ref _selectedSalesInvoice, value)) RaiseCommands(); } }
+    public OutstandingInvoiceApiDto? SelectedPurchaseInvoice { get => _selectedPurchaseInvoice; set { if (Set(ref _selectedPurchaseInvoice, value)) RaiseCommands(); } }
     public CustomerReceiptApiDto? SelectedReceipt { get => _selectedReceipt; set { if (Set(ref _selectedReceipt, value)) RaiseCommands(); } }
     public SupplierPaymentApiDto? SelectedPayment { get => _selectedPayment; set { if (Set(ref _selectedPayment, value)) RaiseCommands(); } }
     public ApiFiscalPeriod? SelectedPeriod { get => _selectedPeriod; set { if (Set(ref _selectedPeriod, value)) RaiseCommands(); } }
@@ -76,10 +76,10 @@ public sealed class SettlementsWorkspaceViewModel : INotifyPropertyChanged
         ? "سندات القبض والصرف · لم يتم اختيار شركة"
         : $"الشركة: {SelectedCompany.Name} · العملة: {SelectedCompany.BaseCurrency} · سندات قبض وصرف مرتبطة بالأستاذ العام";
     public bool CanCreateReceipt => !IsBusy && SelectedCompany is not null && SelectedCustomer is not null &&
-        SelectedSalesInvoice?.Status == "ACCOUNTING_POSTED" && SelectedSalesInvoice.CustomerId == SelectedCustomer.Id &&
+        SelectedSalesInvoice is not null && SelectedSalesInvoice.PartyId == SelectedCustomer.Id && SelectedSalesInvoice.OutstandingAmount > 0 &&
         !string.IsNullOrWhiteSpace(ReceiptNumber) && TryAmount(ReceiptAmountText, out var receiptAmount) && receiptAmount > 0;
     public bool CanCreatePayment => !IsBusy && SelectedCompany is not null && SelectedSupplier is not null &&
-        SelectedPurchaseInvoice?.Status == "ACCOUNTING_POSTED" && SelectedPurchaseInvoice.SupplierId == SelectedSupplier.Id &&
+        SelectedPurchaseInvoice is not null && SelectedPurchaseInvoice.PartyId == SelectedSupplier.Id && SelectedPurchaseInvoice.OutstandingAmount > 0 &&
         !string.IsNullOrWhiteSpace(PaymentNumber) && TryAmount(PaymentAmountText, out var paymentAmount) && paymentAmount > 0;
     public bool CanPostReceipt => !IsBusy && SelectedCompany is not null && SelectedReceipt?.Status == "DRAFT" &&
         SelectedPeriod?.Status == "OPEN" && SelectedCashAccount is not null && SelectedReceivableAccount is not null &&
@@ -153,8 +153,8 @@ public sealed class SettlementsWorkspaceViewModel : INotifyPropertyChanged
         var companyId = SelectedCompany.Id;
         var customersTask = _apiClient.GetCustomersAsync(companyId);
         var suppliersTask = _apiClient.GetSuppliersAsync(companyId);
-        var salesTask = _apiClient.GetSalesInvoiceDraftsAsync(companyId);
-        var purchaseTask = _apiClient.GetPurchaseInvoiceDraftsAsync(companyId);
+        var salesTask = _apiClient.GetOutstandingSalesInvoicesAsync(companyId);
+        var purchaseTask = _apiClient.GetOutstandingPurchaseInvoicesAsync(companyId);
         var accountsTask = _apiClient.GetAccountsAsync(companyId);
         var periodsTask = _apiClient.GetFiscalPeriodsAsync(companyId);
         var receiptsTask = _apiClient.GetCustomerReceiptsAsync(companyId);
@@ -163,8 +163,8 @@ public sealed class SettlementsWorkspaceViewModel : INotifyPropertyChanged
 
         Replace(Customers, (await customersTask).Where(x => x.IsActive));
         Replace(Suppliers, (await suppliersTask).Where(x => x.IsActive));
-        Replace(SalesInvoices, (await salesTask).Where(x => x.Status == "ACCOUNTING_POSTED"));
-        Replace(PurchaseInvoices, (await purchaseTask).Where(x => x.Status == "ACCOUNTING_POSTED"));
+        Replace(SalesInvoices, await salesTask);
+        Replace(PurchaseInvoices, await purchaseTask);
         Replace(FiscalPeriods, (await periodsTask).Where(x => x.Status == "OPEN"));
         Replace(Receipts, await receiptsTask);
         Replace(Payments, await paymentsTask);
@@ -196,7 +196,7 @@ public sealed class SettlementsWorkspaceViewModel : INotifyPropertyChanged
         {
             var request = new CreateCustomerReceiptApiRequest(SelectedCustomer.Id, ReceiptNumber.Trim(),
                 DateOnly.FromDateTime(ReceiptDate), amount, SelectedCompany.BaseCurrency, ReceiptNotes.Trim(),
-                [new SettlementAllocationApiRequest(SelectedSalesInvoice.Id, amount)]);
+                [new SettlementAllocationApiRequest(SelectedSalesInvoice.InvoiceId, amount)]);
             await _apiClient.CreateCustomerReceiptAsync(SelectedCompany.Id, request);
             ReceiptNumber = "";
             ReceiptAmountText = "";
@@ -233,7 +233,7 @@ public sealed class SettlementsWorkspaceViewModel : INotifyPropertyChanged
         {
             var request = new CreateSupplierPaymentApiRequest(SelectedSupplier.Id, PaymentNumber.Trim(),
                 DateOnly.FromDateTime(PaymentDate), amount, SelectedCompany.BaseCurrency, PaymentNotes.Trim(),
-                [new SettlementAllocationApiRequest(SelectedPurchaseInvoice.Id, amount)]);
+                [new SettlementAllocationApiRequest(SelectedPurchaseInvoice.InvoiceId, amount)]);
             await _apiClient.CreateSupplierPaymentAsync(SelectedCompany.Id, request);
             PaymentNumber = "";
             PaymentAmountText = "";
