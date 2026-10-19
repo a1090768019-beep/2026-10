@@ -31,6 +31,6 @@ test('sales and purchase VAT details are paged, labelled as internal, and export
   assert.match(codeBehind, /ReportsTabs\.SelectedIndex == 4.*CurrentPurchaseVatDetailsReport/s);
   assert.match(codeBehind, /return \("PurchaseVatDetails", rows\)/);
   assert.match(api, /GetPurchaseVatDetailsReport/);
-  assert.match(api, /TaxCalculationStatus/);
+  assert.match(api, /tax_calculation_status = 'CALCULATED'/);
   assert.match(api, /tenant\.TenantId/);
 });
