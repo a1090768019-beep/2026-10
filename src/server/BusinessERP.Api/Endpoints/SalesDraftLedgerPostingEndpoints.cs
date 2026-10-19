@@ -136,6 +136,48 @@ public static class SalesDraftLedgerPostingEndpoints
             if (period.Status != "OPEN" || draft.IssueDate < period.StartDate || draft.IssueDate > period.EndDate)
                 return Results.Conflict(new { error = "fiscal_period_not_open_for_sales_draft_date" });
 
+
+            var sourceLines = await db.Database.SqlQuery<InventoryDocumentPostingLine>($"""
+                SELECT id AS "Id", line_number AS "LineNumber",
+                       inventory_item_id AS "InventoryItemId", inventory_warehouse_id AS "InventoryWarehouseId",
+                       quantity AS "Quantity", line_amount AS "LineAmount",
+                       NULL::numeric(20,4) AS "NetAmount", NULL::numeric(20,4) AS "TotalAmount",
+                       serial_numbers::text AS "SerialNumbersJson", inventory_cost_amount AS "InventoryCostAmount"
+                  FROM sales_invoice_draft_lines
+                 WHERE tenant_id = {tenant.TenantId} AND company_id = {companyId}
+                   AND sales_invoice_draft_id = {invoiceId}
+                 ORDER BY line_number
+                """).ToListAsync(token);
+            var linkedLines = sourceLines.Where(line => line.InventoryItemId.HasValue).ToList();
+            if (linkedLines.Count > 0 &&
+                (!request.InventoryAssetAccountId.HasValue || !request.CostOfGoodsSoldAccountId.HasValue))
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["inventoryAccounts"] = ["عند ربط بنود المبيعات بالمخزون، اختر حساب أصل المخزون وحساب تكلفة البضاعة المباعة."]
+                });
+
+            if (linkedLines.Count > 0)
+            {
+                var allSerialValues = linkedLines.SelectMany(line => InventoryDocumentStockPostingService.ParseSerialNumbers(line.SerialNumbersJson)).ToArray();
+                if (allSerialValues.Distinct(StringComparer.OrdinalIgnoreCase).Count() != allSerialValues.Length)
+                    return Results.ValidationProblem(new Dictionary<string, string[]>
+                    {
+                        ["lines.serialNumbers"] = ["يوجد رقم تسلسلي مكرر بين بنود فاتورة البيع."]
+                    });
+
+                var inventoryAccountId = request.InventoryAssetAccountId!.Value;
+                var cogsAccountId = request.CostOfGoodsSoldAccountId!.Value;
+                if (inventoryAccountId == cogsAccountId ||
+                    inventoryAccountId == request.ReceivableAccountId || inventoryAccountId == request.RevenueAccountId ||
+                    cogsAccountId == request.ReceivableAccountId || cogsAccountId == request.RevenueAccountId ||
+                    (request.OutputVatAccountId.HasValue &&
+                     (inventoryAccountId == request.OutputVatAccountId.Value || cogsAccountId == request.OutputVatAccountId.Value)))
+                    return Results.ValidationProblem(new Dictionary<string, string[]>
+                    {
+                        ["inventoryAccounts"] = ["حساب المخزون وحساب تكلفة البضاعة المباعة يجب أن يكونا مستقلين عن بقية حسابات القيد."]
+                    });
+            }
+
             if (request.ReceivableAccountId == request.RevenueAccountId ||
                 (vat > 0m && (!request.OutputVatAccountId.HasValue ||
                               request.OutputVatAccountId.Value == request.ReceivableAccountId ||
@@ -154,6 +196,11 @@ public static class SalesDraftLedgerPostingEndpoints
             };
             if (vat > 0m)
                 requiredAccountIds.Add(request.OutputVatAccountId!.Value);
+            if (linkedLines.Count > 0)
+            {
+                requiredAccountIds.Add(request.InventoryAssetAccountId!.Value);
+                requiredAccountIds.Add(request.CostOfGoodsSoldAccountId!.Value);
+            }
 
             var accounts = await db.Accounts.AsNoTracking()
                 .Where(x => x.CompanyId == companyId && requiredAccountIds.Contains(x.Id))
@@ -181,6 +228,86 @@ public static class SalesDraftLedgerPostingEndpoints
                     {
                         ["outputVatAccountId"] = ["حساب ضريبة المخرجات يجب أن يكون التزامًا دائنًا ونشطًا وقابلًا للترحيل."]
                     });
+            }
+
+            AccountRecord? inventoryAssetAccount = null;
+            AccountRecord? costOfGoodsSoldAccount = null;
+            if (linkedLines.Count > 0)
+            {
+                inventoryAssetAccount = accounts.Single(x => x.Id == request.InventoryAssetAccountId!.Value);
+                costOfGoodsSoldAccount = accounts.Single(x => x.Id == request.CostOfGoodsSoldAccountId!.Value);
+                if (!IsPostable(inventoryAssetAccount, "ASSET", "DEBIT") ||
+                    !IsPostable(costOfGoodsSoldAccount, "EXPENSE", "DEBIT"))
+                    return Results.ValidationProblem(new Dictionary<string, string[]>
+                    {
+                        ["inventoryAccounts"] = ["حساب المخزون يجب أن يكون أصلًا مدينًا، وحساب تكلفة البضاعة المباعة يجب أن يكون مصروفًا مدينًا ونشطين وقابلين للترحيل."]
+                    });
+            }
+
+            var issuePlans = new List<InventoryIssuePlan>();
+            decimal cogsAmount = 0m;
+            if (linkedLines.Count > 0)
+            {
+                await InventoryDocumentStockPostingService.AcquireMovementLocksAsync(
+                    db, tenant.TenantId, companyId,
+                    linkedLines.Select(line => (line.InventoryItemId!.Value, line.InventoryWarehouseId!.Value)), token);
+
+                var balances = new Dictionary<(Guid ItemId, Guid WarehouseId), InventoryStockBalance>();
+                foreach (var line in linkedLines)
+                {
+                    var itemId = line.InventoryItemId!.Value;
+                    var warehouseId = line.InventoryWarehouseId!.Value;
+                    var key = (itemId, warehouseId);
+                    if (!balances.ContainsKey(key))
+                        balances[key] = await InventoryDocumentStockPostingService.GetBalanceAsync(
+                            db, tenant.TenantId, companyId, warehouseId, itemId, token);
+                }
+
+                foreach (var line in linkedLines)
+                {
+                    var itemId = line.InventoryItemId!.Value;
+                    var warehouseId = line.InventoryWarehouseId!.Value;
+                    var key = (itemId, warehouseId);
+                    var balance = balances[key];
+                    if (line.Quantity > balance.Quantity)
+                        return Results.Conflict(new
+                        {
+                            error = "insufficient_inventory_for_sales_draft",
+                            lineNumber = line.LineNumber,
+                            availableQuantity = balance.Quantity,
+                            requestedQuantity = line.Quantity,
+                            message = $"الرصيد المتاح للصنف المرتبط بالبند {line.LineNumber} في المستودع المحدد أقل من الكمية المطلوبة."
+                        });
+                    if (balance.Quantity <= 0m)
+                        return Results.Conflict(new { error = "insufficient_inventory_for_sales_draft", lineNumber = line.LineNumber });
+
+                    var costAmount = balance.Quantity == line.Quantity
+                        ? balance.Value
+                        : decimal.Round(line.Quantity * (balance.Value / balance.Quantity), 4, MidpointRounding.AwayFromZero);
+                    costAmount = decimal.Round(costAmount, 4, MidpointRounding.AwayFromZero);
+                    if (costAmount < 0m)
+                        return Results.Conflict(new { error = "inventory_cost_is_negative", lineNumber = line.LineNumber });
+                    var unitCost = decimal.Round(costAmount / line.Quantity, 8, MidpointRounding.AwayFromZero);
+                    var serialNumbers = InventoryDocumentStockPostingService.ParseSerialNumbers(line.SerialNumbersJson);
+                    var tracksSerials = await InventoryEndpoints.GetTracksSerialsAsync(db, tenant.TenantId, companyId, itemId, token);
+                    var serialValidation = await InventoryEndpoints.ValidateSerialNumbersAsync(
+                        db, tenant.TenantId, companyId, itemId, warehouseId, line.Quantity, false, tracksSerials, serialNumbers, token);
+                    if (serialValidation is not null) return serialValidation;
+
+                    issuePlans.Add(new InventoryIssuePlan(line, itemId, warehouseId, unitCost, costAmount, serialNumbers));
+                    cogsAmount = checked(cogsAmount + costAmount);
+                    balances[key] = new InventoryStockBalance(balance.Quantity - line.Quantity, balance.Value - costAmount);
+                }
+
+                foreach (var plan in issuePlans)
+                {
+                    await db.Database.ExecuteSqlInterpolatedAsync($"""
+                        UPDATE sales_invoice_draft_lines
+                           SET inventory_cost_amount = {plan.CostAmount}
+                         WHERE tenant_id = {tenant.TenantId} AND company_id = {companyId}
+                           AND sales_invoice_draft_id = {invoiceId} AND id = {plan.Line.Id}
+                        """, token);
+                }
             }
 
             var entryNumberLock = $"journal-entry-number:{tenant.TenantId:D}:{companyId:D}:{entryNumber}";
@@ -235,6 +362,24 @@ public static class SalesDraftLedgerPostingEndpoints
                 });
             }
 
+            if (issuePlans.Count > 0 && cogsAmount > 0m &&
+                inventoryAssetAccount is not null && costOfGoodsSoldAccount is not null)
+            {
+                var cogsLineNumber = vat > 0m ? 4 : 3;
+                db.JournalEntryLines.Add(new JournalEntryLineRecord
+                {
+                    Id = Guid.NewGuid(), TenantId = tenant.TenantId, CompanyId = companyId,
+                    JournalEntryId = entry.Id, AccountId = costOfGoodsSoldAccount.Id, LineNumber = cogsLineNumber,
+                    Description = "Cost of goods sold from inventory issue", Debit = cogsAmount, Credit = 0m
+                });
+                db.JournalEntryLines.Add(new JournalEntryLineRecord
+                {
+                    Id = Guid.NewGuid(), TenantId = tenant.TenantId, CompanyId = companyId,
+                    JournalEntryId = entry.Id, AccountId = inventoryAssetAccount.Id, LineNumber = cogsLineNumber + 1,
+                    Description = "Inventory asset relief from sales", Debit = 0m, Credit = cogsAmount
+                });
+            }
+
             await db.SaveChangesAsync(token);
 
             entry.Status = "APPROVED";
@@ -243,6 +388,17 @@ public static class SalesDraftLedgerPostingEndpoints
             entry.Status = "POSTED";
             entry.PostedAt = postedAt;
             await db.SaveChangesAsync(token);
+
+            foreach (var plan in issuePlans)
+            {
+                var movementId = await InventoryDocumentStockPostingService.InsertDocumentMovementAsync(
+                    db, tenant.TenantId, companyId, "SALES", plan.Line.Id,
+                    plan.ItemId, plan.WarehouseId, draft.IssueDate, -plan.Line.Quantity, plan.UnitCost,
+                    -plan.CostAmount, $"Sales draft {invoiceId:D}", tenant.UserId, token);
+                await InventoryDocumentStockPostingService.RecordSerialEventsAsync(
+                    db, tenant.TenantId, companyId, plan.ItemId, plan.WarehouseId, movementId,
+                    draft.IssueDate, plan.Line.Quantity, receipt: false, plan.SerialNumbers, tenant.UserId, token);
+            }
 
             await db.Database.ExecuteSqlInterpolatedAsync($"""
                 UPDATE sales_invoice_drafts
@@ -271,7 +427,11 @@ public static class SalesDraftLedgerPostingEndpoints
                     DiscountAmount = discount,
                     NetAmount = net,
                     VatAmount = vat,
-                    TotalAmount = total
+                    TotalAmount = total,
+                    InventoryAssetAccountId = inventoryAssetAccount?.Id,
+                    CostOfGoodsSoldAccountId = costOfGoodsSoldAccount?.Id,
+                    InventoryMovementCount = issuePlans.Count,
+                    CostOfGoodsSoldAmount = cogsAmount
                 }),
                 CreatedAt = postedAt
             });
@@ -296,7 +456,8 @@ public static class SalesDraftLedgerPostingEndpoints
 
     public sealed record PostSalesDraftToLedgerRequest(
         Guid FiscalPeriodId, string? EntryNumber, Guid ReceivableAccountId,
-        Guid RevenueAccountId, Guid? OutputVatAccountId = null);
+        Guid RevenueAccountId, Guid? OutputVatAccountId = null,
+        Guid? InventoryAssetAccountId = null, Guid? CostOfGoodsSoldAccountId = null);
 
     public sealed record SalesDraftLedgerPostingResult(
         Guid SalesInvoiceDraftId, Guid JournalEntryId, string EntryNumber,
