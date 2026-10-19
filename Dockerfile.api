@@ -8,7 +8,9 @@ RUN dotnet publish src/server/BusinessERP.Api/BusinessERP.Api.csproj \
     --configuration Release \
     --no-restore \
     --output /app/publish \
-    /p:UseAppHost=false
+    /p:UseAppHost=false \
+    /p:DebugType=None \
+    /p:DebugSymbols=false
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
