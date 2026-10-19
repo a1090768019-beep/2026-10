@@ -292,9 +292,19 @@ public static class PurchaseDraftLedgerPostingEndpoints
 
             return Results.Created(
                 $"/api/v1/journal-entries/{entry.Id}",
-                ToResult(draft with
+                ToResult(new PurchaseDraftPostingSource
                 {
+                    Id = draft.Id,
                     Status = "ACCOUNTING_POSTED",
+                    TaxCalculationStatus = draft.TaxCalculationStatus,
+                    IssueDate = draft.IssueDate,
+                    CurrencyCode = draft.CurrencyCode,
+                    SubtotalAmount = draft.SubtotalAmount,
+                    GrossAmount = draft.GrossAmount,
+                    DiscountAmount = draft.DiscountAmount,
+                    NetAmount = draft.NetAmount,
+                    VatAmount = draft.VatAmount,
+                    TotalAmount = draft.TotalAmount,
                     AccountingPostedJournalEntryId = entry.Id,
                     AccountingPostedAt = postedAt,
                     AccountingInputVatAccountId = inputVatAccount?.Id
