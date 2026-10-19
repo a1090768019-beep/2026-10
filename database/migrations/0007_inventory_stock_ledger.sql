@@ -84,6 +84,51 @@ CREATE TRIGGER trg_inventory_movements_immutable
     BEFORE UPDATE OR DELETE ON inventory_movements
     FOR EACH ROW EXECUTE FUNCTION prevent_inventory_movement_mutation();
 
+-- Database-level guard prevents negative stock even if a caller bypasses the API's pre-check.
+-- The lock-key format matches InventoryEndpoints.RecordMovement.
+CREATE OR REPLACE FUNCTION guard_inventory_movement_balance() RETURNS trigger
+LANGUAGE plpgsql AS $
+DECLARE
+    current_quantity numeric(20,4);
+    current_value numeric(20,4);
+    balance_lock text;
+BEGIN
+    balance_lock := 'inventory-balance:' || NEW.tenant_id::text || ':' || NEW.company_id::text
+                    || ':' || NEW.warehouse_id::text || ':' || NEW.item_id::text;
+    PERFORM pg_advisory_xact_lock(hashtextextended(balance_lock, 0));
+
+    SELECT COALESCE(sum(quantity_delta), 0), COALESCE(sum(inventory_value_delta), 0)
+      INTO current_quantity, current_value
+      FROM inventory_movements
+     WHERE tenant_id = NEW.tenant_id
+       AND company_id = NEW.company_id
+       AND item_id = NEW.item_id
+       AND warehouse_id = NEW.warehouse_id;
+
+    IF NEW.movement_type = 'ISSUE' THEN
+        IF -NEW.quantity_delta > current_quantity THEN
+            RAISE EXCEPTION 'Inventory issue would make on-hand quantity negative'
+                USING ERRCODE = '23514';
+        END IF;
+        IF -NEW.inventory_value_delta > current_value THEN
+            RAISE EXCEPTION 'Inventory issue would make inventory value negative'
+                USING ERRCODE = '23514';
+        END IF;
+    ELSIF NEW.movement_type = 'RECEIPT' THEN
+        IF current_quantity + NEW.quantity_delta > 9999999999999999.9999
+           OR current_value + NEW.inventory_value_delta > 9999999999999999.9999 THEN
+            RAISE EXCEPTION 'Inventory receipt exceeds supported balance precision'
+                USING ERRCODE = '23514';
+        END IF;
+    END IF;
+
+    RETURN NEW;
+END $;
+
+CREATE TRIGGER trg_inventory_movements_balance_guard
+    BEFORE INSERT ON inventory_movements
+    FOR EACH ROW EXECUTE FUNCTION guard_inventory_movement_balance();
+
 ALTER TABLE items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE items FORCE ROW LEVEL SECURITY;
 CREATE POLICY tenant_isolation ON items
