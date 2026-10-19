@@ -25,12 +25,6 @@ public sealed class ErpApiClient(HttpClient httpClient, Guid tenantId)
     public Task<ApiCompany> CreateCompanyAsync(CreateCompanyApiRequest request, CancellationToken ct = default) =>
         SendJsonAsync<ApiCompany>(HttpMethod.Post, "/api/v1/companies", request, ct);
 
-    public Task<IReadOnlyList<ApiAccount>> GetAccountsAsync(Guid companyId, CancellationToken ct = default) =>
-        GetListAsync<ApiAccount>($"/api/v1/companies/{companyId:D}/accounts", ct);
-
-    public Task<IReadOnlyList<ApiFiscalPeriod>> GetFiscalPeriodsAsync(Guid companyId, CancellationToken ct = default) =>
-        GetListAsync<ApiFiscalPeriod>($"/api/v1/companies/{companyId:D}/fiscal-periods", ct);
-
     public Task<SalesDraftLedgerPostingApiResult> PostSalesDraftToLedgerAsync(
         Guid companyId, Guid invoiceId, PostSalesDraftToLedgerApiRequest request, CancellationToken ct = default) =>
         SendJsonAsync<SalesDraftLedgerPostingApiResult>(
@@ -253,10 +247,12 @@ public sealed record CreateCompanyApiRequest(string Name, string BaseCurrency = 
 public sealed record ApiAccount(Guid Id, string Code, string NameAr, string NameEn, string AccountType, string NormalBalance, Guid? ParentAccountId, bool IsActive, bool AllowPosting)
 {
     public string DisplayName => $"{Code} — {NameAr} ({NameEn})";
+    public string DisplayLabel => DisplayName;
 }
 public sealed record ApiFiscalPeriod(Guid Id, Guid FiscalYearId, int PeriodNumber, DateOnly StartDate, DateOnly EndDate, string Status)
 {
     public string DisplayName => $"الفترة {PeriodNumber}: {StartDate:yyyy-MM-dd} — {EndDate:yyyy-MM-dd} ({Status})";
+    public string DisplayLabel => DisplayName;
 }
 public sealed record PostSalesDraftToLedgerApiRequest(
     Guid FiscalPeriodId, string EntryNumber, Guid ReceivableAccountId, Guid RevenueAccountId, Guid? OutputVatAccountId = null);
@@ -266,17 +262,6 @@ public sealed record SalesDraftLedgerPostingApiResult(
     decimal VatAmount, decimal TotalAmount, bool AlreadyPosted, string Message);
 public sealed record ApiCustomer(Guid Id, string Code, string Name, string? Email, string? Phone, string? TaxNumber, bool IsActive, DateTime CreatedAt);
 public sealed record ApiSupplier(Guid Id, string Code, string Name, string? Email, string? Phone, string? TaxNumber, bool IsActive, DateTime CreatedAt);
-public sealed record ApiAccount(
-    Guid Id, string Code, string NameAr, string NameEn, string AccountType, string NormalBalance,
-    Guid? ParentAccountId, bool IsActive, bool AllowPosting)
-{
-    public string DisplayLabel => $"{Code} · {NameAr}";
-}
-public sealed record ApiFiscalPeriod(Guid Id, Guid FiscalYearId, int PeriodNumber, DateOnly StartDate, DateOnly EndDate, string Status)
-{
-    public string DisplayLabel => $"{StartDate:yyyy-MM-dd} — {EndDate:yyyy-MM-dd} (فترة {PeriodNumber})";
-}
-
 public sealed record CreateSupplierApiRequest(string Code, string Name, string? Email = null, string? Phone = null, string? TaxNumber = null);
 public sealed record PurchaseInvoiceDraftListItem(
     Guid Id, string PurchaseNumber, string SupplierInvoiceNumber, DateOnly IssueDate, DateOnly? DueDate,
