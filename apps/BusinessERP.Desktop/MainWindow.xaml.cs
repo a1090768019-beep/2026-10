@@ -20,7 +20,7 @@ public partial class MainWindow : Window
             ["Sales"] = new("Sales", "المبيعات والعملاء", "العملاء ومسودات البيع وحساب VAT الداخلي وترحيل الأثر المحاسبي إلى الأستاذ العام؛ دون إصدار نظامي أو إرسال ZATCA.", "AR", "مسودات VAT وGL داخلية"),
             ["Purchases"] = new("Purchases", "المشتريات والموردون", "الموردون ومسودات فواتير الشراء وحساب VAT الداخلي وتقرير البنود المحسوبة؛ دون ترحيل GL أو اعتماد استرداد VAT.", "AP", "مسودات الموردين وتقرير VAT داخلي"),
             ["Inventory"] = new("Inventory", "المخزون والمستودعات", "الأصناف والوحدات والتحويلات والجرد وتقييم المخزون.", "ST", "لاحقًا"),
-            ["CashBank"] = new("CashBank", "الصناديق والبنوك", "سندات القبض والصرف والتحويلات والتسويات البنكية.", "CB", "لاحقًا"),
+            ["CashBank"] = new("CashBank", "الصناديق والبنوك", "سندات القبض والصرف المخصصة للفواتير المرحلة مع ترحيل القيد إلى الأستاذ العام.", "CB", "سندات القبض والصرف مفعّلة"),
             ["Tax"] = new("Tax", "الضرائب والفوترة", "إعدادات ضريبة القيمة المضافة والفوترة الإلكترونية والتكامل مع فاتورة.", "TX", "يتطلب تحققًا رسميًا"),
             ["Settings"] = new("Settings", "الإعدادات والصلاحيات", "إعدادات الشركة والمستخدمين والأدوار والفروع وسياسات الوصول.", "CFG", "لم تُربط بعد"),
             ["Reports"] = new("Reports", "التقارير المالية", "تقارير الأستاذ العام وميزان المراجعة وقائمة الدخل والميزانية من الحركات المرحلة.", "RPT", "واجهات API موجودة؛ شاشة التقارير قيد الربط"),
@@ -41,6 +41,7 @@ public partial class MainWindow : Window
         ReportsWorkspacePanel.WorkspaceContextChanged += (_, _) => UpdateWorkspaceContext();
         PurchasesWorkspacePanel.WorkspaceContextChanged += (_, _) => UpdateWorkspaceContext();
         InventoryWorkspacePanel.WorkspaceContextChanged += (_, _) => UpdateWorkspaceContext();
+        SettlementsWorkspacePanel.WorkspaceContextChanged += (_, _) => UpdateWorkspaceContext();
         _apiBaseUrl = LoadApiBaseUrl();
         _apiHealthService = new ApiHealthService(_apiBaseUrl);
         _oidcAuthenticationService = new OidcAuthenticationService(
@@ -199,6 +200,8 @@ public partial class MainWindow : Window
                 await ReportsWorkspacePanel.SetApiClientAsync(candidateClient);
             if (InventoryWorkspacePanel.Visibility == Visibility.Visible)
                 await InventoryWorkspacePanel.SetApiClientAsync(candidateClient);
+            if (SettlementsWorkspacePanel.Visibility == Visibility.Visible)
+                await SettlementsWorkspacePanel.SetApiClientAsync(candidateClient);
             AuthStatusText.Text = $"تم تفعيل المستأجر · {tenantId.ToString("D")[..8]}";
             UpdateRibbonContext();
             RibbonStatusText.Text = $"API متصل · المستأجر {tenantId.ToString("D")[..8]}";
@@ -210,6 +213,7 @@ public partial class MainWindow : Window
             await ReportsWorkspacePanel.SetApiClientAsync(null);
             await PurchasesWorkspacePanel.SetApiClientAsync(null);
             await InventoryWorkspacePanel.SetApiClientAsync(null);
+            await SettlementsWorkspacePanel.SetApiClientAsync(null);
             UpdateWorkspaceContext();
             AuthStatusText.Text = "تم رفض المستأجر أو صلاحيات المستخدم";
             RibbonStatusText.Text = "تم رفض عضوية المستأجر أو صلاحيات المستخدم";
@@ -222,6 +226,8 @@ public partial class MainWindow : Window
             await SalesWorkspacePanel.SetApiClientAsync(null);
             await ReportsWorkspacePanel.SetApiClientAsync(null);
             await PurchasesWorkspacePanel.SetApiClientAsync(null);
+            await InventoryWorkspacePanel.SetApiClientAsync(null);
+            await SettlementsWorkspacePanel.SetApiClientAsync(null);
             UpdateWorkspaceContext();
             AuthStatusText.Text = "تعذر الاتصال بـ API";
             RibbonStatusText.Text = "تعذر الاتصال بـ API";
@@ -240,6 +246,7 @@ public partial class MainWindow : Window
         await ReportsWorkspacePanel.SetApiClientAsync(null);
         await PurchasesWorkspacePanel.SetApiClientAsync(null);
         await InventoryWorkspacePanel.SetApiClientAsync(null);
+        await SettlementsWorkspacePanel.SetApiClientAsync(null);
         UpdateWorkspaceContext();
         _authenticatedHttpClient?.Dispose();
         _authenticatedHttpClient = null;
@@ -487,6 +494,8 @@ public partial class MainWindow : Window
             WorkspaceContextText.Text = ReportsWorkspacePanel.WorkspaceContextSummary;
         else if (InventoryWorkspacePanel.Visibility == Visibility.Visible)
             WorkspaceContextText.Text = InventoryWorkspacePanel.WorkspaceContextSummary;
+        else if (SettlementsWorkspacePanel.Visibility == Visibility.Visible)
+            WorkspaceContextText.Text = SettlementsWorkspacePanel.WorkspaceContextSummary;
         else if (_erpApiClient is not null)
             WorkspaceContextText.Text = "المستأجر مفعل · لم يتم اختيار شاشة شركة/فترة";
         else
@@ -538,6 +547,7 @@ public partial class MainWindow : Window
             PurchasesWorkspacePanel.Visibility = Visibility.Collapsed;
             ReportsWorkspacePanel.Visibility = Visibility.Collapsed;
             InventoryWorkspacePanel.Visibility = Visibility.Collapsed;
+            SettlementsWorkspacePanel.Visibility = Visibility.Collapsed;
             UpdateWorkspaceContext();
             UpdateRibbonContext();
             return;
@@ -555,12 +565,32 @@ public partial class MainWindow : Window
             PurchasesWorkspacePanel.Visibility = Visibility.Collapsed;
             ReportsWorkspacePanel.Visibility = Visibility.Visible;
             InventoryWorkspacePanel.Visibility = Visibility.Collapsed;
+            SettlementsWorkspacePanel.Visibility = Visibility.Collapsed;
             UpdateWorkspaceContext();
             if (_erpApiClient is null)
                 await ReportsWorkspacePanel.SetApiClientAsync(null);
             else
                 await ReportsWorkspacePanel.SetApiClientAsync(_erpApiClient);
             RibbonStatusText.Text = ReportsWorkspacePanel.WorkspaceStatusMessage;
+            UpdateWorkspaceContext();
+            UpdateRibbonContext();
+            return;
+        }
+
+        if (string.Equals(key, "CashBank", StringComparison.OrdinalIgnoreCase))
+        {
+            DashboardPanel.Visibility = Visibility.Collapsed;
+            ModulePlaceholderPanel.Visibility = Visibility.Collapsed;
+            SalesWorkspacePanel.Visibility = Visibility.Collapsed;
+            PurchasesWorkspacePanel.Visibility = Visibility.Collapsed;
+            ReportsWorkspacePanel.Visibility = Visibility.Collapsed;
+            InventoryWorkspacePanel.Visibility = Visibility.Collapsed;
+            SettlementsWorkspacePanel.Visibility = Visibility.Visible;
+            if (_erpApiClient is null)
+                await SettlementsWorkspacePanel.SetApiClientAsync(null);
+            else
+                await SettlementsWorkspacePanel.SetApiClientAsync(_erpApiClient);
+            RibbonStatusText.Text = SettlementsWorkspacePanel.WorkspaceStatusMessage;
             UpdateWorkspaceContext();
             UpdateRibbonContext();
             return;
@@ -573,6 +603,7 @@ public partial class MainWindow : Window
             ReportsWorkspacePanel.Visibility = Visibility.Collapsed;
             PurchasesWorkspacePanel.Visibility = Visibility.Collapsed;
             InventoryWorkspacePanel.Visibility = Visibility.Collapsed;
+            SettlementsWorkspacePanel.Visibility = Visibility.Collapsed;
             SalesWorkspacePanel.Visibility = Visibility.Visible;
             if (_erpApiClient is null)
                 await SalesWorkspacePanel.SetApiClientAsync(null);
@@ -591,6 +622,7 @@ public partial class MainWindow : Window
             ReportsWorkspacePanel.Visibility = Visibility.Collapsed;
             PurchasesWorkspacePanel.Visibility = Visibility.Visible;
             InventoryWorkspacePanel.Visibility = Visibility.Collapsed;
+            SettlementsWorkspacePanel.Visibility = Visibility.Collapsed;
             if (_erpApiClient is null)
                 await PurchasesWorkspacePanel.SetApiClientAsync(null);
             else
@@ -608,6 +640,7 @@ public partial class MainWindow : Window
             SalesWorkspacePanel.Visibility = Visibility.Collapsed;
             PurchasesWorkspacePanel.Visibility = Visibility.Collapsed;
             ReportsWorkspacePanel.Visibility = Visibility.Collapsed;
+            SettlementsWorkspacePanel.Visibility = Visibility.Collapsed;
             InventoryWorkspacePanel.Visibility = Visibility.Visible;
             if (_erpApiClient is null)
                 await InventoryWorkspacePanel.SetApiClientAsync(null);
@@ -623,6 +656,7 @@ public partial class MainWindow : Window
         PurchasesWorkspacePanel.Visibility = Visibility.Collapsed;
         ReportsWorkspacePanel.Visibility = Visibility.Collapsed;
         InventoryWorkspacePanel.Visibility = Visibility.Collapsed;
+        SettlementsWorkspacePanel.Visibility = Visibility.Collapsed;
         ModulePageTitle.Text = module.Name;
         ModuleCodeText.Text = module.Code;
         ModulePageDescription.Text = module.Description;

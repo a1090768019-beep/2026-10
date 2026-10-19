@@ -211,6 +211,24 @@ public sealed class ErpApiClient(HttpClient httpClient, Guid tenantId)
         SendJsonAsync<SalesVatPreviewApiResult>(
             HttpMethod.Post, $"/api/v1/companies/{companyId:D}/sales-vat-preview", request, ct);
 
+    public Task<IReadOnlyList<CustomerReceiptApiDto>> GetCustomerReceiptsAsync(Guid companyId, CancellationToken ct = default) =>
+        GetListAsync<CustomerReceiptApiDto>($"/api/v1/companies/{companyId:D}/customer-receipts", ct);
+
+    public Task<CustomerReceiptApiDto> CreateCustomerReceiptAsync(Guid companyId, CreateCustomerReceiptApiRequest request, CancellationToken ct = default) =>
+        SendJsonAsync<CustomerReceiptApiDto>(HttpMethod.Post, $"/api/v1/companies/{companyId:D}/customer-receipts", request, ct);
+
+    public Task<SettlementPostingApiResult> PostCustomerReceiptAsync(Guid companyId, Guid receiptId, PostCustomerReceiptApiRequest request, CancellationToken ct = default) =>
+        SendJsonAsync<SettlementPostingApiResult>(HttpMethod.Post, $"/api/v1/companies/{companyId:D}/customer-receipts/{receiptId:D}/post-to-ledger", request, ct);
+
+    public Task<IReadOnlyList<SupplierPaymentApiDto>> GetSupplierPaymentsAsync(Guid companyId, CancellationToken ct = default) =>
+        GetListAsync<SupplierPaymentApiDto>($"/api/v1/companies/{companyId:D}/supplier-payments", ct);
+
+    public Task<SupplierPaymentApiDto> CreateSupplierPaymentAsync(Guid companyId, CreateSupplierPaymentApiRequest request, CancellationToken ct = default) =>
+        SendJsonAsync<SupplierPaymentApiDto>(HttpMethod.Post, $"/api/v1/companies/{companyId:D}/supplier-payments", request, ct);
+
+    public Task<SettlementPostingApiResult> PostSupplierPaymentAsync(Guid companyId, Guid paymentId, PostSupplierPaymentApiRequest request, CancellationToken ct = default) =>
+        SendJsonAsync<SettlementPostingApiResult>(HttpMethod.Post, $"/api/v1/companies/{companyId:D}/supplier-payments/{paymentId:D}/post-to-ledger", request, ct);
+
     private async Task<IReadOnlyList<T>> GetListAsync<T>(string path, CancellationToken ct)
     {
         using var response = await SendAsync(HttpMethod.Get, path, null, ct);
@@ -535,3 +553,17 @@ public sealed record PersistedSalesDraftVatResult(
 public sealed record PersistedSalesDraftVatLineResult(
     int LineNumber, string Description, string Treatment, decimal GrossAmount, decimal DiscountAmount,
     decimal NetAmount, decimal VatRatePercent, decimal VatAmount, decimal TotalAmount, string? TreatmentReason);
+
+public sealed record SettlementAllocationApiRequest(Guid InvoiceId, decimal Amount);
+public sealed record CreateCustomerReceiptApiRequest(Guid PartyId, string? Number, DateOnly Date, decimal Amount,
+    string? CurrencyCode, string? Notes, IReadOnlyList<SettlementAllocationApiRequest> Allocations);
+public sealed record PostCustomerReceiptApiRequest(Guid FiscalPeriodId, string EntryNumber, Guid CashAccountId, Guid ReceivableAccountId);
+public sealed record CreateSupplierPaymentApiRequest(Guid PartyId, string? Number, DateOnly Date, decimal Amount,
+    string? CurrencyCode, string? Notes, IReadOnlyList<SettlementAllocationApiRequest> Allocations);
+public sealed record PostSupplierPaymentApiRequest(Guid FiscalPeriodId, string EntryNumber, Guid CashAccountId, Guid PayableAccountId);
+public sealed record CustomerReceiptApiDto(Guid Id, string Number, DateOnly Date, Guid PartyId, string PartyName,
+    string CurrencyCode, decimal Amount, string Status, Guid? JournalEntryId);
+public sealed record SupplierPaymentApiDto(Guid Id, string Number, DateOnly Date, Guid PartyId, string PartyName,
+    string CurrencyCode, decimal Amount, string Status, Guid? JournalEntryId);
+public sealed record SettlementPostingApiResult(Guid SettlementId, Guid JournalEntryId, string EntryNumber,
+    string JournalEntryStatus, DateOnly EntryDate, decimal Amount, bool AlreadyPosted);
