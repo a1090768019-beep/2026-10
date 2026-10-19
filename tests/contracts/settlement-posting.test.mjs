@@ -12,6 +12,7 @@ test('settlement posting is tenant-scoped, balanced, idempotent, and immutable a
   const program = await read('src/server/BusinessERP.Api/Program.cs');
   const grants = await read('database/tests/prepare-runtime-role.sql');
   const ci = await read('.github/workflows/ci.yml');
+  const smoke = await read('database/tests/settlement-smoke.sql');
 
   for (const table of ['customer_receipts', 'customer_receipt_allocations', 'supplier_payments', 'supplier_payment_allocations']) {
     assert.match(migration, new RegExp('CREATE TABLE ' + table));
