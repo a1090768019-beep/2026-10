@@ -260,7 +260,7 @@ public static class SalesDraftLedgerPostingEndpoints
                     var key = (itemId, warehouseId);
                     if (!balances.ContainsKey(key))
                         balances[key] = await InventoryDocumentStockPostingService.GetBalanceAsync(
-                            db, tenant.TenantId, companyId, warehouseId, itemId, token);
+                            db, tenant.TenantId, companyId, warehouseId, itemId, draft.IssueDate, token);
                 }
 
                 foreach (var line in linkedLines)
