@@ -29,6 +29,32 @@ public sealed class AccountingApiIntegrationTests
     private static readonly Guid EquityAccountA = Guid.Parse("11111111-1111-4111-8111-111111111105");
 
     [RequiresApiPostgresFact]
+    public async Task Tenant_without_active_subscription_is_blocked_except_subscription_views()
+    {
+        var connectionString = Environment.GetEnvironmentVariable("BUSINESS_ERP_TEST_CONNECTION");
+        Assert.False(string.IsNullOrWhiteSpace(connectionString));
+
+        using var factory = new ApiTestFactory(connectionString!);
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Test-Subject", "ci-subject-b");
+        SetTenant(client, TenantB);
+
+        using (var businessResponse = await client.GetAsync("/api/v1/companies"))
+            Assert.Equal(HttpStatusCode.PaymentRequired, businessResponse.StatusCode);
+
+        using (var subscriptionResponse = await client.GetAsync("/api/v1/subscription"))
+        {
+            Assert.Equal(HttpStatusCode.OK, subscriptionResponse.StatusCode);
+            using var subscription = await ParseJsonAsync(subscriptionResponse);
+            Assert.False(subscription.RootElement.GetProperty("hasSubscription").GetBoolean());
+            Assert.False(subscription.RootElement.GetProperty("isEntitled").GetBoolean());
+        }
+
+        using (var plansResponse = await client.GetAsync("/api/v1/subscription-plans"))
+            Assert.Equal(HttpStatusCode.OK, plansResponse.StatusCode);
+    }
+
+    [RequiresApiPostgresFact]
     public async Task Tenant_scoping_idempotency_journal_workflow_and_reports_work_end_to_end()
     {
         var connectionString = Environment.GetEnvironmentVariable("BUSINESS_ERP_TEST_CONNECTION");
@@ -803,9 +829,15 @@ public sealed class TestAuthHandler(
 
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
+        // Allow an explicit subject only in this test-only authentication handler so integration
+        // tests can verify tenant-specific negative cases without changing production auth code.
+        var subject = Context.Request.Headers.TryGetValue("X-Test-Subject", out var subjectHeader) &&
+                      !string.IsNullOrWhiteSpace(subjectHeader.ToString())
+            ? subjectHeader.ToString()
+            : "ci-subject-a";
         var claims = new[]
         {
-            new Claim("sub", "ci-subject-a"),
+            new Claim("sub", subject),
             new Claim(ClaimTypes.Name, "CI Test User")
         };
         var identity = new ClaimsIdentity(claims, SchemeName);
