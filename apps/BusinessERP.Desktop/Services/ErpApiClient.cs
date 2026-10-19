@@ -107,6 +107,22 @@ public sealed class ErpApiClient(HttpClient httpClient, Guid tenantId)
     public Task<InventoryMovementApiResult> IssueInventoryStockAsync(Guid companyId, InventoryMovementApiRequest request, CancellationToken ct = default) =>
         SendJsonAsync<InventoryMovementApiResult>(HttpMethod.Post, $"/api/v1/companies/{companyId:D}/inventory/issues", request, ct);
 
+    public Task<InventoryTransferApiResult> TransferInventoryStockAsync(Guid companyId, InventoryTransferApiRequest request, CancellationToken ct = default) =>
+        SendJsonAsync<InventoryTransferApiResult>(HttpMethod.Post, $"/api/v1/companies/{companyId:D}/inventory/transfers", request, ct);
+
+    public Task<InventoryTransfersApiReport> GetInventoryTransfersAsync(Guid companyId, DateOnly? fromDate = null,
+        DateOnly? toDate = null, Guid? itemId = null, Guid? sourceWarehouseId = null, Guid? destinationWarehouseId = null,
+        int page = 1, int pageSize = 100, CancellationToken ct = default)
+    {
+        var query = $"page={page}&pageSize={pageSize}";
+        if (fromDate.HasValue) query += $"&fromDate={fromDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}";
+        if (toDate.HasValue) query += $"&toDate={toDate.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}";
+        if (itemId.HasValue) query += $"&itemId={itemId.Value:D}";
+        if (sourceWarehouseId.HasValue) query += $"&sourceWarehouseId={sourceWarehouseId.Value:D}";
+        if (destinationWarehouseId.HasValue) query += $"&destinationWarehouseId={destinationWarehouseId.Value:D}";
+        return GetObjectAsync<InventoryTransfersApiReport>($"/api/v1/companies/{companyId:D}/inventory/transfers?{query}", ct);
+    }
+
     public Task<IReadOnlyList<ApiSupplier>> GetSuppliersAsync(Guid companyId, CancellationToken ct = default) =>
         GetListAsync<ApiSupplier>($"/api/v1/companies/{companyId:D}/suppliers", ct);
 
@@ -325,6 +341,19 @@ public sealed record InventoryMovementsApiReport(int Page, int PageSize, long To
 public sealed record InventoryMovementApiRow(Guid Id, string MovementNumber, string MovementType, DateOnly MovementDate,
     Guid ItemId, string ItemCode, string? Barcode, string ItemNameAr, Guid WarehouseId, string WarehouseCode,
     string WarehouseName, decimal QuantityDelta, decimal UnitCost, decimal InventoryValueDelta, string Notes, DateTime CreatedAt);
+public sealed record InventoryTransferApiRequest(Guid ItemId, Guid SourceWarehouseId, Guid DestinationWarehouseId,
+    string TransferNumber, DateOnly TransferDate, decimal Quantity, string? Notes = null);
+public sealed record InventoryTransferApiResult(Guid Id, string TransferNumber, DateOnly TransferDate, Guid ItemId,
+    Guid SourceWarehouseId, Guid DestinationWarehouseId, decimal Quantity, decimal UnitCost, decimal InventoryValue,
+    decimal SourceOnHandQuantity, decimal SourceInventoryValue, decimal DestinationOnHandQuantity,
+    decimal DestinationInventoryValue, decimal DestinationAverageUnitCost, DateTime CreatedAt);
+public sealed record InventoryTransfersApiReport(int Page, int PageSize, long TotalRows, int TotalPages,
+    IReadOnlyList<InventoryTransferApiRow> Rows);
+public sealed record InventoryTransferApiRow(Guid Id, string TransferNumber, DateOnly TransferDate,
+    Guid ItemId, string ItemCode, string? Barcode, string ItemNameAr, string UnitCode,
+    Guid SourceWarehouseId, string SourceWarehouseCode, string SourceWarehouseName,
+    Guid DestinationWarehouseId, string DestinationWarehouseCode, string DestinationWarehouseName,
+    decimal Quantity, decimal UnitCost, decimal InventoryValue, string Notes, DateTime CreatedAt);
 
 public sealed record CreateSupplierApiRequest(string Code, string Name, string? Email = null, string? Phone = null, string? TaxNumber = null);
 public sealed record PurchaseInvoiceDraftListItem(

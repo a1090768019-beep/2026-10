@@ -108,7 +108,7 @@ VALUES
   'ffffffff-ffff-4fff-8fff-fffffffffff6', 'RECEIPT', '2026-04-03', 2.0000, 5.00000000, 10.0000,
   'TRANSFER', 'ffffffff-ffff-4fff-8fff-fffffffffff7', 'Inventory transfer CI', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
 
-DO $
+DO $$
 BEGIN
     IF (SELECT sum(quantity_delta) FROM inventory_movements
          WHERE item_id = 'ffffffff-ffff-4fff-8fff-fffffffffff1'
@@ -124,7 +124,7 @@ BEGIN
            AND warehouse_id = 'ffffffff-ffff-4fff-8fff-fffffffffff6') <> 10.0000 THEN
         RAISE EXCEPTION 'Inventory transfer did not preserve 2 units / value 10 across source and destination';
     END IF;
-END $;
+END $$;;
 
 -- Runtime role has INSERT/SELECT but deliberately has no UPDATE or DELETE grant on the stock ledger.
 DO $$

@@ -8,8 +8,8 @@ using BusinessERP.Desktop.Services;
 namespace BusinessERP.Desktop.ViewModels;
 
 /// <summary>
-/// Tenant-scoped item catalog and immutable receipt/issue stock ledger workspace.
-/// Serial-level tracking, inter-warehouse transfers, and purchase/sales document integration are not yet enabled.
+/// Tenant-scoped item catalog, receipt/issue stock ledger and inter-warehouse transfer workspace.
+/// Serial-level tracking and purchase/sales document integration are not yet enabled.
 /// </summary>
 public sealed class InventoryWorkspaceViewModel : INotifyPropertyChanged
 {
@@ -17,6 +17,8 @@ public sealed class InventoryWorkspaceViewModel : INotifyPropertyChanged
     private ApiCompany? _selectedCompany;
     private InventoryItemApiDto? _selectedItem;
     private InventoryWarehouseApiDto? _selectedWarehouse;
+    private InventoryWarehouseApiDto? _selectedSourceWarehouse;
+    private InventoryWarehouseApiDto? _selectedDestinationWarehouse;
     private StockBalanceApiRow? _selectedBalance;
     private bool _suppressCompanyReload;
     private bool _isBusy;
@@ -34,6 +36,10 @@ public sealed class InventoryWorkspaceViewModel : INotifyPropertyChanged
     private decimal? _movementUnitCost;
     private DateTime? _movementDate = DateTime.Today;
     private string _movementNotes = "";
+    private string _transferNumber = $"TRF-{DateTime.Now:yyyyMMdd-HHmmss}";
+    private decimal _transferQuantity = 1m;
+    private DateTime? _transferDate = DateTime.Today;
+    private string _transferNotes = "";
     private const int PageSize = 100;
 
     public ObservableCollection<ApiCompany> Companies { get; } = [];
@@ -41,6 +47,7 @@ public sealed class InventoryWorkspaceViewModel : INotifyPropertyChanged
     public ObservableCollection<InventoryWarehouseApiDto> Warehouses { get; } = [];
     public ObservableCollection<StockBalanceApiRow> StockBalances { get; } = [];
     public ObservableCollection<InventoryMovementApiRow> Movements { get; } = [];
+    public ObservableCollection<InventoryTransferApiRow> Transfers { get; } = [];
 
     public ICommand RefreshCommand { get; }
     public ICommand CreateItemCommand { get; }
@@ -48,6 +55,7 @@ public sealed class InventoryWorkspaceViewModel : INotifyPropertyChanged
     public ICommand ReceiveStockCommand { get; }
     public ICommand IssueStockCommand { get; }
     public ICommand RefreshStockCardCommand { get; }
+    public ICommand TransferStockCommand { get; }
 
     public event PropertyChangedEventHandler? PropertyChanged;
     public event EventHandler? WorkspaceContextChanged;
@@ -60,6 +68,7 @@ public sealed class InventoryWorkspaceViewModel : INotifyPropertyChanged
         ReceiveStockCommand = new AsyncCommand(() => RecordMovementAsync(receipt: true), CanReceiveStock, HandleUnexpectedFailure);
         IssueStockCommand = new AsyncCommand(() => RecordMovementAsync(receipt: false), CanIssueStock, HandleUnexpectedFailure);
         RefreshStockCardCommand = new AsyncCommand(RefreshStockCardAsync, () => _apiClient is not null && SelectedCompany is not null && !IsBusy, HandleUnexpectedFailure);
+        TransferStockCommand = new AsyncCommand(RecordTransferAsync, CanTransferStock, HandleUnexpectedFailure);
     }
 
     public ApiCompany? SelectedCompany
@@ -86,6 +95,18 @@ public sealed class InventoryWorkspaceViewModel : INotifyPropertyChanged
     {
         get => _selectedWarehouse;
         set { if (ReferenceEquals(_selectedWarehouse, value)) return; _selectedWarehouse = value; OnPropertyChanged(); NotifyCommands(); }
+    }
+
+    public InventoryWarehouseApiDto? SelectedSourceWarehouse
+    {
+        get => _selectedSourceWarehouse;
+        set { if (ReferenceEquals(_selectedSourceWarehouse, value)) return; _selectedSourceWarehouse = value; OnPropertyChanged(); NotifyCommands(); }
+    }
+
+    public InventoryWarehouseApiDto? SelectedDestinationWarehouse
+    {
+        get => _selectedDestinationWarehouse;
+        set { if (ReferenceEquals(_selectedDestinationWarehouse, value)) return; _selectedDestinationWarehouse = value; OnPropertyChanged(); NotifyCommands(); }
     }
 
     public StockBalanceApiRow? SelectedBalance
@@ -116,6 +137,10 @@ public sealed class InventoryWorkspaceViewModel : INotifyPropertyChanged
     public decimal? MovementUnitCost { get => _movementUnitCost; set { if (_movementUnitCost == value) return; _movementUnitCost = value; OnPropertyChanged(); NotifyCommands(); } }
     public DateTime? MovementDate { get => _movementDate; set { if (_movementDate == value) return; _movementDate = value; OnPropertyChanged(); NotifyCommands(); } }
     public string MovementNotes { get => _movementNotes; set { if (_movementNotes == value) return; _movementNotes = value; OnPropertyChanged(); } }
+    public string TransferNumber { get => _transferNumber; set { if (_transferNumber == value) return; _transferNumber = value; OnPropertyChanged(); NotifyCommands(); } }
+    public decimal TransferQuantity { get => _transferQuantity; set { if (_transferQuantity == value) return; _transferQuantity = value; OnPropertyChanged(); NotifyCommands(); } }
+    public DateTime? TransferDate { get => _transferDate; set { if (_transferDate == value) return; _transferDate = value; OnPropertyChanged(); NotifyCommands(); } }
+    public string TransferNotes { get => _transferNotes; set { if (_transferNotes == value) return; _transferNotes = value; OnPropertyChanged(); } }
 
     public bool IsBusy
     {
@@ -209,7 +234,8 @@ public sealed class InventoryWorkspaceViewModel : INotifyPropertyChanged
         var warehousesTask = _apiClient.GetInventoryWarehousesAsync(companyId);
         var balancesTask = _apiClient.GetInventoryBalancesAsync(companyId, 1, PageSize);
         var movementsTask = _apiClient.GetInventoryMovementsAsync(companyId, page: 1, pageSize: PageSize);
-        await Task.WhenAll(itemsTask, warehousesTask, balancesTask, movementsTask);
+        var transfersTask = _apiClient.GetInventoryTransfersAsync(companyId, page: 1, pageSize: PageSize);
+        await Task.WhenAll(itemsTask, warehousesTask, balancesTask, movementsTask, transfersTask);
 
         var prevItem = SelectedItem?.Id;
         var prevWarehouse = SelectedWarehouse?.Id;
@@ -219,10 +245,15 @@ public sealed class InventoryWorkspaceViewModel : INotifyPropertyChanged
         foreach (var warehouse in await warehousesTask) Warehouses.Add(warehouse);
         SelectedItem = (prevItem.HasValue ? Items.FirstOrDefault(x => x.Id == prevItem.Value) : null) ?? Items.FirstOrDefault();
         SelectedWarehouse = (prevWarehouse.HasValue ? Warehouses.FirstOrDefault(x => x.Id == prevWarehouse.Value) : null) ?? Warehouses.FirstOrDefault();
+        SelectedSourceWarehouse = Warehouses.FirstOrDefault(x => x.Id == _selectedSourceWarehouse?.Id) ?? SelectedWarehouse;
+        SelectedDestinationWarehouse = Warehouses.FirstOrDefault(x => x.Id == _selectedDestinationWarehouse?.Id)
+            ?? Warehouses.FirstOrDefault(x => x.Id != SelectedSourceWarehouse?.Id);
         StockBalances.Clear();
         foreach (var balance in (await balancesTask).Rows) StockBalances.Add(balance);
         Movements.Clear();
         foreach (var movement in (await movementsTask).Rows) Movements.Add(movement);
+        Transfers.Clear();
+        foreach (var transfer in (await transfersTask).Rows) Transfers.Add(transfer);
         OnPropertyChanged(nameof(WorkspaceContextSummary));
     }
 
@@ -293,6 +324,31 @@ public sealed class InventoryWorkspaceViewModel : INotifyPropertyChanged
         finally { IsBusy = false; }
     }
 
+    private async Task RecordTransferAsync()
+    {
+        if (!CanTransferStock() || _apiClient is null || SelectedCompany is null ||
+            SelectedItem is null || SelectedSourceWarehouse is null || SelectedDestinationWarehouse is null || TransferDate is null)
+            return;
+
+        IsBusy = true;
+        try
+        {
+            var request = new InventoryTransferApiRequest(SelectedItem.Id, SelectedSourceWarehouse.Id,
+                SelectedDestinationWarehouse.Id, TransferNumber.Trim(), DateOnly.FromDateTime(TransferDate.Value.Date),
+                TransferQuantity, BlankToNull(TransferNotes));
+            var result = await _apiClient.TransferInventoryStockAsync(SelectedCompany.Id, request);
+            await LoadCompanyDataAsync();
+            TransferNumber = $"TRF-{DateTime.Now:yyyyMMdd-HHmmss}";
+            TransferQuantity = 1m;
+            TransferNotes = "";
+            StatusMessage = $"تم التحويل {result.TransferNumber}: {result.Quantity:N4} {SelectedItem.UnitCode} من {SelectedSourceWarehouse.Name} إلى {SelectedDestinationWarehouse.Name}. القيمة المنقولة {result.InventoryValue:N4} {SelectedCurrency}. رصيد المصدر {result.SourceOnHandQuantity:N4}؛ رصيد الوجهة {result.DestinationOnHandQuantity:N4}.";
+            StatusIsError = false;
+        }
+        catch (ErpApiException ex) { StatusMessage = ex.Message; StatusIsError = true; }
+        catch (HttpRequestException) { StatusMessage = "تعذر الاتصال بالخادم أثناء تسجيل التحويل بين المستودعات."; StatusIsError = true; }
+        finally { IsBusy = false; }
+    }
+
     private async Task RefreshStockCardAsync()
     {
         if (_apiClient is null || SelectedCompany is null) return;
@@ -325,6 +381,12 @@ public sealed class InventoryWorkspaceViewModel : INotifyPropertyChanged
         CanCreateMovementBase() && MovementUnitCost.HasValue && MovementUnitCost.Value >= 0m &&
         HasPrecision(MovementUnitCost.Value, 4);
     private bool CanIssueStock() => CanCreateMovementBase();
+    private bool CanTransferStock() =>
+        _apiClient is not null && SelectedCompany is not null && SelectedItem is not null &&
+        SelectedSourceWarehouse is not null && SelectedDestinationWarehouse is not null &&
+        SelectedSourceWarehouse.Id != SelectedDestinationWarehouse.Id && !IsBusy &&
+        !string.IsNullOrWhiteSpace(TransferNumber) && TransferDate.HasValue &&
+        TransferQuantity > 0m && HasPrecision(TransferQuantity, 4);
 
     private bool CanCreateMovementBase() =>
         _apiClient is not null && SelectedCompany is not null && SelectedItem is not null &&
@@ -333,8 +395,8 @@ public sealed class InventoryWorkspaceViewModel : INotifyPropertyChanged
 
     private void ClearCompanyData()
     {
-        Items.Clear(); Warehouses.Clear(); StockBalances.Clear(); Movements.Clear();
-        SelectedItem = null; SelectedWarehouse = null; SelectedBalance = null;
+        Items.Clear(); Warehouses.Clear(); StockBalances.Clear(); Movements.Clear(); Transfers.Clear();
+        SelectedItem = null; SelectedWarehouse = null; SelectedSourceWarehouse = null; SelectedDestinationWarehouse = null; SelectedBalance = null;
         OnPropertyChanged(nameof(WorkspaceContextSummary));
     }
 
@@ -355,6 +417,7 @@ public sealed class InventoryWorkspaceViewModel : INotifyPropertyChanged
         (ReceiveStockCommand as AsyncCommand)?.RaiseCanExecuteChanged();
         (IssueStockCommand as AsyncCommand)?.RaiseCanExecuteChanged();
         (RefreshStockCardCommand as AsyncCommand)?.RaiseCanExecuteChanged();
+        (TransferStockCommand as AsyncCommand)?.RaiseCanExecuteChanged();
     }
 
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null)

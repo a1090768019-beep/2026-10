@@ -60,6 +60,7 @@
                             <Button Content="تحديث البيانات" Command="{Binding RefreshCommand}" />
                             <Button Content="تصدير الأرصدة إلى Excel" Click="ExportStockBalances_Click" />
                             <Button Content="تصدير بطاقة الحركة إلى Excel" Click="ExportInventoryMovements_Click" />
+                            <Button Content="تصدير التحويلات إلى Excel" Click="ExportInventoryTransfers_Click" />
                         </StackPanel>
                     </Grid>
                     <Grid Margin="0,14,0,0">
@@ -201,6 +202,65 @@
                 </StackPanel>
             </Border>
 
+            <Border Background="White" BorderBrush="#E3E9F2" BorderThickness="1" CornerRadius="14" Padding="16" Margin="0,0,0,14">
+                <StackPanel>
+                    <TextBlock Text="تحويل مخزني بين مستودعين" FontSize="16" FontWeight="SemiBold" />
+                    <TextBlock Text="يُنشئ النظام سجل تحويل وحركتي صرف واستلام مرتبطتين ضمن معاملة واحدة، ويستخدم متوسط تكلفة المصدر. لا يمكن التحويل إلى المستودع نفسه أو تجاوز الرصيد المتاح."
+                               Foreground="#69758D" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,8" />
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="1.5*" />
+                            <ColumnDefinition Width="1.5*" />
+                            <ColumnDefinition Width="1.5*" />
+                            <ColumnDefinition Width="1.1*" />
+                            <ColumnDefinition Width="1.1*" />
+                            <ColumnDefinition Width="1*" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Margin="0,0,6,0">
+                            <TextBlock Text="الصنف" FontSize="12" Foreground="#69758D" />
+                            <ComboBox ItemsSource="{Binding Items}" SelectedItem="{Binding SelectedItem, Mode=TwoWay}" DisplayMemberPath="DisplayLabel" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Margin="6,0">
+                            <TextBlock Text="من مستودع" FontSize="12" Foreground="#69758D" />
+                            <ComboBox ItemsSource="{Binding Warehouses}" SelectedItem="{Binding SelectedSourceWarehouse, Mode=TwoWay}" DisplayMemberPath="DisplayLabel" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Margin="6,0">
+                            <TextBlock Text="إلى مستودع" FontSize="12" Foreground="#69758D" />
+                            <ComboBox ItemsSource="{Binding Warehouses}" SelectedItem="{Binding SelectedDestinationWarehouse, Mode=TwoWay}" DisplayMemberPath="DisplayLabel" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="3" Margin="6,0">
+                            <TextBlock Text="رقم التحويل" FontSize="12" Foreground="#69758D" />
+                            <TextBox Text="{Binding TransferNumber, UpdateSourceTrigger=PropertyChanged}" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="4" Margin="6,0">
+                            <TextBlock Text="التاريخ" FontSize="12" Foreground="#69758D" />
+                            <DatePicker SelectedDate="{Binding TransferDate, Mode=TwoWay}" Margin="0,4,0,0" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="5" Margin="6,0">
+                            <TextBlock Text="الكمية" FontSize="12" Foreground="#69758D" />
+                            <TextBox Text="{Binding TransferQuantity, UpdateSourceTrigger=PropertyChanged}" Margin="0,4,0,0" />
+                        </StackPanel>
+                    </Grid>
+                    <TextBox Text="{Binding TransferNotes, UpdateSourceTrigger=PropertyChanged}" ToolTip="ملاحظات التحويل (اختياري)" Margin="0,8,0,0" />
+                    <Button Content="تسجيل التحويل" Command="{Binding TransferStockCommand}" HorizontalAlignment="Left" Margin="0,8,0,0" Background="#146C4A" />
+                    <TextBlock Text="سجل التحويلات" FontSize="14" FontWeight="SemiBold" Margin="0,12,0,0" />
+                    <DataGrid ItemsSource="{Binding Transfers}" Height="220" Margin="0,8,0,0">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="رقم التحويل" Binding="{Binding TransferNumber}" Width="150" />
+                            <DataGridTextColumn Header="التاريخ" Binding="{Binding TransferDate, StringFormat=yyyy-MM-dd}" Width="105" />
+                            <DataGridTextColumn Header="الصنف" Binding="{Binding ItemNameAr}" Width="*" />
+                            <DataGridTextColumn Header="رمز الصنف" Binding="{Binding ItemCode}" Width="105" />
+                            <DataGridTextColumn Header="من مستودع" Binding="{Binding SourceWarehouseName}" Width="150" />
+                            <DataGridTextColumn Header="إلى مستودع" Binding="{Binding DestinationWarehouseName}" Width="150" />
+                            <DataGridTextColumn Header="الكمية" Binding="{Binding Quantity, StringFormat=N4}" Width="100" />
+                            <DataGridTextColumn Header="تكلفة الوحدة" Binding="{Binding UnitCost, StringFormat=N8}" Width="120" />
+                            <DataGridTextColumn Header="القيمة" Binding="{Binding InventoryValue, StringFormat=N4}" Width="120" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                    <TextBlock Text="يظهر آخر 100 تحويل في هذه الشاشة. سجل API يدعم التصفية وترقيم الصفحات، وسيتم توسيع المرشحات في الواجهة مع استكمال التقارير المخزنية."
+                               Foreground="#8A6A20" FontSize="11" TextWrapping="Wrap" Margin="2,8,2,0" />
+                </StackPanel>
+            </Border>
             <Border Background="White" BorderBrush="#E3E9F2" BorderThickness="1" CornerRadius="14" Padding="16" Margin="0,0,0,14">
                 <StackPanel>
                     <TextBlock Text="الأرصدة المخزنية والقيمة بالتكلفة المتوسطة" FontSize="16" FontWeight="SemiBold" />

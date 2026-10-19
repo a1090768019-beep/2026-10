@@ -116,3 +116,23 @@ test('warehouse transfer backend persists an atomic issue/receipt pair and valid
   assert.match(smoke, /preserve 2 units \/ value 10/);
   assert.match(smoke, /tenant B can view tenant A inventory/);
 });
+
+test('desktop inventory workspace creates, lists and exports warehouse transfers', async () => {
+  const client = await read('apps/BusinessERP.Desktop/Services/ErpApiClient.cs');
+  const vm = await read('apps/BusinessERP.Desktop/ViewModels/InventoryWorkspaceViewModel.cs');
+  const view = await read('apps/BusinessERP.Desktop/Views/InventoryWorkspaceControl.xaml');
+  const code = await read('apps/BusinessERP.Desktop/Views/InventoryWorkspaceControl.xaml.cs');
+  assert.match(client, /TransferInventoryStockAsync/);
+  assert.match(client, /GetInventoryTransfersAsync/);
+  assert.match(client, /InventoryTransferApiRequest/);
+  assert.match(vm, /RecordTransferAsync/);
+  assert.match(vm, /CanTransferStock/);
+  assert.match(vm, /Transfers.Clear\(\)/);
+  assert.match(vm, /TransferStockCommand/);
+  assert.match(view, /SelectedSourceWarehouse/);
+  assert.match(view, /SelectedDestinationWarehouse/);
+  assert.match(view, /ItemsSource="{Binding Transfers}"/);
+  assert.match(view, /Click="ExportInventoryTransfers_Click"/);
+  assert.match(code, /ExportInventoryTransfers_Click/);
+  assert.match(code, /BusinessERP-InventoryTransfers/);
+});

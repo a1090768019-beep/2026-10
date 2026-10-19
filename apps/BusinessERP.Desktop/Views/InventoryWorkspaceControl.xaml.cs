@@ -78,6 +78,30 @@ public partial class InventoryWorkspaceControl : UserControl
         SaveInventoryReport("BusinessERP-InventoryMovements", "InventoryMovements", reportRows);
     }
 
+    private void ExportInventoryTransfers_Click(object sender, RoutedEventArgs e)
+    {
+        if (_viewModel.SelectedCompany is null || _viewModel.Transfers.Count == 0)
+        {
+            MessageBox.Show(Window.GetWindow(this), "لا توجد تحويلات مخزنية محمّلة للتصدير.", "Business ERP", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        var rows = new List<object?[]>
+        {
+            new object?[] { "Business ERP", "سجل التحويلات المخزنية" },
+            new object?[] { "الشركة", _viewModel.SelectedCompany.Name, "العملة", _viewModel.SelectedCurrency },
+            new object?[] { "ملاحظة", "هذه البيانات للصفحة المحمّلة حاليًا فقط وليست كشفًا شاملًا لكل الصفحات." },
+            Array.Empty<object?>(),
+            new object?[] { "رقم التحويل", "التاريخ", "الصنف", "رمز الصنف", "الباركود", "من مستودع", "رمز المصدر", "إلى مستودع", "رمز الوجهة", "الكمية", "تكلفة الوحدة", "القيمة", "ملاحظات" }
+        };
+        rows.AddRange(_viewModel.Transfers.Select(row => new object?[]
+        {
+            row.TransferNumber, row.TransferDate, row.ItemNameAr, row.ItemCode, row.Barcode,
+            row.SourceWarehouseName, row.SourceWarehouseCode, row.DestinationWarehouseName, row.DestinationWarehouseCode,
+            row.Quantity, row.UnitCost, row.InventoryValue, row.Notes
+        }));
+        SaveInventoryReport("BusinessERP-InventoryTransfers", "InventoryTransfers", rows);
+    }
+
     private void SaveInventoryReport(string filePrefix, string sheetName, IReadOnlyList<object?[]> rows)
     {
         var dialog = new SaveFileDialog
