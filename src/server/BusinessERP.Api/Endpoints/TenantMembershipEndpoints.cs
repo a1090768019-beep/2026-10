@@ -175,6 +175,13 @@ public static class TenantMembershipEndpoints
         {
             await AcquireTenantMembershipLockAsync(db, tenant.TenantId, token);
 
+            var targetUser = await db.Users.AsNoTracking()
+                .SingleOrDefaultAsync(x => x.Id == userId, token);
+            if (targetUser is null)
+                return Results.NotFound(new { error = "provisioned_user_not_found" });
+            if (status == "ACTIVE" && targetUser.DisabledAt is not null)
+                return Results.Conflict(new { error = "identity_user_disabled" });
+
             var membership = await db.TenantMemberships.SingleOrDefaultAsync(
                 x => x.TenantId == tenant.TenantId && x.UserId == userId, token);
             if (membership is null)
@@ -228,12 +235,8 @@ public static class TenantMembershipEndpoints
                 new { oldRole, oldStatus, newRole = role, newStatus = status }));
             await db.SaveChangesAsync(token);
 
-            var user = await db.Users.AsNoTracking().SingleOrDefaultAsync(x => x.Id == userId, token);
-            if (user is null)
-                return Results.NotFound(new { error = "provisioned_user_not_found" });
-
-            return Results.Ok(new TenantMemberDto(user.Id, user.DisplayName, user.Email,
-                membership.RoleCode, membership.Status, membership.CreatedAt, user.DisabledAt != null));
+            return Results.Ok(new TenantMemberDto(targetUser.Id, targetUser.DisplayName, targetUser.Email,
+                membership.RoleCode, membership.Status, membership.CreatedAt, targetUser.DisabledAt != null));
         }, ct);
     }
 
@@ -299,10 +302,13 @@ public static class TenantMembershipEndpoints
     }
 
     private static Task<int> AcquireTenantMembershipLockAsync(
-        ErpDbContext db, Guid tenantId, CancellationToken ct) =>
-        db.Database.ExecuteSqlInterpolatedAsync(
-            $"SELECT pg_advisory_xact_lock(hashtextextended($"tenant-membership-quota:{tenantId:D}", 0))",
+        ErpDbContext db, Guid tenantId, CancellationToken ct)
+    {
+        var lockKey = $"tenant-membership-quota:{tenantId:D}";
+        return db.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({lockKey}, 0))",
             ct);
+    }
 
     private static bool HasRole(string role, params string[] allowedRoles) =>
         allowedRoles.Contains(role, StringComparer.OrdinalIgnoreCase);
