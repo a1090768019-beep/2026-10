@@ -20,6 +20,11 @@ public sealed class InventoryWorkspaceViewModel : INotifyPropertyChanged
     private InventoryWarehouseApiDto? _selectedSourceWarehouse;
     private InventoryWarehouseApiDto? _selectedDestinationWarehouse;
     private StockBalanceApiRow? _selectedBalance;
+    private InventoryMovementApiRow? _selectedLedgerMovement;
+    private ApiFiscalPeriod? _selectedLedgerFiscalPeriod;
+    private ApiAccount? _selectedInventoryAssetAccount;
+    private ApiAccount? _selectedCounterpartAccount;
+    private string _ledgerEntryNumber = $"INVGL-{DateTime.Now:yyyyMMddHHmmss}";
     private bool _suppressCompanyReload;
     private bool _isBusy;
     private bool _statusIsError;
@@ -53,6 +58,11 @@ public sealed class InventoryWorkspaceViewModel : INotifyPropertyChanged
     public ObservableCollection<InventoryTransferApiRow> Transfers { get; } = [];
     public ObservableCollection<InventorySerialEventApiRow> SerialEvents { get; } = [];
     public ObservableCollection<InventorySerialSummaryApiRow> SerialSummaryRows { get; } = [];
+    public ObservableCollection<InventoryMovementApiRow> LedgerEligibleMovements { get; } = [];
+    public ObservableCollection<ApiAccount> Accounts { get; } = [];
+    public ObservableCollection<ApiAccount> InventoryAssetAccounts { get; } = [];
+    public ObservableCollection<ApiAccount> CounterpartAccounts { get; } = [];
+    public ObservableCollection<ApiFiscalPeriod> OpenFiscalPeriods { get; } = [];
 
     public ICommand RefreshCommand { get; }
     public ICommand CreateItemCommand { get; }
@@ -61,6 +71,7 @@ public sealed class InventoryWorkspaceViewModel : INotifyPropertyChanged
     public ICommand IssueStockCommand { get; }
     public ICommand RefreshStockCardCommand { get; }
     public ICommand TransferStockCommand { get; }
+    public ICommand PostInventoryMovementToLedgerCommand { get; }
 
     public event PropertyChangedEventHandler? PropertyChanged;
     public event EventHandler? WorkspaceContextChanged;
@@ -74,6 +85,7 @@ public sealed class InventoryWorkspaceViewModel : INotifyPropertyChanged
         IssueStockCommand = new AsyncCommand(() => RecordMovementAsync(receipt: false), CanIssueStock, HandleUnexpectedFailure);
         RefreshStockCardCommand = new AsyncCommand(RefreshStockCardAsync, () => _apiClient is not null && SelectedCompany is not null && !IsBusy, HandleUnexpectedFailure);
         TransferStockCommand = new AsyncCommand(RecordTransferAsync, CanTransferStock, HandleUnexpectedFailure);
+        PostInventoryMovementToLedgerCommand = new AsyncCommand(PostInventoryMovementToLedgerAsync, CanPostInventoryMovementToLedger, HandleUnexpectedFailure);
     }
 
     public ApiCompany? SelectedCompany
@@ -113,6 +125,53 @@ public sealed class InventoryWorkspaceViewModel : INotifyPropertyChanged
         get => _selectedDestinationWarehouse;
         set { if (ReferenceEquals(_selectedDestinationWarehouse, value)) return; _selectedDestinationWarehouse = value; OnPropertyChanged(); NotifyCommands(); }
     }
+
+    public InventoryMovementApiRow? SelectedLedgerMovement
+    {
+        get => _selectedLedgerMovement;
+        set
+        {
+            if (ReferenceEquals(_selectedLedgerMovement, value)) return;
+            _selectedLedgerMovement = value;
+            OnPropertyChanged();
+            RefreshCounterpartAccounts();
+            if (value is not null)
+            {
+                SelectedLedgerFiscalPeriod = OpenFiscalPeriods.FirstOrDefault(period => period.StartDate <= value.MovementDate && period.EndDate >= value.MovementDate)
+                    ?? SelectedLedgerFiscalPeriod;
+            }
+            OnPropertyChanged(nameof(LedgerPostingSummary));
+            NotifyCommands();
+        }
+    }
+
+    public ApiFiscalPeriod? SelectedLedgerFiscalPeriod
+    {
+        get => _selectedLedgerFiscalPeriod;
+        set { if (ReferenceEquals(_selectedLedgerFiscalPeriod, value)) return; _selectedLedgerFiscalPeriod = value; OnPropertyChanged(); NotifyCommands(); }
+    }
+
+    public ApiAccount? SelectedInventoryAssetAccount
+    {
+        get => _selectedInventoryAssetAccount;
+        set { if (ReferenceEquals(_selectedInventoryAssetAccount, value)) return; _selectedInventoryAssetAccount = value; OnPropertyChanged(); NotifyCommands(); }
+    }
+
+    public ApiAccount? SelectedCounterpartAccount
+    {
+        get => _selectedCounterpartAccount;
+        set { if (ReferenceEquals(_selectedCounterpartAccount, value)) return; _selectedCounterpartAccount = value; OnPropertyChanged(); NotifyCommands(); }
+    }
+
+    public string LedgerEntryNumber
+    {
+        get => _ledgerEntryNumber;
+        set { if (_ledgerEntryNumber == value) return; _ledgerEntryNumber = value; OnPropertyChanged(); NotifyCommands(); }
+    }
+
+    public string LedgerPostingSummary => SelectedLedgerMovement is null
+        ? "اختر حركة استلام/صرف يدوية غير مرحلة."
+        : $"{SelectedLedgerMovement.MovementNumber} · {SelectedLedgerMovement.MovementType} · القيمة {Math.Abs(SelectedLedgerMovement.InventoryValueDelta):N2} {SelectedCurrency} · التاريخ {SelectedLedgerMovement.MovementDate:yyyy-MM-dd}";
 
     public StockBalanceApiRow? SelectedBalance
     {
@@ -245,7 +304,9 @@ public sealed class InventoryWorkspaceViewModel : INotifyPropertyChanged
         var transfersTask = _apiClient.GetInventoryTransfersAsync(companyId, page: 1, pageSize: PageSize);
         var serialEventsTask = _apiClient.GetInventorySerialEventsAsync(companyId, page: 1, pageSize: PageSize);
         var serialSummaryTask = _apiClient.GetInventorySerialSummaryAsync(companyId, page: 1, pageSize: PageSize);
-        await Task.WhenAll(itemsTask, warehousesTask, balancesTask, movementsTask, transfersTask, serialEventsTask, serialSummaryTask);
+        var accountsTask = _apiClient.GetAccountsAsync(companyId);
+        var fiscalPeriodsTask = _apiClient.GetFiscalPeriodsAsync(companyId);
+        await Task.WhenAll(itemsTask, warehousesTask, balancesTask, movementsTask, transfersTask, serialEventsTask, serialSummaryTask, accountsTask, fiscalPeriodsTask);
 
         var prevItem = SelectedItem?.Id;
         var prevWarehouse = SelectedWarehouse?.Id;
@@ -262,6 +323,29 @@ public sealed class InventoryWorkspaceViewModel : INotifyPropertyChanged
         foreach (var balance in (await balancesTask).Rows) StockBalances.Add(balance);
         Movements.Clear();
         foreach (var movement in (await movementsTask).Rows) Movements.Add(movement);
+        LedgerEligibleMovements.Clear();
+        foreach (var movement in Movements.Where(m => m.SourceType == "MANUAL" && !m.TransferId.HasValue &&
+                     !m.IsAccountingPosted && m.MovementType is "RECEIPT" or "ISSUE" &&
+                     Math.Abs(m.InventoryValueDelta) > 0m))
+            LedgerEligibleMovements.Add(movement);
+        Accounts.Clear();
+        foreach (var account in await accountsTask) Accounts.Add(account);
+        InventoryAssetAccounts.Clear();
+        foreach (var account in Accounts.Where(a => a.IsActive && a.AllowPosting &&
+                     a.AccountType == "ASSET" && a.NormalBalance == "DEBIT"))
+            InventoryAssetAccounts.Add(account);
+        OpenFiscalPeriods.Clear();
+        foreach (var period in (await fiscalPeriodsTask).Where(p => p.Status == "OPEN"))
+            OpenFiscalPeriods.Add(period);
+        SelectedInventoryAssetAccount = InventoryAssetAccounts.FirstOrDefault(a => a.Code == "1200") ?? InventoryAssetAccounts.FirstOrDefault();
+        SelectedLedgerMovement = LedgerEligibleMovements.FirstOrDefault(m => m.MovementType == "RECEIPT") ?? LedgerEligibleMovements.FirstOrDefault();
+        if (SelectedLedgerMovement is not null)
+        {
+            SelectedLedgerFiscalPeriod = OpenFiscalPeriods.FirstOrDefault(p => p.StartDate <= SelectedLedgerMovement.MovementDate && p.EndDate >= SelectedLedgerMovement.MovementDate)
+                ?? OpenFiscalPeriods.FirstOrDefault(p => p.StartDate <= DateOnly.FromDateTime(DateTime.Today) && p.EndDate >= DateOnly.FromDateTime(DateTime.Today))
+                ?? OpenFiscalPeriods.FirstOrDefault();
+        }
+        RefreshCounterpartAccounts();
         Transfers.Clear();
         foreach (var transfer in (await transfersTask).Rows) Transfers.Add(transfer);
         SerialEvents.Clear();
@@ -269,6 +353,8 @@ public sealed class InventoryWorkspaceViewModel : INotifyPropertyChanged
         SerialSummaryRows.Clear();
         foreach (var row in (await serialSummaryTask).Rows) SerialSummaryRows.Add(row);
         OnPropertyChanged(nameof(WorkspaceContextSummary));
+        OnPropertyChanged(nameof(LedgerPostingSummary));
+        NotifyCommands();
     }
 
     private async Task CreateItemAsync()
@@ -365,6 +451,66 @@ public sealed class InventoryWorkspaceViewModel : INotifyPropertyChanged
         finally { IsBusy = false; }
     }
 
+    private void RefreshCounterpartAccounts()
+    {
+        var previousId = SelectedCounterpartAccount?.Id;
+        CounterpartAccounts.Clear();
+        var movementType = SelectedLedgerMovement?.MovementType;
+        var candidates = Accounts.Where(account => account.IsActive && account.AllowPosting &&
+            (movementType == "RECEIPT"
+                ? account.NormalBalance == "CREDIT" && account.AccountType is "LIABILITY" or "EQUITY" or "REVENUE"
+                : movementType == "ISSUE" && account.NormalBalance == "DEBIT" && account.AccountType == "EXPENSE"));
+        foreach (var account in candidates)
+            CounterpartAccounts.Add(account);
+
+        SelectedCounterpartAccount = (previousId.HasValue
+            ? CounterpartAccounts.FirstOrDefault(account => account.Id == previousId.Value)
+            : null) ?? CounterpartAccounts.FirstOrDefault(account =>
+                movementType == "RECEIPT" && account.AccountType == "EQUITY" ||
+                movementType == "ISSUE" && account.Code.StartsWith("5", StringComparison.Ordinal))
+            ?? CounterpartAccounts.FirstOrDefault();
+    }
+
+    private bool CanPostInventoryMovementToLedger() =>
+        _apiClient is not null && SelectedCompany is not null && SelectedLedgerMovement is not null &&
+        !SelectedLedgerMovement.IsAccountingPosted && SelectedLedgerMovement.SourceType == "MANUAL" &&
+        !SelectedLedgerMovement.TransferId.HasValue && SelectedLedgerMovement.MovementType is "RECEIPT" or "ISSUE" &&
+        Math.Abs(SelectedLedgerMovement.InventoryValueDelta) > 0m &&
+        SelectedLedgerFiscalPeriod is not null && SelectedLedgerFiscalPeriod.Status == "OPEN" &&
+        SelectedLedgerFiscalPeriod.StartDate <= SelectedLedgerMovement.MovementDate &&
+        SelectedLedgerFiscalPeriod.EndDate >= SelectedLedgerMovement.MovementDate &&
+        SelectedInventoryAssetAccount is not null && SelectedCounterpartAccount is not null &&
+        SelectedInventoryAssetAccount.Id != SelectedCounterpartAccount.Id &&
+        !string.IsNullOrWhiteSpace(LedgerEntryNumber) && !IsBusy;
+
+    private async Task PostInventoryMovementToLedgerAsync()
+    {
+        if (!CanPostInventoryMovementToLedger() || _apiClient is null || SelectedCompany is null ||
+            SelectedLedgerMovement is null || SelectedLedgerFiscalPeriod is null ||
+            SelectedInventoryAssetAccount is null || SelectedCounterpartAccount is null)
+            return;
+
+        var movementNumber = SelectedLedgerMovement.MovementNumber;
+        IsBusy = true;
+        try
+        {
+            var request = new PostInventoryMovementToLedgerApiRequest(
+                SelectedLedgerFiscalPeriod.Id, LedgerEntryNumber.Trim(),
+                SelectedInventoryAssetAccount.Id, SelectedCounterpartAccount.Id);
+            var result = await _apiClient.PostInventoryMovementToLedgerAsync(
+                SelectedCompany.Id, SelectedLedgerMovement.Id, request);
+            await LoadCompanyDataAsync();
+            LedgerEntryNumber = $"INVGL-{DateTime.Now:yyyyMMddHHmmss}";
+            StatusMessage = result.AlreadyPosted
+                ? $"الحركة {movementNumber} مرحّلة مسبقًا بالقيد {result.EntryNumber}."
+                : $"تم ترحيل الحركة {movementNumber} إلى دفتر الأستاذ بالقيد {result.EntryNumber}. القيمة {result.Amount:N2} {SelectedCurrency}. الحالة {result.JournalEntryStatus}.";
+            StatusIsError = false;
+        }
+        catch (ErpApiException ex) { StatusMessage = ex.Message; StatusIsError = true; }
+        catch (HttpRequestException) { StatusMessage = "تعذر الاتصال بالخادم أثناء ترحيل حركة المخزون إلى دفتر الأستاذ."; StatusIsError = true; }
+        finally { IsBusy = false; NotifyCommands(); }
+    }
+
     private async Task RefreshStockCardAsync()
     {
         if (_apiClient is null || SelectedCompany is null) return;
@@ -412,7 +558,9 @@ public sealed class InventoryWorkspaceViewModel : INotifyPropertyChanged
     private void ClearCompanyData()
     {
         Items.Clear(); Warehouses.Clear(); StockBalances.Clear(); Movements.Clear(); Transfers.Clear(); SerialEvents.Clear(); SerialSummaryRows.Clear();
+        LedgerEligibleMovements.Clear(); Accounts.Clear(); InventoryAssetAccounts.Clear(); CounterpartAccounts.Clear(); OpenFiscalPeriods.Clear();
         SelectedItem = null; SelectedWarehouse = null; SelectedSourceWarehouse = null; SelectedDestinationWarehouse = null; SelectedBalance = null;
+        SelectedLedgerMovement = null; SelectedLedgerFiscalPeriod = null; SelectedInventoryAssetAccount = null; SelectedCounterpartAccount = null;
         OnPropertyChanged(nameof(WorkspaceContextSummary));
     }
 
@@ -437,6 +585,7 @@ public sealed class InventoryWorkspaceViewModel : INotifyPropertyChanged
         (IssueStockCommand as AsyncCommand)?.RaiseCanExecuteChanged();
         (RefreshStockCardCommand as AsyncCommand)?.RaiseCanExecuteChanged();
         (TransferStockCommand as AsyncCommand)?.RaiseCanExecuteChanged();
+        (PostInventoryMovementToLedgerCommand as AsyncCommand)?.RaiseCanExecuteChanged();
     }
 
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null)

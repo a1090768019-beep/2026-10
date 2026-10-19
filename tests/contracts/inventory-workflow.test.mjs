@@ -192,3 +192,24 @@ test('manual inventory receipts/issues post balanced, immutable journals linked 
   assert.match(smoke, /CI-INV-GL-ISSUE-001/);
   assert.match(smoke, /tenant B can view tenant A inventory accounting postings/);
 });
+
+test('inventory movement ledger posting is available only for eligible manual movements and displays posted state', async () => {
+  const api = await read('src/server/BusinessERP.Api/Endpoints/InventoryEndpoints.cs');
+  const postingEndpoint = await read('src/server/BusinessERP.Api/Endpoints/InventoryMovementLedgerPostingEndpoints.cs');
+  const client = await read('apps/BusinessERP.Desktop/Services/ErpApiClient.cs');
+  const vm = await read('apps/BusinessERP.Desktop/ViewModels/InventoryWorkspaceViewModel.cs');
+  const view = await read('apps/BusinessERP.Desktop/Views/InventoryWorkspaceControl.xaml');
+  assert.match(api, /is_accounting_posted/);
+  assert.match(api, /SourceType/);
+  assert.match(postingEndpoint, /PostInventoryMovementToLedger/);
+  assert.match(client, /PostInventoryMovementToLedgerAsync/);
+  assert.match(client, /PostInventoryMovementToLedgerApiRequest/);
+  assert.match(vm, /LedgerEligibleMovements/);
+  assert.match(vm, /CanPostInventoryMovementToLedger/);
+  assert.match(vm, /OpenFiscalPeriods/);
+  assert.match(vm, /InventoryAssetAccounts/);
+  assert.match(vm, /CounterpartAccounts/);
+  assert.match(vm, /SelectedLedgerMovement/);
+  assert.match(view, /PostInventoryMovementToLedgerCommand/);
+  assert.match(view, /IsAccountingPosted/);
+});

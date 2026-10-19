@@ -107,6 +107,11 @@ public sealed class ErpApiClient(HttpClient httpClient, Guid tenantId)
     public Task<InventoryMovementApiResult> IssueInventoryStockAsync(Guid companyId, InventoryMovementApiRequest request, CancellationToken ct = default) =>
         SendJsonAsync<InventoryMovementApiResult>(HttpMethod.Post, $"/api/v1/companies/{companyId:D}/inventory/issues", request, ct);
 
+    public Task<InventoryMovementLedgerPostingApiResult> PostInventoryMovementToLedgerAsync(
+        Guid companyId, Guid movementId, PostInventoryMovementToLedgerApiRequest request, CancellationToken ct = default) =>
+        SendJsonAsync<InventoryMovementLedgerPostingApiResult>(HttpMethod.Post,
+            $"/api/v1/companies/{companyId:D}/inventory/movements/{movementId:D}/post-to-ledger", request, ct);
+
     public Task<InventorySerialEventsApiReport> GetInventorySerialEventsAsync(Guid companyId,
         DateOnly? fromDate = null, DateOnly? toDate = null, Guid? itemId = null, Guid? warehouseId = null,
         string? status = null, int page = 1, int pageSize = 100, CancellationToken ct = default)
@@ -361,7 +366,17 @@ public sealed record InventoryMovementsApiReport(int Page, int PageSize, long To
     IReadOnlyList<InventoryMovementApiRow> Rows);
 public sealed record InventoryMovementApiRow(Guid Id, string MovementNumber, string MovementType, DateOnly MovementDate,
     Guid ItemId, string ItemCode, string? Barcode, string ItemNameAr, Guid WarehouseId, string WarehouseCode,
-    string WarehouseName, decimal QuantityDelta, decimal UnitCost, decimal InventoryValueDelta, string Notes, DateTime CreatedAt);
+    string WarehouseName, decimal QuantityDelta, decimal UnitCost, decimal InventoryValueDelta, string Notes, DateTime CreatedAt,
+    string SourceType, Guid? TransferId, bool IsAccountingPosted)
+{
+    public string DisplayLabel => $"{MovementNumber} · {MovementType} · {MovementDate:yyyy-MM-dd} · {InventoryValueDelta:N2}";
+}
+public sealed record PostInventoryMovementToLedgerApiRequest(
+    Guid FiscalPeriodId, string EntryNumber, Guid InventoryAssetAccountId, Guid CounterpartAccountId);
+public sealed record InventoryMovementLedgerPostingApiResult(
+    Guid InventoryMovementId, Guid JournalEntryId, string EntryNumber, string JournalEntryStatus,
+    DateOnly EntryDate, string MovementType, decimal QuantityDelta, decimal Amount,
+    Guid InventoryAssetAccountId, Guid CounterpartAccountId, bool AlreadyPosted, string Message);
 public sealed record InventoryTransferApiRequest(Guid ItemId, Guid SourceWarehouseId, Guid DestinationWarehouseId,
     string TransferNumber, DateOnly TransferDate, decimal Quantity, string? Notes = null, IReadOnlyList<string>? SerialNumbers = null);
 public sealed record InventoryTransferApiResult(Guid Id, string TransferNumber, DateOnly TransferDate, Guid ItemId,
