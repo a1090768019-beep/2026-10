@@ -274,7 +274,7 @@ test('sales inventory costing excludes movements dated after the sales document'
   const salesPosting = await read('src/server/BusinessERP.Api/Endpoints/SalesDraftLedgerPostingEndpoints.cs');
 
   assert.match(service, /Guid warehouseId, Guid itemId, DateOnly asOfDate, CancellationToken ct/);
-  assert.match(service, /AND item_id = \\{itemId\\}\\s+AND movement_date <= \\{asOfDate\\}/);
-  assert.match(salesPosting, /GetBalanceAsync\\([\\s\\S]*?draft\\.IssueDate, token\\)/);
+  assert.match(service, /AND item_id = \{itemId\}\s+AND movement_date <= \{asOfDate\}/);
+  assert.match(salesPosting, /GetBalanceAsync\([\s\S]*?draft\.IssueDate, token\)/);
 });
 
