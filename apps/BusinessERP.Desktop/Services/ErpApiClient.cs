@@ -336,7 +336,8 @@ public sealed record ApiFiscalPeriod(Guid Id, Guid FiscalYearId, int PeriodNumbe
     public string DisplayLabel => DisplayName;
 }
 public sealed record PostSalesDraftToLedgerApiRequest(
-    Guid FiscalPeriodId, string EntryNumber, Guid ReceivableAccountId, Guid RevenueAccountId, Guid? OutputVatAccountId = null);
+    Guid FiscalPeriodId, string EntryNumber, Guid ReceivableAccountId, Guid RevenueAccountId, Guid? OutputVatAccountId = null,
+    Guid? InventoryAssetAccountId = null, Guid? CostOfGoodsSoldAccountId = null);
 public sealed record SalesDraftLedgerPostingApiResult(
     Guid SalesInvoiceDraftId, Guid JournalEntryId, string EntryNumber, string JournalEntryStatus,
     DateOnly EntryDate, decimal GrossAmount, decimal DiscountAmount, decimal NetAmount,

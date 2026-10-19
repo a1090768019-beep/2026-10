@@ -241,7 +241,7 @@ public static class PurchaseDraftLedgerPostingEndpoints
                     var serialNumbers = InventoryDocumentStockPostingService.ParseSerialNumbers(line.SerialNumbersJson);
                     var tracksSerials = await InventoryEndpoints.GetTracksSerialsAsync(db, tenant.TenantId, companyId, itemId, token);
                     var serialValidation = await InventoryEndpoints.ValidateSerialNumbersAsync(
-                        db, tenant.TenantId, companyId, itemId, warehouseId, line.Quantity, receipt, tracksSerials, serialNumbers, token);
+                        db, tenant.TenantId, companyId, itemId, warehouseId, line.Quantity, receipt: true, tracksSerials, serialNumbers, token);
                     if (serialValidation is not null) return serialValidation;
                     var unitCost = decimal.Round(costAmount / line.Quantity, 8, MidpointRounding.AwayFromZero);
                     receiptPlans.Add((line, itemId, warehouseId, costAmount, unitCost, serialNumbers));

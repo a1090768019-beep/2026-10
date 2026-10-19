@@ -1,6 +1,7 @@
 using System.Data.Common;
 using System.Text.Json;
 using BusinessERP.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 
 namespace BusinessERP.Api.Endpoints;
