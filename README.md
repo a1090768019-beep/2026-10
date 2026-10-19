@@ -107,8 +107,10 @@ dotnet run --project src/server/BusinessERP.Api/BusinessERP.Api.csproj --urls ht
 | POST | `/companies/{companyId}/sales-invoice-drafts/{invoiceId}/post-to-ledger` | إنشاء قيد داخلي متوازن وترحيله إلى GL وربطه بالمصدر مرة واحدة |
 | POST | `/companies/{companyId}/sales-vat-preview` | حساب VAT مؤقت لكل بند؛ لا يحفظ المستند أو الضريبة |
 | GET / POST | `/companies/{companyId}/customer-receipts` | عرض/إنشاء سندات قبض داخلية مخصصة لفواتير مبيعات مرحلة |
+| GET | `/companies/{companyId}/customer-receipts/outstanding-invoices` | الفواتير المرحلة التي لها رصيد متبقٍ بعد سندات القبض المرحلة |
 | POST | `/companies/{companyId}/customer-receipts/{receiptId}/post-to-ledger` | ترحيل سند القبض إلى النقدية/البنك والعملاء بقيد متوازن |
 | GET / POST | `/companies/{companyId}/supplier-payments` | عرض/إنشاء سندات صرف داخلية مخصصة لفواتير شراء مرحلة |
+| GET | `/companies/{companyId}/supplier-payments/outstanding-invoices` | فواتير الشراء المرحلة التي لها رصيد متبقٍ بعد سندات الصرف المرحلة |
 | POST | `/companies/{companyId}/supplier-payments/{paymentId}/post-to-ledger` | ترحيل سند الصرف إلى الموردين والنقدية/البنك بقيد متوازن |
 
 تفاصيل DTOs، وقواعد صلاحيات الأدوار، ومتطلبات الإعداد موجودة في `docs/accounting-core-api.md`. تفاصيل واجهات الاشتراك وحدودها موجودة في `docs/subscriptions.md`؛ حالة الأهلية هناك للعرض فقط ولا تمنع الوصول ولا تثبت تحصيل دفعة. الحسابات تتطلب رمزًا واسمًا عربيًا وإنجليزيًا ونوعًا ورصيدًا طبيعيًا. إنشاء القيد يتطلب فترة مفتوحة، وحسابات نشطة وقابلة للترحيل، وسطرين على الأقل ومجموع مدين مساويًا لمجموع دائن.
