@@ -90,6 +90,11 @@ public sealed class ErpApiClient(HttpClient httpClient, Guid tenantId)
         SendJsonAsync<PurchaseDraftVatResult>(
             HttpMethod.Post, $"/api/v1/companies/{companyId:D}/purchase-invoice-drafts/{invoiceId:D}/calculate-vat", request, ct);
 
+    public Task<PurchaseDraftLedgerPostingResult> PostPurchaseDraftToLedgerAsync(
+        Guid companyId, Guid invoiceId, PostPurchaseDraftToLedgerApiRequest request, CancellationToken ct = default) =>
+        SendJsonAsync<PurchaseDraftLedgerPostingResult>(
+            HttpMethod.Post, $"/api/v1/companies/{companyId:D}/purchase-invoice-drafts/{invoiceId:D}/post-to-ledger", request, ct);
+
     public Task<PurchaseVatDetailsApiReport> GetPurchaseVatDetailsReportAsync(
         Guid companyId, DateOnly fromDate, DateOnly toDate, int page = 1, int pageSize = 100, CancellationToken ct = default) =>
         GetObjectAsync<PurchaseVatDetailsApiReport>(
@@ -284,6 +289,12 @@ public sealed record PurchaseDraftVatResult(
 public sealed record PurchaseDraftVatLineResult(
     int LineNumber, string Description, string Treatment, decimal GrossAmount, decimal DiscountAmount,
     decimal NetAmount, decimal VatRatePercent, decimal VatAmount, decimal TotalAmount, string? TreatmentReason);
+public sealed record PostPurchaseDraftToLedgerApiRequest(
+    Guid FiscalPeriodId, string EntryNumber, Guid PurchaseDebitAccountId, Guid PayableAccountId, Guid? InputVatAccountId = null);
+public sealed record PurchaseDraftLedgerPostingResult(
+    Guid PurchaseInvoiceDraftId, Guid JournalEntryId, string EntryNumber, string JournalEntryStatus, DateOnly EntryDate,
+    decimal GrossAmount, decimal DiscountAmount, decimal NetAmount, decimal VatAmount, decimal TotalAmount,
+    bool AlreadyPosted, Guid? InputVatAccountId, string InputVatPostingMode, string Message);
 public sealed record PurchaseVatDetailsApiReport(
     Guid CompanyId, DateOnly FromDate, DateOnly ToDate, int Page, int PageSize, long TotalLines, int TotalPages,
     long InvoiceCount, decimal GrossAmount, decimal DiscountAmount, decimal NetAmount, decimal VatAmount,
