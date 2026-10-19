@@ -176,8 +176,8 @@ public sealed class SettlementsWorkspaceViewModel : INotifyPropertyChanged
 
         SelectedCustomer = Customers.FirstOrDefault(x => x.Id == SelectedCustomer?.Id) ?? Customers.FirstOrDefault();
         SelectedSupplier = Suppliers.FirstOrDefault(x => x.Id == SelectedSupplier?.Id) ?? Suppliers.FirstOrDefault();
-        SelectedSalesInvoice = SalesInvoices.FirstOrDefault(x => x.Id == SelectedSalesInvoice?.Id) ?? SalesInvoices.FirstOrDefault();
-        SelectedPurchaseInvoice = PurchaseInvoices.FirstOrDefault(x => x.Id == SelectedPurchaseInvoice?.Id) ?? PurchaseInvoices.FirstOrDefault();
+        SelectedSalesInvoice = SalesInvoices.FirstOrDefault(x => x.InvoiceId == SelectedSalesInvoice?.InvoiceId) ?? SalesInvoices.FirstOrDefault();
+        SelectedPurchaseInvoice = PurchaseInvoices.FirstOrDefault(x => x.InvoiceId == SelectedPurchaseInvoice?.InvoiceId) ?? PurchaseInvoices.FirstOrDefault();
         SelectedReceipt = Receipts.FirstOrDefault(x => x.Id == SelectedReceipt?.Id) ?? Receipts.FirstOrDefault();
         SelectedPayment = Payments.FirstOrDefault(x => x.Id == SelectedPayment?.Id) ?? Payments.FirstOrDefault();
         SelectedPeriod = FiscalPeriods.FirstOrDefault(x => x.Id == SelectedPeriod?.Id) ?? FiscalPeriods.FirstOrDefault();
