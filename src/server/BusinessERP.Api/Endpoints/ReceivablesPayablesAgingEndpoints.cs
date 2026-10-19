@@ -51,12 +51,18 @@ public static class ReceivablesPayablesAgingEndpoints
                                  SUM(a.allocated_amount)::numeric(20,2) AS settled_amount
                             FROM customer_receipt_allocations a
                             JOIN customer_receipts r ON r.tenant_id=a.tenant_id AND r.company_id=a.company_id AND r.id=a.receipt_id
+                            JOIN journal_entries settlement_je ON settlement_je.tenant_id=r.tenant_id AND settlement_je.company_id=r.company_id
+                                AND settlement_je.id=r.accounting_posted_journal_entry_id AND settlement_je.status='POSTED'
                            WHERE a.tenant_id={tenant.TenantId} AND a.company_id={companyId}
-                             AND r.status='ACCOUNTING_POSTED' AND r.receipt_date <= {reportDate}
+                             AND r.status='ACCOUNTING_POSTED' AND settlement_je.entry_date <= {reportDate}
                            GROUP BY a.tenant_id, a.company_id, a.sales_invoice_draft_id
                       ) settled ON settled.tenant_id=i.tenant_id AND settled.company_id=i.company_id AND settled.invoice_id=i.id
                      WHERE i.tenant_id={tenant.TenantId} AND i.company_id={companyId}
                        AND i.status='ACCOUNTING_POSTED' AND i.issue_date <= {reportDate}
+                       AND EXISTS (SELECT 1 FROM journal_entries invoice_je
+                                    WHERE invoice_je.tenant_id=i.tenant_id AND invoice_je.company_id=i.company_id
+                                      AND invoice_je.id=i.accounting_posted_journal_entry_id
+                                      AND invoice_je.status='POSTED' AND invoice_je.entry_date <= {reportDate})
                 ), open_balances AS (
                     SELECT *,
                            CASE WHEN due_date IS NULL OR due_date >= {reportDate} THEN 0
@@ -94,12 +100,18 @@ public static class ReceivablesPayablesAgingEndpoints
                                  SUM(a.allocated_amount)::numeric(20,2) AS settled_amount
                             FROM customer_receipt_allocations a
                             JOIN customer_receipts r ON r.tenant_id=a.tenant_id AND r.company_id=a.company_id AND r.id=a.receipt_id
+                            JOIN journal_entries settlement_je ON settlement_je.tenant_id=r.tenant_id AND settlement_je.company_id=r.company_id
+                                AND settlement_je.id=r.accounting_posted_journal_entry_id AND settlement_je.status='POSTED'
                            WHERE a.tenant_id={tenant.TenantId} AND a.company_id={companyId}
-                             AND r.status='ACCOUNTING_POSTED' AND r.receipt_date <= {reportDate}
+                             AND r.status='ACCOUNTING_POSTED' AND settlement_je.entry_date <= {reportDate}
                            GROUP BY a.tenant_id, a.company_id, a.sales_invoice_draft_id
                       ) settled ON settled.tenant_id=i.tenant_id AND settled.company_id=i.company_id AND settled.invoice_id=i.id
                      WHERE i.tenant_id={tenant.TenantId} AND i.company_id={companyId}
                        AND i.status='ACCOUNTING_POSTED' AND i.issue_date <= {reportDate}
+                       AND EXISTS (SELECT 1 FROM journal_entries invoice_je
+                                    WHERE invoice_je.tenant_id=i.tenant_id AND invoice_je.company_id=i.company_id
+                                      AND invoice_je.id=i.accounting_posted_journal_entry_id
+                                      AND invoice_je.status='POSTED' AND invoice_je.entry_date <= {reportDate})
                 ), open_balances AS (
                     SELECT *,
                            CASE WHEN due_date IS NULL OR due_date >= {reportDate} THEN 0
@@ -152,12 +164,18 @@ public static class ReceivablesPayablesAgingEndpoints
                                  SUM(a.allocated_amount)::numeric(20,2) AS settled_amount
                             FROM supplier_payment_allocations a
                             JOIN supplier_payments p ON p.tenant_id=a.tenant_id AND p.company_id=a.company_id AND p.id=a.payment_id
+                            JOIN journal_entries settlement_je ON settlement_je.tenant_id=p.tenant_id AND settlement_je.company_id=p.company_id
+                                AND settlement_je.id=p.accounting_posted_journal_entry_id AND settlement_je.status='POSTED'
                            WHERE a.tenant_id={tenant.TenantId} AND a.company_id={companyId}
-                             AND p.status='ACCOUNTING_POSTED' AND p.payment_date <= {reportDate}
+                             AND p.status='ACCOUNTING_POSTED' AND settlement_je.entry_date <= {reportDate}
                            GROUP BY a.tenant_id, a.company_id, a.purchase_invoice_draft_id
                       ) settled ON settled.tenant_id=i.tenant_id AND settled.company_id=i.company_id AND settled.invoice_id=i.id
                      WHERE i.tenant_id={tenant.TenantId} AND i.company_id={companyId}
                        AND i.status='ACCOUNTING_POSTED' AND i.issue_date <= {reportDate}
+                       AND EXISTS (SELECT 1 FROM journal_entries invoice_je
+                                    WHERE invoice_je.tenant_id=i.tenant_id AND invoice_je.company_id=i.company_id
+                                      AND invoice_je.id=i.accounting_posted_journal_entry_id
+                                      AND invoice_je.status='POSTED' AND invoice_je.entry_date <= {reportDate})
                 ), open_balances AS (
                     SELECT *,
                            CASE WHEN due_date IS NULL OR due_date >= {reportDate} THEN 0
@@ -195,12 +213,18 @@ public static class ReceivablesPayablesAgingEndpoints
                                  SUM(a.allocated_amount)::numeric(20,2) AS settled_amount
                             FROM supplier_payment_allocations a
                             JOIN supplier_payments p ON p.tenant_id=a.tenant_id AND p.company_id=a.company_id AND p.id=a.payment_id
+                            JOIN journal_entries settlement_je ON settlement_je.tenant_id=p.tenant_id AND settlement_je.company_id=p.company_id
+                                AND settlement_je.id=p.accounting_posted_journal_entry_id AND settlement_je.status='POSTED'
                            WHERE a.tenant_id={tenant.TenantId} AND a.company_id={companyId}
-                             AND p.status='ACCOUNTING_POSTED' AND p.payment_date <= {reportDate}
+                             AND p.status='ACCOUNTING_POSTED' AND settlement_je.entry_date <= {reportDate}
                            GROUP BY a.tenant_id, a.company_id, a.purchase_invoice_draft_id
                       ) settled ON settled.tenant_id=i.tenant_id AND settled.company_id=i.company_id AND settled.invoice_id=i.id
                      WHERE i.tenant_id={tenant.TenantId} AND i.company_id={companyId}
                        AND i.status='ACCOUNTING_POSTED' AND i.issue_date <= {reportDate}
+                       AND EXISTS (SELECT 1 FROM journal_entries invoice_je
+                                    WHERE invoice_je.tenant_id=i.tenant_id AND invoice_je.company_id=i.company_id
+                                      AND invoice_je.id=i.accounting_posted_journal_entry_id
+                                      AND invoice_je.status='POSTED' AND invoice_je.entry_date <= {reportDate})
                 ), open_balances AS (
                     SELECT *,
                            CASE WHEN due_date IS NULL OR due_date >= {reportDate} THEN 0

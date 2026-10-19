@@ -620,6 +620,43 @@ public sealed class AccountingApiIntegrationTests
                 row.GetProperty("totalAmount").GetDecimal() == 24.99m);
         }
 
+        // Aging reports must execute the real PostgreSQL query and derive historical balances from posted ledger dates.
+        using (var receivablesAgingResponse = await client.GetAsync(
+            $"/api/v1/companies/{CompanyA}/reports/receivables-aging?asOfDate=2026-02-28&page=1&pageSize=100"))
+        {
+            Assert.Equal(HttpStatusCode.OK, receivablesAgingResponse.StatusCode);
+            using var aging = await ParseJsonAsync(receivablesAgingResponse);
+            Assert.Equal(new DateOnly(2026, 2, 28), DateOnly.Parse(aging.RootElement.GetProperty("asOfDate").GetString()!));
+            var invoice = Assert.Single(aging.RootElement.GetProperty("rows").EnumerateArray(),
+                row => row.GetProperty("invoiceId").GetGuid() == draftId);
+            Assert.Equal(24.99m, invoice.GetProperty("invoiceAmount").GetDecimal());
+            Assert.Equal(0m, invoice.GetProperty("settledAmount").GetDecimal());
+            Assert.Equal(24.99m, invoice.GetProperty("outstandingAmount").GetDecimal());
+            Assert.Equal(0, invoice.GetProperty("daysPastDue").GetInt32());
+            Assert.Equal("CURRENT", invoice.GetProperty("agingBucket").GetString());
+        }
+
+        using (var payablesAgingResponse = await client.GetAsync(
+            $"/api/v1/companies/{CompanyA}/reports/payables-aging?asOfDate=2026-02-28&page=1&pageSize=100"))
+        {
+            Assert.Equal(HttpStatusCode.OK, payablesAgingResponse.StatusCode);
+            using var aging = await ParseJsonAsync(payablesAgingResponse);
+            Assert.Equal(0m, aging.RootElement.GetProperty("totalOutstandingAmount").GetDecimal());
+            Assert.Empty(aging.RootElement.GetProperty("rows").EnumerateArray());
+        }
+
+        using (var missingAgingDate = await client.GetAsync(
+            $"/api/v1/companies/{CompanyA}/reports/receivables-aging?page=1&pageSize=100"))
+            Assert.Equal(HttpStatusCode.BadRequest, missingAgingDate.StatusCode);
+
+        using (var excessiveAgingPageSize = await client.GetAsync(
+            $"/api/v1/companies/{CompanyA}/reports/payables-aging?asOfDate=2026-02-28&page=1&pageSize=201"))
+            Assert.Equal(HttpStatusCode.BadRequest, excessiveAgingPageSize.StatusCode);
+
+        using (var crossTenantAging = await client.GetAsync(
+            $"/api/v1/companies/{CompanyB}/reports/receivables-aging?asOfDate=2026-02-28"))
+            Assert.Equal(HttpStatusCode.NotFound, crossTenantAging.StatusCode);
+
         var reversalNumber = "IT-REV-" + Guid.NewGuid().ToString("N");
         using var reversalResponse = await client.PostAsJsonAsync(
             $"/api/v1/journal-entries/{entryId}/reverse",

@@ -6,7 +6,7 @@ import { resolve } from 'node:path';
 const root = resolve(import.meta.dirname, '../..');
 const read = (path) => readFile(resolve(root, path), 'utf8');
 
-test('receivables and payables aging reports are tenant-scoped, as-of-date aware and paginated', async () => {
+test('receivables and payables aging reports use ledger posting dates and enforce tenant/page boundaries', async () => {
   const endpoint = await read('src/server/BusinessERP.Api/Endpoints/ReceivablesPayablesAgingEndpoints.cs');
   const program = await read('src/server/BusinessERP.Api/Program.cs');
   const client = await read('apps/BusinessERP.Desktop/Services/ErpApiClient.cs');
@@ -16,10 +16,9 @@ test('receivables and payables aging reports are tenant-scoped, as-of-date aware
   assert.ok(endpoint.includes('/reports/receivables-aging'));
   assert.ok(endpoint.includes('/reports/payables-aging'));
   assert.match(endpoint, /AllowedRoles\.Contains\(tenant\.RoleCode/);
-  assert.ok(endpoint.includes("i.status='ACCOUNTING_POSTED' AND i.issue_date <= {reportDate}"));
-  assert.ok(endpoint.includes("r.status='ACCOUNTING_POSTED' AND r.receipt_date <= {reportDate}"));
-  assert.ok(endpoint.includes("p.status='ACCOUNTING_POSTED' AND p.payment_date <= {reportDate}"));
-  assert.ok(endpoint.includes('WHERE i.tenant_id={tenant.TenantId} AND i.company_id={companyId}'));
+  assert.equal((endpoint.match(/invoice_je\.entry_date <= \{reportDate\}/g) || []).length, 4);
+  assert.equal((endpoint.match(/settlement_je\.entry_date <= \{reportDate\}/g) || []).length, 4);
+  assert.match(endpoint, /i\.status='ACCOUNTING_POSTED' AND i\.issue_date <= \{reportDate\}/);
   assert.match(endpoint, /pageSize is < 1 or > 200/);
   assert.match(endpoint, /LIMIT \{pageSize\} OFFSET \{offset\}/);
   for (const bucket of ['CURRENT', 'DAYS_1_30', 'DAYS_31_60', 'DAYS_61_90', 'OVER_90']) {
