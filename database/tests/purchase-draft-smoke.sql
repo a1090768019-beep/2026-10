@@ -75,7 +75,7 @@ INSERT INTO accounts (id, tenant_id, company_id, code, name_ar, name_en, account
 VALUES
  ('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee4', '11111111-1111-4111-8111-111111111111', '11111111-1111-4111-8111-111111111101', '5901', 'تكلفة مشتريات الاختبار', 'CI Purchase Expense', 'EXPENSE', 'DEBIT', true, true),
  ('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee5', '11111111-1111-4111-8111-111111111111', '11111111-1111-4111-8111-111111111101', '2101', 'موردون الاختبار', 'CI Accounts Payable', 'LIABILITY', 'CREDIT', true, true),
- ('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee6', '11111111-1111-4111-8111-111111111101', '11111111-1111-4111-8111-111111111101', '1411', 'ضريبة مدخلات الاختبار', 'CI Input VAT', 'ASSET', 'DEBIT', true, true);
+ ('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee6', '11111111-1111-4111-8111-111111111111', '11111111-1111-4111-8111-111111111101', '1411', 'ضريبة مدخلات الاختبار', 'CI Input VAT', 'ASSET', 'DEBIT', true, true);
 
 INSERT INTO journal_entries
     (id, tenant_id, company_id, fiscal_period_id, entry_number, entry_date, description, currency_code, status, source_type, source_id)
