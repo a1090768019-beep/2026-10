@@ -32,6 +32,9 @@ public sealed class SettlementsWorkspaceViewModel : INotifyPropertyChanged
     private string _paymentNotes = "";
     private DateTime _receiptDate = DateTime.Today;
     private DateTime _paymentDate = DateTime.Today;
+    private DateTime? _agingAsOfDate = DateTime.Today;
+    private InvoiceAgingApiReport? _receivablesAgingReport;
+    private InvoiceAgingApiReport? _payablesAgingReport;
     private bool _isBusy;
     private bool _statusIsError;
     private string _statusMessage = "سجّل الدخول واختر الشركة لإدارة سندات القبض والصرف.";
@@ -47,6 +50,8 @@ public sealed class SettlementsWorkspaceViewModel : INotifyPropertyChanged
     public ObservableCollection<ApiAccount> CashAccounts { get; } = [];
     public ObservableCollection<ApiAccount> ReceivableAccounts { get; } = [];
     public ObservableCollection<ApiAccount> PayableAccounts { get; } = [];
+    public ObservableCollection<InvoiceAgingApiRow> ReceivablesAgingRows { get; } = [];
+    public ObservableCollection<InvoiceAgingApiRow> PayablesAgingRows { get; } = [];
 
     public ApiCompany? SelectedCompany { get => _selectedCompany; set { if (Set(ref _selectedCompany, value)) RaiseCommands(); } }
     public ApiCustomer? SelectedCustomer { get => _selectedCustomer; set { if (Set(ref _selectedCustomer, value)) RaiseCommands(); } }
@@ -69,6 +74,42 @@ public sealed class SettlementsWorkspaceViewModel : INotifyPropertyChanged
     public string PaymentNotes { get => _paymentNotes; set => Set(ref _paymentNotes, value); }
     public DateTime ReceiptDate { get => _receiptDate; set => Set(ref _receiptDate, value); }
     public DateTime PaymentDate { get => _paymentDate; set => Set(ref _paymentDate, value); }
+    public DateTime? AgingAsOfDate
+    {
+        get => _agingAsOfDate;
+        set
+        {
+            if (!Set(ref _agingAsOfDate, value)) return;
+            ClearAgingReports();
+            RaiseCommands();
+        }
+    }
+    public InvoiceAgingApiReport? ReceivablesAgingReport
+    {
+        get => _receivablesAgingReport;
+        private set
+        {
+            if (!Set(ref _receivablesAgingReport, value)) return;
+            OnPropertyChanged(nameof(ReceivablesAgingSummary));
+            OnPropertyChanged(nameof(ReceivablesAgingPageLabel));
+            RaiseCommands();
+        }
+    }
+    public InvoiceAgingApiReport? PayablesAgingReport
+    {
+        get => _payablesAgingReport;
+        private set
+        {
+            if (!Set(ref _payablesAgingReport, value)) return;
+            OnPropertyChanged(nameof(PayablesAgingSummary));
+            OnPropertyChanged(nameof(PayablesAgingPageLabel));
+            RaiseCommands();
+        }
+    }
+    public string ReceivablesAgingSummary => ReceivablesAgingReport?.SummaryLabel ?? "حدد تاريخ التقرير ثم اضغط تحديث.";
+    public string PayablesAgingSummary => PayablesAgingReport?.SummaryLabel ?? "حدد تاريخ التقرير ثم اضغط تحديث.";
+    public string ReceivablesAgingPageLabel => ReceivablesAgingReport?.PageLabel ?? "لا يوجد تقرير محمّل";
+    public string PayablesAgingPageLabel => PayablesAgingReport?.PageLabel ?? "لا يوجد تقرير محمّل";
     public bool IsBusy { get => _isBusy; private set { if (Set(ref _isBusy, value)) RaiseCommands(); } }
     public bool StatusIsError { get => _statusIsError; private set => Set(ref _statusIsError, value); }
     public string StatusMessage { get => _statusMessage; private set { if (Set(ref _statusMessage, value)) OnPropertyChanged(nameof(WorkspaceContextSummary)); } }
@@ -93,6 +134,11 @@ public sealed class SettlementsWorkspaceViewModel : INotifyPropertyChanged
     public ICommand PostReceiptCommand { get; }
     public ICommand CreatePaymentCommand { get; }
     public ICommand PostPaymentCommand { get; }
+    public ICommand RefreshAgingReportsCommand { get; }
+    public ICommand PreviousReceivablesAgingPageCommand { get; }
+    public ICommand NextReceivablesAgingPageCommand { get; }
+    public ICommand PreviousPayablesAgingPageCommand { get; }
+    public ICommand NextPayablesAgingPageCommand { get; }
 
     public event PropertyChangedEventHandler? PropertyChanged;
     public event EventHandler? WorkspaceContextChanged;
@@ -104,6 +150,16 @@ public sealed class SettlementsWorkspaceViewModel : INotifyPropertyChanged
         PostReceiptCommand = new AsyncRelayCommand(PostReceiptAsync, () => CanPostReceipt);
         CreatePaymentCommand = new AsyncRelayCommand(CreatePaymentAsync, () => CanCreatePayment);
         PostPaymentCommand = new AsyncRelayCommand(PostPaymentAsync, () => CanPostPayment);
+        RefreshAgingReportsCommand = new AsyncRelayCommand(RefreshAgingReportsAsync,
+            () => _apiClient is not null && SelectedCompany is not null && AgingAsOfDate.HasValue && !IsBusy);
+        PreviousReceivablesAgingPageCommand = new AsyncRelayCommand(
+            PreviousReceivablesAgingPageAsync, () => !IsBusy && ReceivablesAgingReport is { Page: > 1 });
+        NextReceivablesAgingPageCommand = new AsyncRelayCommand(
+            NextReceivablesAgingPageAsync, () => !IsBusy && ReceivablesAgingReport is { } ar && ar.Page < ar.TotalPages);
+        PreviousPayablesAgingPageCommand = new AsyncRelayCommand(
+            PreviousPayablesAgingPageAsync, () => !IsBusy && PayablesAgingReport is { Page: > 1 });
+        NextPayablesAgingPageCommand = new AsyncRelayCommand(
+            NextPayablesAgingPageAsync, () => !IsBusy && PayablesAgingReport is { } ap && ap.Page < ap.TotalPages);
     }
 
     public async Task SetApiClientAsync(ErpApiClient? apiClient)
@@ -150,6 +206,7 @@ public sealed class SettlementsWorkspaceViewModel : INotifyPropertyChanged
     private async Task LoadCompanyDataCoreAsync()
     {
         if (_apiClient is null || SelectedCompany is null) return;
+        ClearAgingReports();
         var companyId = SelectedCompany.Id;
         var customersTask = _apiClient.GetCustomersAsync(companyId);
         var suppliersTask = _apiClient.GetSuppliersAsync(companyId);
@@ -262,6 +319,77 @@ public sealed class SettlementsWorkspaceViewModel : INotifyPropertyChanged
         });
     }
 
+    public async Task RefreshAgingReportsAsync()
+    {
+        if (_apiClient is null || SelectedCompany is null || !AgingAsOfDate.HasValue) return;
+        await RunBusyAsync(async () =>
+        {
+            var client = _apiClient;
+            var companyId = SelectedCompany!.Id;
+            var reportDate = DateOnly.FromDateTime(AgingAsOfDate!.Value);
+            var receivablesTask = client.GetReceivablesAgingAsync(companyId, reportDate, page: 1, pageSize: 100);
+            var payablesTask = client.GetPayablesAgingAsync(companyId, reportDate, page: 1, pageSize: 100);
+            await Task.WhenAll(receivablesTask, payablesTask);
+
+            var receivables = await receivablesTask;
+            var payables = await payablesTask;
+            ReceivablesAgingReport = receivables;
+            PayablesAgingReport = payables;
+            Replace(ReceivablesAgingRows, receivables.Rows);
+            Replace(PayablesAgingRows, payables.Rows);
+            StatusMessage = $"تم تحديث أعمار الذمم المدينة والدائنة حتى {reportDate:yyyy-MM-dd}.";
+            StatusIsError = false;
+        });
+    }
+
+    private Task PreviousReceivablesAgingPageAsync() =>
+        LoadReceivablesAgingPageAsync(Math.Max(1, (ReceivablesAgingReport?.Page ?? 1) - 1));
+
+    private Task NextReceivablesAgingPageAsync() =>
+        LoadReceivablesAgingPageAsync((ReceivablesAgingReport?.Page ?? 1) + 1);
+
+    private Task PreviousPayablesAgingPageAsync() =>
+        LoadPayablesAgingPageAsync(Math.Max(1, (PayablesAgingReport?.Page ?? 1) - 1));
+
+    private Task NextPayablesAgingPageAsync() =>
+        LoadPayablesAgingPageAsync((PayablesAgingReport?.Page ?? 1) + 1);
+
+    private async Task LoadReceivablesAgingPageAsync(int page)
+    {
+        if (_apiClient is null || SelectedCompany is null || !AgingAsOfDate.HasValue || ReceivablesAgingReport is null) return;
+        await RunBusyAsync(async () =>
+        {
+            var report = await _apiClient!.GetReceivablesAgingAsync(
+                SelectedCompany!.Id, DateOnly.FromDateTime(AgingAsOfDate!.Value), page, 100);
+            ReceivablesAgingReport = report;
+            Replace(ReceivablesAgingRows, report.Rows);
+            StatusMessage = $"تم تحميل صفحة أعمار الذمم المدينة {report.Page} من {report.TotalPages}.";
+            StatusIsError = false;
+        });
+    }
+
+    private async Task LoadPayablesAgingPageAsync(int page)
+    {
+        if (_apiClient is null || SelectedCompany is null || !AgingAsOfDate.HasValue || PayablesAgingReport is null) return;
+        await RunBusyAsync(async () =>
+        {
+            var report = await _apiClient!.GetPayablesAgingAsync(
+                SelectedCompany!.Id, DateOnly.FromDateTime(AgingAsOfDate!.Value), page, 100);
+            PayablesAgingReport = report;
+            Replace(PayablesAgingRows, report.Rows);
+            StatusMessage = $"تم تحميل صفحة أعمار الذمم الدائنة {report.Page} من {report.TotalPages}.";
+            StatusIsError = false;
+        });
+    }
+
+    private void ClearAgingReports()
+    {
+        ReceivablesAgingReport = null;
+        PayablesAgingReport = null;
+        ReceivablesAgingRows.Clear();
+        PayablesAgingRows.Clear();
+    }
+
     private async Task RunBusyAsync(Func<Task> action)
     {
         if (IsBusy) return;
@@ -284,6 +412,7 @@ public sealed class SettlementsWorkspaceViewModel : INotifyPropertyChanged
     {
         Customers.Clear(); Suppliers.Clear(); SalesInvoices.Clear(); PurchaseInvoices.Clear(); Receipts.Clear(); Payments.Clear();
         FiscalPeriods.Clear(); CashAccounts.Clear(); ReceivableAccounts.Clear(); PayableAccounts.Clear();
+        ClearAgingReports();
         SelectedCustomer = null; SelectedSupplier = null; SelectedSalesInvoice = null; SelectedPurchaseInvoice = null;
         SelectedReceipt = null; SelectedPayment = null; SelectedPeriod = null; SelectedCashAccount = null;
         SelectedReceivableAccount = null; SelectedPayableAccount = null;
@@ -313,7 +442,9 @@ public sealed class SettlementsWorkspaceViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(WorkspaceContextSummary));
         OnPropertyChanged(nameof(CanCreateReceipt)); OnPropertyChanged(nameof(CanCreatePayment));
         OnPropertyChanged(nameof(CanPostReceipt)); OnPropertyChanged(nameof(CanPostPayment));
-        foreach (var command in new[] { RefreshCommand, CreateReceiptCommand, PostReceiptCommand, CreatePaymentCommand, PostPaymentCommand })
+        foreach (var command in new[] { RefreshCommand, CreateReceiptCommand, PostReceiptCommand, CreatePaymentCommand, PostPaymentCommand,
+                     RefreshAgingReportsCommand, PreviousReceivablesAgingPageCommand, NextReceivablesAgingPageCommand,
+                     PreviousPayablesAgingPageCommand, NextPayablesAgingPageCommand })
             if (command is AsyncRelayCommand asyncCommand) asyncCommand.RaiseCanExecuteChanged();
         WorkspaceContextChanged?.Invoke(this, EventArgs.Empty);
     }
