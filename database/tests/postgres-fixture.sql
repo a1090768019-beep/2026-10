@@ -4,25 +4,32 @@ INSERT INTO subscription_plans
     (id, code, name, billing_interval, price, currency, limits_json, is_active)
 VALUES
     ('33333333-3333-4333-8333-333333333333', 'CI-STARTER', 'CI Starter', 'MONTHLY', 0.0000, 'SAR',
-     '{"companies":1,"users":3,"entriesPerMonth":1000}'::jsonb, true);
+     '{"companies":1,"users":3,"entriesPerMonth":1000}'::jsonb, true),
+    ('44444444-4444-4444-8444-444444444444', 'CI-NO-COMPANIES', 'CI No Companies', 'MONTHLY', 0.0000, 'SAR',
+     '{"companies":0,"users":1,"entriesPerMonth":10}'::jsonb, true);
 
 INSERT INTO tenants (id, slug, name, status) VALUES
 ('11111111-1111-4111-8111-111111111111', 'ci-tenant-a', 'CI Tenant A', 'ACTIVE'),
-('22222222-2222-4222-8222-222222222222', 'ci-tenant-b', 'CI Tenant B', 'ACTIVE');
+('22222222-2222-4222-8222-222222222222', 'ci-tenant-b', 'CI Tenant B', 'ACTIVE'),
+('33333333-3333-4333-8333-333333333301', 'ci-tenant-c', 'CI Tenant C', 'ACTIVE');
 
 INSERT INTO tenant_subscriptions
     (id, tenant_id, subscription_plan_id, status, starts_at, ends_at)
 VALUES
     ('11111111-1111-4111-8111-111111111109', '11111111-1111-4111-8111-111111111111',
-     '33333333-3333-4333-8333-333333333333', 'ACTIVE', '2026-01-01T00:00:00Z', '2027-01-01T00:00:00Z');
+     '33333333-3333-4333-8333-333333333333', 'ACTIVE', '2026-01-01T00:00:00Z', '2027-01-01T00:00:00Z'),
+    ('33333333-3333-4333-8333-333333333309', '33333333-3333-4333-8333-333333333301',
+     '44444444-4444-4444-8444-444444444444', 'ACTIVE', '2026-01-01T00:00:00Z', '2027-01-01T00:00:00Z');
 
 INSERT INTO users (id, oidc_subject, email, display_name) VALUES
 ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'ci-subject-a', 'ci-a@example.invalid', 'CI User A'),
-('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'ci-subject-b', 'ci-b@example.invalid', 'CI User B');
+('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'ci-subject-b', 'ci-b@example.invalid', 'CI User B'),
+('cccccccc-cccc-4ccc-8ccc-ccccccccccc3', 'ci-subject-c', 'ci-c@example.invalid', 'CI User C');
 
 INSERT INTO tenant_memberships (tenant_id, user_id, status, role_code) VALUES
 ('11111111-1111-4111-8111-111111111111', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'ACTIVE', 'OWNER'),
-('22222222-2222-4222-8222-222222222222', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'ACTIVE', 'OWNER');
+('22222222-2222-4222-8222-222222222222', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', 'ACTIVE', 'OWNER'),
+('33333333-3333-4333-8333-333333333301', 'cccccccc-cccc-4ccc-8ccc-ccccccccccc3', 'ACTIVE', 'OWNER');
 
 INSERT INTO companies (id, tenant_id, name, base_currency) VALUES
 ('11111111-1111-4111-8111-111111111101', '11111111-1111-4111-8111-111111111111', 'CI Company A', 'SAR'),
