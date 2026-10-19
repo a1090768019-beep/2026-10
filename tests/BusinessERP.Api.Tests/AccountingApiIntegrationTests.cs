@@ -22,11 +22,64 @@ public sealed class AccountingApiIntegrationTests
 {
     private static readonly Guid TenantA = Guid.Parse("11111111-1111-4111-8111-111111111111");
     private static readonly Guid TenantB = Guid.Parse("22222222-2222-4222-8222-222222222222");
+    private static readonly Guid TenantC = Guid.Parse("33333333-3333-4333-8333-333333333301");
     private static readonly Guid CompanyA = Guid.Parse("11111111-1111-4111-8111-111111111101");
     private static readonly Guid CompanyB = Guid.Parse("22222222-2222-4222-8222-222222222201");
     private static readonly Guid PeriodA = Guid.Parse("11111111-1111-4111-8111-111111111103");
     private static readonly Guid CashAccountA = Guid.Parse("11111111-1111-4111-8111-111111111104");
     private static readonly Guid EquityAccountA = Guid.Parse("11111111-1111-4111-8111-111111111105");
+
+    [RequiresApiPostgresFact]
+    public async Task Tenant_without_active_subscription_is_blocked_except_subscription_views()
+    {
+        var connectionString = Environment.GetEnvironmentVariable("BUSINESS_ERP_TEST_CONNECTION");
+        Assert.False(string.IsNullOrWhiteSpace(connectionString));
+
+        using var factory = new ApiTestFactory(connectionString!);
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Test-Subject", "ci-subject-b");
+        SetTenant(client, TenantB);
+
+        using (var businessResponse = await client.GetAsync("/api/v1/companies"))
+            Assert.Equal(HttpStatusCode.PaymentRequired, businessResponse.StatusCode);
+
+        using (var subscriptionResponse = await client.GetAsync("/api/v1/subscription"))
+        {
+            Assert.Equal(HttpStatusCode.OK, subscriptionResponse.StatusCode);
+            using var subscription = await ParseJsonAsync(subscriptionResponse);
+            Assert.False(subscription.RootElement.GetProperty("hasSubscription").GetBoolean());
+            Assert.False(subscription.RootElement.GetProperty("isEntitled").GetBoolean());
+        }
+
+        using (var plansResponse = await client.GetAsync("/api/v1/subscription-plans"))
+            Assert.Equal(HttpStatusCode.OK, plansResponse.StatusCode);
+    }
+
+    [RequiresApiPostgresFact]
+    public async Task Company_creation_is_rejected_when_subscription_company_limit_is_reached()
+    {
+        var connectionString = Environment.GetEnvironmentVariable("BUSINESS_ERP_TEST_CONNECTION");
+        Assert.False(string.IsNullOrWhiteSpace(connectionString));
+
+        using var factory = new ApiTestFactory(connectionString!);
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Test-Subject", "ci-subject-c");
+        SetTenant(client, TenantC);
+
+        using var response = await client.PostAsJsonAsync("/api/v1/companies", new
+        {
+            name = "شركة تتجاوز الخطة ذات الحصة صفر",
+            baseCurrency = "SAR"
+        });
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        using var json = JsonDocument.Parse(body);
+        Assert.Equal("plan_limit_exceeded", json.RootElement.GetProperty("error").GetString());
+        Assert.Equal("companies", json.RootElement.GetProperty("limitName").GetString());
+        Assert.Equal(0, json.RootElement.GetProperty("limit").GetInt32());
+        Assert.Equal(0, json.RootElement.GetProperty("current").GetInt32());
+    }
 
     [RequiresApiPostgresFact]
     public async Task Tenant_scoping_idempotency_journal_workflow_and_reports_work_end_to_end()
@@ -803,9 +856,15 @@ public sealed class TestAuthHandler(
 
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
+        // Allow an explicit subject only in this test-only authentication handler so integration
+        // tests can verify tenant-specific negative cases without changing production auth code.
+        var subject = Context.Request.Headers.TryGetValue("X-Test-Subject", out var subjectHeader) &&
+                      !string.IsNullOrWhiteSpace(subjectHeader.ToString())
+            ? subjectHeader.ToString()
+            : "ci-subject-a";
         var claims = new[]
         {
-            new Claim("sub", "ci-subject-a"),
+            new Claim("sub", subject),
             new Claim(ClaimTypes.Name, "CI Test User")
         };
         var identity = new ClaimsIdentity(claims, SchemeName);

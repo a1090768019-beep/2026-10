@@ -53,7 +53,7 @@ public sealed class SubscriptionPersistenceTests
         Assert.Equal("SAR", subscription.PlanCurrency.Trim());
         Assert.Equal(0m, subscription.PlanPrice);
         using var limits = JsonDocument.Parse(subscription.LimitsJson);
-        Assert.Equal(1, limits.RootElement.GetProperty("companies").GetInt32());
+        Assert.Equal(2, limits.RootElement.GetProperty("companies").GetInt32());
         Assert.Equal(3, limits.RootElement.GetProperty("users").GetInt32());
 
         // A known foreign tenant identifier is not sufficient to read its rows in this context.

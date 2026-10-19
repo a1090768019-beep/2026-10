@@ -70,6 +70,36 @@ public static class AccountingEndpoints
 
         return await runner.ExecuteAsync<IResult>(async (db, token) =>
         {
+            // Serialize company creation per tenant before counting, so concurrent requests cannot
+            // both consume the last company slot from the same subscription plan.
+            await AcquireTransactionLockAsync(db, $"tenant-company-quota:{tenant.TenantId:D}", token);
+
+            var currentLimitsJson = await (
+                from subscription in db.TenantSubscriptions.AsNoTracking()
+                join plan in db.SubscriptionPlans.AsNoTracking()
+                    on subscription.SubscriptionPlanId equals plan.Id
+                where subscription.TenantId == tenant.TenantId
+                orderby subscription.StartsAt descending, subscription.CreatedAt descending
+                select plan.LimitsJson)
+                .FirstOrDefaultAsync(token);
+
+            var companyLimit = ReadPlanLimit(currentLimitsJson, "companies");
+            if (companyLimit is int maximumCompanies)
+            {
+                var currentCompanies = await db.Companies.CountAsync(x => x.TenantId == tenant.TenantId, token);
+                if (currentCompanies >= maximumCompanies)
+                {
+                    return Results.Conflict(new
+                    {
+                        error = "plan_limit_exceeded",
+                        limitName = "companies",
+                        limit = maximumCompanies,
+                        current = currentCompanies,
+                        message = $"وصلت إلى حد الشركات المسموح به في خطتك ({maximumCompanies}). رقِّ الخطة أو تواصل مع مشغل المنصة."
+                    });
+                }
+            }
+
             var company = new CompanyRecord
             {
                 Id = Guid.NewGuid(), TenantId = tenant.TenantId, Name = name,
@@ -737,6 +767,28 @@ public static class AccountingEndpoints
         db.Database.ExecuteSqlInterpolatedAsync(
             $"SELECT pg_advisory_xact_lock(hashtextextended({lockKey}, 0))",
             cancellationToken);
+
+    private static int? ReadPlanLimit(string? limitsJson, string propertyName)
+    {
+        if (string.IsNullOrWhiteSpace(limitsJson))
+            throw new InvalidOperationException("The active subscription plan has no valid limits_json configuration.");
+
+        using var document = JsonDocument.Parse(limitsJson);
+        if (document.RootElement.ValueKind != JsonValueKind.Object)
+            throw new InvalidOperationException("The active subscription plan limits_json must be a JSON object.");
+
+        if (!document.RootElement.TryGetProperty(propertyName, out var limitElement))
+            return null; // No property means this resource has no configured cap.
+
+        if (limitElement.ValueKind != JsonValueKind.Number ||
+            !limitElement.TryGetInt32(out var limit) ||
+            limit < 0)
+        {
+            throw new InvalidOperationException($"The subscription plan limit '{propertyName}' must be a non-negative integer.");
+        }
+
+        return limit;
+    }
 
     private static bool HasSupportedMoneyPrecision(decimal value) => value >= 0m && value <= 9_999_999_999_999_999.9999m && decimal.Round(value, 4, MidpointRounding.ToEven) == value;
     private static string ComputeHash(CreateJournalEntryRequest request) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(request, JsonOptions))));

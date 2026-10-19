@@ -75,6 +75,55 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next, ILogger<Ten
         }
 
         services.GetRequiredService<TenantContext>().Set(tenantId, user.Id, roleCode);
+
+        // Keep the plan catalogue and subscription-status views available so a tenant can
+        // understand why access is suspended. All business API routes require a current
+        // ACTIVE/TRIALING subscription; payment collection itself is verified only by a
+        // future reviewed billing-provider integration.
+        var requestPath = http.Request.Path.Value?.TrimEnd('/');
+        var isSubscriptionRead =
+            HttpMethods.IsGet(http.Request.Method) &&
+            (string.Equals(requestPath, "/api/v1/subscription", StringComparison.OrdinalIgnoreCase) ||
+             string.Equals(requestPath, "/api/v1/subscription-plans", StringComparison.OrdinalIgnoreCase));
+
+        if (!isSubscriptionRead)
+        {
+            // Subscription rows are protected by PostgreSQL RLS, so this lookup must use the
+            // same transaction-local tenant context as all other tenant data access.
+            var transactionRunner = services.GetRequiredService<TenantTransactionRunner>();
+            var subscriptionState = await transactionRunner.ExecuteAsync(async (tenantDb, token) =>
+            {
+                var subscription = await tenantDb.TenantSubscriptions.AsNoTracking()
+                    .Where(x => x.TenantId == tenantId)
+                    .OrderByDescending(x => x.StartsAt)
+                    .ThenByDescending(x => x.CreatedAt)
+                    .Select(x => new { x.Status, x.StartsAt, x.EndsAt })
+                    .FirstOrDefaultAsync(token);
+
+                var now = DateTime.UtcNow;
+                var withinWindow = subscription is not null &&
+                    subscription.StartsAt <= now &&
+                    (!subscription.EndsAt.HasValue || subscription.EndsAt.Value > now);
+                var entitled = withinWindow && subscription is not null &&
+                    (subscription.Status.Equals("ACTIVE", StringComparison.OrdinalIgnoreCase) ||
+                     subscription.Status.Equals("TRIALING", StringComparison.OrdinalIgnoreCase));
+                return (HasSubscription: subscription is not null, IsEntitled: entitled);
+            }, cancellationToken);
+
+            if (!subscriptionState.IsEntitled)
+            {
+                http.Response.StatusCode = StatusCodes.Status402PaymentRequired;
+                await http.Response.WriteAsJsonAsync(new
+                {
+                    error = "subscription_required_or_inactive",
+                    message = !subscriptionState.HasSubscription
+                        ? "لا يوجد اشتراك مخصص لهذا العميل. راجع حالة الاشتراك أو تواصل مع مشغل المنصة."
+                        : "الاشتراك غير نشط أو انتهت مدته. راجع حالة الاشتراك أو تواصل مع مشغل المنصة."
+                }, cancellationToken);
+                return;
+            }
+        }
+
         await next(http);
     }
 }
