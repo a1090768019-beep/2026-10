@@ -18,6 +18,8 @@ public static class SettlementEndpoints
     {
         endpoints.MapGet("/api/v1/companies/{companyId:guid}/customer-receipts", ListCustomerReceipts)
             .WithName("ListCustomerReceipts").WithTags("Settlements");
+        endpoints.MapGet("/api/v1/companies/{companyId:guid}/customer-receipts/outstanding-invoices", ListOutstandingSalesInvoices)
+            .WithName("ListOutstandingSalesInvoices").WithTags("Settlements");
         endpoints.MapPost("/api/v1/companies/{companyId:guid}/customer-receipts", CreateCustomerReceipt)
             .WithName("CreateCustomerReceipt").WithTags("Settlements");
         endpoints.MapPost("/api/v1/companies/{companyId:guid}/customer-receipts/{receiptId:guid}/post-to-ledger", PostCustomerReceipt)
@@ -25,6 +27,8 @@ public static class SettlementEndpoints
 
         endpoints.MapGet("/api/v1/companies/{companyId:guid}/supplier-payments", ListSupplierPayments)
             .WithName("ListSupplierPayments").WithTags("Settlements");
+        endpoints.MapGet("/api/v1/companies/{companyId:guid}/supplier-payments/outstanding-invoices", ListOutstandingPurchaseInvoices)
+            .WithName("ListOutstandingPurchaseInvoices").WithTags("Settlements");
         endpoints.MapPost("/api/v1/companies/{companyId:guid}/supplier-payments", CreateSupplierPayment)
             .WithName("CreateSupplierPayment").WithTags("Settlements");
         endpoints.MapPost("/api/v1/companies/{companyId:guid}/supplier-payments/{paymentId:guid}/post-to-ledger", PostSupplierPayment)
@@ -46,6 +50,76 @@ public static class SettlementEndpoints
                   JOIN customers c ON c.tenant_id=r.tenant_id AND c.company_id=r.company_id AND c.id=r.customer_id
                  WHERE r.tenant_id={tenant.TenantId} AND r.company_id={companyId}
                  ORDER BY r.receipt_date DESC, r.created_at DESC
+                 LIMIT 500
+                """).ToListAsync(token);
+            return Results.Ok(rows);
+        }, ct);
+    }
+
+    private static async Task<IResult> ListOutstandingSalesInvoices(
+        Guid companyId, ITenantContext tenant, TenantTransactionRunner runner, CancellationToken ct)
+    {
+        if (!AllowedRoles.Contains(tenant.RoleCode, StringComparer.OrdinalIgnoreCase)) return Results.Forbid();
+        return await runner.ExecuteAsync<IResult>(async (db, token) =>
+        {
+            var rows = await db.Database.SqlQuery<OutstandingInvoiceRow>($"""
+                SELECT i.id AS "InvoiceId", i.invoice_number AS "Number", i.issue_date AS "Date",
+                       i.customer_id AS "PartyId", c.name AS "PartyName", i.currency_code AS "CurrencyCode",
+                       i.total_amount AS "InvoiceAmount",
+                       i.total_amount - COALESCE((
+                           SELECT sum(a.allocated_amount)
+                             FROM customer_receipt_allocations a
+                             JOIN customer_receipts r ON r.tenant_id=a.tenant_id AND r.company_id=a.company_id AND r.id=a.receipt_id
+                            WHERE a.tenant_id=i.tenant_id AND a.company_id=i.company_id
+                              AND a.sales_invoice_draft_id=i.id AND r.status='ACCOUNTING_POSTED'
+                       ),0) AS "OutstandingAmount"
+                  FROM sales_invoice_drafts i
+                  JOIN customers c ON c.tenant_id=i.tenant_id AND c.company_id=i.company_id AND c.id=i.customer_id
+                 WHERE i.tenant_id={tenant.TenantId} AND i.company_id={companyId}
+                   AND i.status='ACCOUNTING_POSTED' AND i.total_amount IS NOT NULL
+                   AND i.total_amount - COALESCE((
+                       SELECT sum(a.allocated_amount)
+                         FROM customer_receipt_allocations a
+                         JOIN customer_receipts r ON r.tenant_id=a.tenant_id AND r.company_id=a.company_id AND r.id=a.receipt_id
+                        WHERE a.tenant_id=i.tenant_id AND a.company_id=i.company_id
+                          AND a.sales_invoice_draft_id=i.id AND r.status='ACCOUNTING_POSTED'
+                   ),0) > 0
+                 ORDER BY i.issue_date, i.invoice_number
+                 LIMIT 500
+                """).ToListAsync(token);
+            return Results.Ok(rows);
+        }, ct);
+    }
+
+    private static async Task<IResult> ListOutstandingPurchaseInvoices(
+        Guid companyId, ITenantContext tenant, TenantTransactionRunner runner, CancellationToken ct)
+    {
+        if (!AllowedRoles.Contains(tenant.RoleCode, StringComparer.OrdinalIgnoreCase)) return Results.Forbid();
+        return await runner.ExecuteAsync<IResult>(async (db, token) =>
+        {
+            var rows = await db.Database.SqlQuery<OutstandingInvoiceRow>($"""
+                SELECT i.id AS "InvoiceId", i.purchase_number AS "Number", i.issue_date AS "Date",
+                       i.supplier_id AS "PartyId", s.name AS "PartyName", i.currency_code AS "CurrencyCode",
+                       i.total_amount AS "InvoiceAmount",
+                       i.total_amount - COALESCE((
+                           SELECT sum(a.allocated_amount)
+                             FROM supplier_payment_allocations a
+                             JOIN supplier_payments p ON p.tenant_id=a.tenant_id AND p.company_id=a.company_id AND p.id=a.payment_id
+                            WHERE a.tenant_id=i.tenant_id AND a.company_id=i.company_id
+                              AND a.purchase_invoice_draft_id=i.id AND p.status='ACCOUNTING_POSTED'
+                       ),0) AS "OutstandingAmount"
+                  FROM purchase_invoice_drafts i
+                  JOIN suppliers s ON s.tenant_id=i.tenant_id AND s.company_id=i.company_id AND s.id=i.supplier_id
+                 WHERE i.tenant_id={tenant.TenantId} AND i.company_id={companyId}
+                   AND i.status='ACCOUNTING_POSTED' AND i.total_amount IS NOT NULL
+                   AND i.total_amount - COALESCE((
+                       SELECT sum(a.allocated_amount)
+                         FROM supplier_payment_allocations a
+                         JOIN supplier_payments p ON p.tenant_id=a.tenant_id AND p.company_id=a.company_id AND p.id=a.payment_id
+                        WHERE a.tenant_id=i.tenant_id AND a.company_id=i.company_id
+                          AND a.purchase_invoice_draft_id=i.id AND p.status='ACCOUNTING_POSTED'
+                   ),0) > 0
+                 ORDER BY i.issue_date, i.purchase_number
                  LIMIT 500
                 """).ToListAsync(token);
             return Results.Ok(rows);
@@ -538,6 +612,8 @@ public static class SettlementEndpoints
     public sealed record PostSupplierPaymentRequest(Guid FiscalPeriodId, string? EntryNumber, Guid CashAccountId, Guid PayableAccountId);
     public sealed record SettlementPostingResult(Guid SettlementId, Guid JournalEntryId, string EntryNumber,
         string JournalEntryStatus, DateOnly EntryDate, decimal Amount, bool AlreadyPosted);
+    public sealed record OutstandingInvoiceRow(Guid InvoiceId, string Number, DateOnly Date, Guid PartyId,
+        string PartyName, string CurrencyCode, decimal InvoiceAmount, decimal OutstandingAmount);
     private sealed record NormalizedAllocation(Guid InvoiceId, decimal Amount);
     private sealed record PartyRow(Guid Id, bool IsActive);
     private sealed record SalesInvoiceBalance(Guid InvoiceId, Guid PartyId, string Status, string CurrencyCode, decimal TotalAmount, decimal Outstanding);

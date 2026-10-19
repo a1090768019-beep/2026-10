@@ -46,7 +46,7 @@
                                 <TextBlock Text="العميل"/>
                                 <ComboBox ItemsSource="{Binding Customers}" SelectedItem="{Binding SelectedCustomer}" DisplayMemberPath="Name" Margin="0,4,0,10" MinHeight="30"/>
                                 <TextBlock Text="فاتورة المبيعات المرحلة"/>
-                                <ComboBox ItemsSource="{Binding SalesInvoices}" SelectedItem="{Binding SelectedSalesInvoice}" DisplayMemberPath="InvoiceNumber" Margin="0,4,0,10" MinHeight="30"/>
+                                <ComboBox ItemsSource="{Binding SalesInvoices}" SelectedItem="{Binding SelectedSalesInvoice}" DisplayMemberPath="DisplayLabel" Margin="0,4,0,10" MinHeight="30"/>
                                 <TextBlock Text="تاريخ السند"/>
                                 <DatePicker SelectedDate="{Binding ReceiptDate}" Margin="0,4,0,10"/>
                                 <TextBlock Text="المبلغ"/>
@@ -102,7 +102,7 @@
                                 <TextBlock Text="المورد"/>
                                 <ComboBox ItemsSource="{Binding Suppliers}" SelectedItem="{Binding SelectedSupplier}" DisplayMemberPath="Name" Margin="0,4,0,10" MinHeight="30"/>
                                 <TextBlock Text="فاتورة الشراء المرحلة"/>
-                                <ComboBox ItemsSource="{Binding PurchaseInvoices}" SelectedItem="{Binding SelectedPurchaseInvoice}" DisplayMemberPath="PurchaseNumber" Margin="0,4,0,10" MinHeight="30"/>
+                                <ComboBox ItemsSource="{Binding PurchaseInvoices}" SelectedItem="{Binding SelectedPurchaseInvoice}" DisplayMemberPath="DisplayLabel" Margin="0,4,0,10" MinHeight="30"/>
                                 <TextBlock Text="تاريخ السند"/>
                                 <DatePicker SelectedDate="{Binding PaymentDate}" Margin="0,4,0,10"/>
                                 <TextBlock Text="المبلغ"/>

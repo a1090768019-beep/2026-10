@@ -224,6 +224,12 @@ public sealed class ErpApiClient(HttpClient httpClient, Guid tenantId)
     public Task<IReadOnlyList<CustomerReceiptApiDto>> GetCustomerReceiptsAsync(Guid companyId, CancellationToken ct = default) =>
         GetListAsync<CustomerReceiptApiDto>($"/api/v1/companies/{companyId:D}/customer-receipts", ct);
 
+    public Task<IReadOnlyList<OutstandingInvoiceApiDto>> GetOutstandingSalesInvoicesAsync(Guid companyId, CancellationToken ct = default) =>
+        GetListAsync<OutstandingInvoiceApiDto>($"/api/v1/companies/{companyId:D}/customer-receipts/outstanding-invoices", ct);
+
+    public Task<IReadOnlyList<OutstandingInvoiceApiDto>> GetOutstandingPurchaseInvoicesAsync(Guid companyId, CancellationToken ct = default) =>
+        GetListAsync<OutstandingInvoiceApiDto>($"/api/v1/companies/{companyId:D}/supplier-payments/outstanding-invoices", ct);
+
     public Task<CustomerReceiptApiDto> CreateCustomerReceiptAsync(Guid companyId, CreateCustomerReceiptApiRequest request, CancellationToken ct = default) =>
         SendJsonAsync<CustomerReceiptApiDto>(HttpMethod.Post, $"/api/v1/companies/{companyId:D}/customer-receipts", request, ct);
 
