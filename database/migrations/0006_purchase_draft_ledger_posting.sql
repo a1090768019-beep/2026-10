@@ -5,20 +5,27 @@ BEGIN;
 ALTER TABLE purchase_invoice_drafts
     DROP CONSTRAINT IF EXISTS purchase_invoice_drafts_status_check,
     ADD COLUMN accounting_posted_journal_entry_id uuid NULL,
-    ADD COLUMN accounting_posted_at timestamptz NULL;
+    ADD COLUMN accounting_posted_at timestamptz NULL,
+    ADD COLUMN accounting_input_vat_account_id uuid NULL;
 
 ALTER TABLE purchase_invoice_drafts
     ADD CONSTRAINT ck_purchase_invoice_draft_status
         CHECK (status IN ('DRAFT', 'ACCOUNTING_POSTED')),
     ADD CONSTRAINT ck_purchase_invoice_draft_accounting_link
         CHECK (
-            (status = 'DRAFT' AND accounting_posted_journal_entry_id IS NULL AND accounting_posted_at IS NULL)
+            (status = 'DRAFT' AND accounting_posted_journal_entry_id IS NULL AND accounting_posted_at IS NULL
+             AND accounting_input_vat_account_id IS NULL)
             OR
             (status = 'ACCOUNTING_POSTED' AND accounting_posted_journal_entry_id IS NOT NULL AND accounting_posted_at IS NOT NULL)
         ),
     ADD CONSTRAINT fk_purchase_invoice_draft_posted_journal
         FOREIGN KEY (tenant_id, company_id, accounting_posted_journal_entry_id)
         REFERENCES journal_entries(tenant_id, company_id, id) ON DELETE RESTRICT;
+
+ALTER TABLE purchase_invoice_drafts
+    ADD CONSTRAINT fk_purchase_invoice_draft_input_vat_account
+        FOREIGN KEY (tenant_id, company_id, accounting_input_vat_account_id)
+        REFERENCES accounts(tenant_id, company_id, id) ON DELETE RESTRICT;
 
 CREATE UNIQUE INDEX ux_purchase_invoice_drafts_posted_journal
     ON purchase_invoice_drafts(tenant_id, company_id, accounting_posted_journal_entry_id)
@@ -50,9 +57,9 @@ BEGIN
                 USING ERRCODE = '23514';
         END IF;
 
-        IF (to_jsonb(NEW) - ARRAY['status', 'accounting_posted_journal_entry_id', 'accounting_posted_at'])
+        IF (to_jsonb(NEW) - ARRAY['status', 'accounting_posted_journal_entry_id', 'accounting_posted_at', 'accounting_input_vat_account_id'])
            IS DISTINCT FROM
-           (to_jsonb(OLD) - ARRAY['status', 'accounting_posted_journal_entry_id', 'accounting_posted_at']) THEN
+           (to_jsonb(OLD) - ARRAY['status', 'accounting_posted_journal_entry_id', 'accounting_posted_at', 'accounting_input_vat_account_id']) THEN
             RAISE EXCEPTION 'Posting a purchase draft cannot modify commercial or tax data'
                 USING ERRCODE = '23514';
         END IF;
