@@ -22,7 +22,9 @@
 
 ## Migration validation
 
-The initial schema is still a bootstrap script, not a complete versioned EF Core migration chain. Apply it only to a new, disposable PostgreSQL database until a tested forward-upgrade path is supplied. The SQL and RLS policies have not been executed against PostgreSQL in this environment. Before production, run clean-install, rerun/upgrade, rollback or restore, two-tenant isolation, concurrent idempotency, journal immutability, and runtime-role permission tests against real PostgreSQL.
+The initial schema `0001_initial.sql` is a bootstrap script followed by ordered SQL migrations through `0012_settlement_posting.sql`; this is not yet a managed EF Core migration chain or a verified production upgrade mechanism. Use a new, empty, disposable PostgreSQL database for a clean install. In PowerShell, set `MIGRATIONS_DATABASE_URL` to a PostgreSQL/libpq connection URI (not a .NET semicolon-delimited connection string), then apply every `database/migrations/*.sql` file in lexical filename order with `psql -v ON_ERROR_STOP=1`, stopping immediately on the first nonzero exit code. Do not replay non-idempotent scripts against an already migrated database. Existing production databases require a separately reviewed and tested forward-upgrade plan.
+
+GitHub Actions has executed the ordered migrations and smoke checks on disposable PostgreSQL 17 during CI. This does not verify production upgrade/rollback behavior. Before production, run clean-install, forward-upgrade, rollback or restore, two-tenant isolation, concurrent idempotency, journal immutability, and runtime-role permission tests in the target PostgreSQL environment.
 
 ## Automated PostgreSQL smoke tests
 
