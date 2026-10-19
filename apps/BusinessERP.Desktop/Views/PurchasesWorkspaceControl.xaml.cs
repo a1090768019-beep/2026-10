@@ -1,3 +1,4 @@
+using System.Windows;
 using System.Windows.Controls;
 using BusinessERP.Desktop.Services;
 using BusinessERP.Desktop.ViewModels;
@@ -22,4 +23,7 @@ public partial class PurchasesWorkspaceControl : UserControl
     public Task SetApiClientAsync(ErpApiClient? apiClient) => _viewModel.SetApiClientAsync(apiClient);
     public Task RefreshAsync() => _viewModel.RefreshAsync();
     public void BeginNewPurchaseDraft() => _viewModel.BeginNewPurchaseDraft();
+
+    private void NewPurchase_Click(object sender, RoutedEventArgs e) =>
+        _viewModel.BeginNewPurchaseDraft();
 }
