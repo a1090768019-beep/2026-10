@@ -22,7 +22,7 @@ public partial class MainWindow : Window
             ["Inventory"] = new("Inventory", "المخزون والمستودعات", "الأصناف والوحدات والتحويلات والجرد وتقييم المخزون.", "ST", "لاحقًا"),
             ["CashBank"] = new("CashBank", "الصناديق والبنوك", "سندات القبض والصرف المخصصة للفواتير المرحلة مع ترحيل القيد إلى الأستاذ العام.", "CB", "سندات القبض والصرف مفعّلة"),
             ["Tax"] = new("Tax", "الضرائب والفوترة", "إعدادات ضريبة القيمة المضافة والفوترة الإلكترونية والتكامل مع فاتورة.", "TX", "يتطلب تحققًا رسميًا"),
-            ["Settings"] = new("Settings", "الإعدادات والصلاحيات", "إعدادات الشركة والمستخدمين والأدوار والفروع وسياسات الوصول.", "CFG", "لم تُربط بعد"),
+            ["Settings"] = new("Settings", "الإعدادات والصلاحيات", "إدارة عضويات المستأجر الحالي للمستخدمين المجهزين مسبقًا، مع ضبط الأدوار والحالات وحدود الخطة.", "CFG", "إدارة العضويات عبر API مفعّلة"),
             ["Reports"] = new("Reports", "التقارير المالية", "تقارير الأستاذ العام وميزان المراجعة وقائمة الدخل والميزانية من الحركات المرحلة.", "RPT", "واجهات API موجودة؛ شاشة التقارير قيد الربط"),
         };
 
@@ -368,6 +368,11 @@ public partial class MainWindow : Window
         {
             await ReportsWorkspacePanel.RefreshAsync();
             RibbonStatusText.Text = ReportsWorkspacePanel.WorkspaceStatusMessage;
+        }
+        if (MembershipWorkspacePanel.Visibility == Visibility.Visible && _erpApiClient is not null)
+        {
+            await MembershipWorkspacePanel.RefreshAsync();
+            RibbonStatusText.Text = MembershipWorkspacePanel.WorkspaceStatusMessage;
         }
         await CheckApiHealthAsync();
     }
