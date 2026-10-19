@@ -288,7 +288,7 @@ public sealed class ReportsWorkspaceViewModel : INotifyPropertyChanged
         IncomeSummary = $"الإيرادات {income.TotalRevenue:N2} · المصروفات {income.TotalExpenses:N2} · صافي الدخل {income.NetIncome:N2} {SelectedCurrency}";
         BalanceSummary = $"الأصول {balance.TotalAssets:N2} · الالتزامات {balance.TotalLiabilities:N2} · حقوق الملكية {balance.TotalEquity:N2} · الفرق {balance.Difference:N2} {SelectedCurrency}";
 
-        StatusMessage = "تم تحميل التقارير المالية وتفاصيل VAT من المسودات المحسوبة. تقرير VAT داخلي ولا يمثل فاتورة ضريبية صادرة.";
+        StatusMessage = "تم تحميل تقارير دفتر الأستاذ من القيود بحالة POSTED فقط، مع تفاصيل VAT من مسودات المبيعات المحسوبة. تقرير VAT داخلي ولا يمثل فاتورة ضريبية صادرة.";
         StatusIsError = balance.Difference != 0m;
     }
 
