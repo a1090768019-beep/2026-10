@@ -250,3 +250,21 @@ test('purchase and sales invoice lines are linked atomically to stock receipts/i
   assert.match(smoke, /DOC-SAL-ISSUE-001/);
   assert.match(smoke, /tenant B can view tenant A document-linked stock records/);
 });
+
+test('inventory valuation is calculated from immutable movements as of the requested date and exposes a paged report', async () => {
+  const api = await read('src/server/BusinessERP.Api/Endpoints/InventoryEndpoints.cs');
+  const client = await read('apps/BusinessERP.Desktop/Services/ErpApiClient.cs');
+  const vm = await read('apps/BusinessERP.Desktop/ViewModels/InventoryWorkspaceViewModel.cs');
+  const view = await read('apps/BusinessERP.Desktop/Views/InventoryWorkspaceControl.xaml');
+  assert.match(api, /\/inventory\/valuation/);
+  assert.match(api, /movement\.movement_date <= @as_of_date/);
+  assert.match(api, /sum\(movement\.quantity_delta\)/);
+  assert.match(api, /sum\(movement\.inventory_value_delta\)/);
+  assert.match(api, /total_inventory_value/);
+  assert.match(client, /GetInventoryValuationAsync/);
+  assert.match(client, /InventoryValuationApiReport/);
+  assert.match(vm, /RefreshInventoryValuationAsync/);
+  assert.match(vm, /ValuationAsOfDate/);
+  assert.match(view, /RefreshInventoryValuationCommand/);
+  assert.match(view, /InventoryValuationRows/);
+});
