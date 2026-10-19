@@ -14,7 +14,7 @@ The current-subscription response reports `HasSubscription` and an informational
 ## Explicit limitations
 
 - These endpoints are read-only. They do not create a tenant, change plans, or write subscription rows.
-- `IsEntitled` is informational only. The business API does not yet block requests based on subscription status or enforce plan quotas.
+- The tenant-resolution middleware enforces a minimum subscription gate for business `/api` routes: the latest tenant subscription must be `ACTIVE` or `TRIALING` and within its start/end window. `GET /api/v1/subscription` and `GET /api/v1/subscription-plans` remain available to explain the status. This gate does not prove payment collection and does not enforce plan quotas.
 - No checkout, payment processing, provider webhook, automated renewal, grace-period policy, refund handling, or customer billing portal is implemented.
 - The database does not seed commercial prices or a default paid plan. A trusted platform operator must configure `subscription_plans` and provision a `tenant_subscriptions` row through a reviewed administrative process.
 - `limits_json` is returned as configured reference data; company/user/document counts are not yet measured or enforced.
