@@ -125,6 +125,19 @@ BEGIN
   IF duplicate_inserted THEN
     RAISE EXCEPTION 'Multiple stock movements must not reference the same purchase invoice line';
   END IF;
+
+  BEGIN
+    UPDATE purchase_invoice_draft_lines SET inventory_cost_amount=49.0000
+     WHERE id='99999999-9999-4999-8999-999999999906';
+    RAISE EXCEPTION 'Posted purchase source line must not be mutable';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
+  BEGIN
+    UPDATE sales_invoice_draft_lines SET serial_numbers='[]'::jsonb
+     WHERE id='99999999-9999-4999-8999-999999999914';
+    RAISE EXCEPTION 'Posted sales source line must not be mutable';
+  EXCEPTION WHEN check_violation THEN NULL;
+  END;
 END $$;
 
 SELECT set_config('app.tenant_id','22222222-2222-4222-8222-222222222222',true);

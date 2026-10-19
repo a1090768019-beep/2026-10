@@ -230,6 +230,7 @@ test('purchase and sales invoice lines are linked atomically to stock receipts/i
   assert.match(migration, /purchase_invoice_draft_line_id/);
   assert.match(migration, /sales_invoice_draft_line_id/);
   assert.match(migration, /assert_inventory_document_movement_source/);
+  assert.match(migration, /prevent_posted_document_inventory_line_mutation/);
   assert.match(migration, /IN \('MANUAL', 'PURCHASE'\)/);
   assert.match(service, /InsertDocumentMovementAsync/);
   assert.match(purchaseDraft, /InventoryItemId/);

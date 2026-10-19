@@ -217,4 +217,46 @@ BEGIN
     RETURN NULL;
 END $$;
 
+
+
+-- Once a source line has a stock movement, it is an immutable accounting/inventory source.
+-- This preserves the quantity, warehouse, serial list and cost used by the deferred movement trigger.
+CREATE OR REPLACE FUNCTION prevent_posted_document_inventory_line_mutation() RETURNS trigger
+LANGUAGE plpgsql AS $
+DECLARE
+    has_movement boolean := false;
+BEGIN
+    IF TG_TABLE_NAME = 'purchase_invoice_draft_lines' THEN
+        SELECT EXISTS (
+            SELECT 1 FROM inventory_movements
+             WHERE tenant_id = OLD.tenant_id AND company_id = OLD.company_id
+               AND purchase_invoice_draft_line_id = OLD.id
+        ) INTO has_movement;
+    ELSIF TG_TABLE_NAME = 'sales_invoice_draft_lines' THEN
+        SELECT EXISTS (
+            SELECT 1 FROM inventory_movements
+             WHERE tenant_id = OLD.tenant_id AND company_id = OLD.company_id
+               AND sales_invoice_draft_line_id = OLD.id
+        ) INTO has_movement;
+    END IF;
+
+    IF has_movement THEN
+        RAISE EXCEPTION 'An invoice line linked to a stock movement is immutable; post a correcting document instead'
+            USING ERRCODE = '23514';
+    END IF;
+
+    IF TG_OP = 'DELETE' THEN
+        RETURN OLD;
+    END IF;
+    RETURN NEW;
+END $;
+
+CREATE TRIGGER trg_purchase_draft_line_inventory_source_immutable
+    BEFORE UPDATE OR DELETE ON purchase_invoice_draft_lines
+    FOR EACH ROW EXECUTE FUNCTION prevent_posted_document_inventory_line_mutation();
+
+CREATE TRIGGER trg_sales_draft_line_inventory_source_immutable
+    BEFORE UPDATE OR DELETE ON sales_invoice_draft_lines
+    FOR EACH ROW EXECUTE FUNCTION prevent_posted_document_inventory_line_mutation();
+
 COMMIT;
